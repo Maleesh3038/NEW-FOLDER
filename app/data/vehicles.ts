@@ -14,6 +14,7 @@ export interface Vehicle {
   images?: string[];
   description?: string;
   isAvailable?: boolean;
+  availableDates?: string[]; // නැත්නම් උඹ කෝඩ් එකේ පාවිච්චි කරන ටයිප් එක (Date[])
 }
 
 export const mockVehicles: Vehicle[] = [
