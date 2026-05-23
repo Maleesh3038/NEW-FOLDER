@@ -1,34 +1,27 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { mockVehicles } from './data/vehicles';
 import { T, LangKey } from './translations';
+import { SL_CITIES } from './types';
 import {
-  RawVehicle, Booking, OwnerAccount, CustomerAccount,
-  FLEET_KEY, OWN_ACCS, CUST_ACCS, SESSION_KEY, SL_CITIES,
-  getOwnerAccs, getCustAccs, saveOwnerAccs, saveCustAccs,
-} from './types';
+  supabase,
+  DbOwner, DbCustomer, DbVehicle, DbBooking,
+  registerOwner, loginOwner,
+  registerCustomer, loginCustomer,
+  getAvailableVehicles, getOwnerVehicles,
+  addVehicle, updateVehicle, deleteVehicle as dbDeleteVehicle,
+  toggleVehicleAvailability,
+  createBooking, getCustomerBookings, getOwnerBookings, updateBookingStatus,
+  trackVisitInDB, trackBookingInDB,
+  uploadPhoto,
+  saveSession, getSession, clearSession,
+} from '../lib/supabase';
 
-// ── Traffic helpers (shared with admin)
-const TRAFFIC_KEY = 'drivo_traffic_v1';
-function trackVisit() {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const entries: {date:string;visits:number;bookings:number}[] = JSON.parse(localStorage.getItem(TRAFFIC_KEY)||'[]');
-    const idx = entries.findIndex(e => e.date === today);
-    if (idx > -1) { entries[idx].visits += 1; } else { entries.push({date:today,visits:1,bookings:0}); }
-    localStorage.setItem(TRAFFIC_KEY, JSON.stringify(entries.slice(-30)));
-  } catch {}
-}
-function trackBooking() {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const entries: {date:string;visits:number;bookings:number}[] = JSON.parse(localStorage.getItem(TRAFFIC_KEY)||'[]');
-    const idx = entries.findIndex(e => e.date === today);
-    if (idx > -1) { entries[idx].bookings += 1; } else { entries.push({date:today,visits:0,bookings:1}); }
-    localStorage.setItem(TRAFFIC_KEY, JSON.stringify(entries.slice(-30)));
-  } catch {}
-}
+// ── Local types for UI state
+type RawVehicle = DbVehicle & { images?: string[]; image?: string; isAvailable?: boolean; mapLink?: string; };
+type Booking = DbBooking & { vehicleImg?: string; };
+type OwnerAccount = DbOwner & { fleet?: RawVehicle[]; bookings?: Booking[]; };
+type CustomerAccount = DbCustomer & { bookings?: Booking[]; };
 
 function DrivoLogo({ className = 'w-9 h-9' }: { className?: string }) {
   return (
@@ -124,50 +117,68 @@ export default function Home() {
   const curr = CURRENCIES[currency] ?? CURRENCIES['LKR'];
   const fmt  = (p:number) => `${curr.sign} ${(p*curr.rate).toLocaleString(undefined,{minimumFractionDigits:curr.dec,maximumFractionDigits:curr.dec})}`;
 
+  // ── Normalize vehicle fields (DB uses snake_case, some UI uses camelCase)
+  const vPrice  = (v: any) => v?.price_per_day || v?.pricePerDay || 0;
+  const vShop   = (v: any) => v?.shop_name || v?.shopName || '';
+  const vAvail  = (v: any) => v?.isAvailable !== false && v?.is_available !== false;
+  const vMap    = (v: any) => v?.mapLink || v?.map_link || '';
+  const vImg    = (v: any) => v?.image || (v?.images?.[0]) || v?.vehicle_photos?.[0]?.storage_url || '';
+
   const typeIcon = (tp:string) => tp==='car'?'🚙':tp==='bike'?'🏍️':'🛺';
   const statusColor = (s:string) => s==='confirmed'?'bg-emerald-50 text-emerald-700 border-emerald-200':s==='completed'?'bg-blue-50 text-blue-700 border-blue-200':'bg-amber-50 text-amber-700 border-amber-200';
   const statusLabel = (s:string) => s==='confirmed'?t.confirmed:s==='completed'?t.completed:t.pending;
 
   // ── bootstrap
   useEffect(() => {
-    trackVisit();
-    try {
-      // Clear old mock vehicle data — v4 key = clean slate
-      const CLEAN_KEY = 'drivo_fleet_v4_clean';
-      if (!localStorage.getItem(CLEAN_KEY)) {
-        localStorage.removeItem(FLEET_KEY);
-        localStorage.setItem(CLEAN_KEY, 'true');
-      }
-      const raw = localStorage.getItem(FLEET_KEY);
-      const base: RawVehicle[] = raw ? JSON.parse(raw) : [];
-      if (!raw) localStorage.setItem(FLEET_KEY, JSON.stringify([]));
-      setAllVehicles(base);
-    } catch {}
-    try {
-      const s = localStorage.getItem(SESSION_KEY);
-      if (s) { const {email,role} = JSON.parse(s); restoreSession(email,role); }
-    } catch {}
+    trackVisitInDB().catch(()=>{});
+    // Load vehicles from Supabase
+    getAvailableVehicles().then(vehicles => {
+      const mapped: RawVehicle[] = vehicles.map(v => ({
+        ...v,
+        image: v.vehicle_photos?.[0]?.storage_url || '',
+        images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url) || [],
+        isAvailable: v.is_available,
+        mapLink: v.map_link,
+      }));
+      setAllVehicles(mapped);
+    }).catch(()=>{});
+    // Restore session
+    const s = getSession();
+    if (s) restoreSession(s.id, s.email, s.role);
   }, []);
 
-  const restoreSession = (email:string, role:'owner'|'customer') => {
-    if (role==='owner') {
-      const acc = getOwnerAccs()[email];
-      if (acc) { setSessionEmail(email); setSessionRole('owner'); setOwnerAcc(acc); setOwnerFleet(acc.fleet||[]); setOwnerBookings(acc.bookings||[]); }
+  const restoreSession = async (id: string, email: string, role: 'owner'|'customer') => {
+    if (role === 'owner') {
+      const { data } = await supabase.from('owners').select('*').eq('id', id).single();
+      if (data) {
+        const vehicles = await getOwnerVehicles(id);
+        const fleet: RawVehicle[] = vehicles.map(v => ({
+          ...v, image: v.vehicle_photos?.[0]?.storage_url || '',
+          images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
+          isAvailable: v.is_available, mapLink: v.map_link,
+        }));
+        const { data: bdata } = await supabase.from('bookings').select('*').eq('owner_id', id).order('booked_at', {ascending:false});
+        setSessionEmail(email); setSessionRole('owner');
+        setOwnerAcc({...data, fleet, bookings: bdata||[]});
+        setOwnerFleet(fleet); setOwnerBookings(bdata||[]);
+      }
     } else {
-      const acc = getCustAccs()[email];
-      if (acc) { setSessionEmail(email); setSessionRole('customer'); setCustAcc(acc); }
+      const { data } = await supabase.from('customers').select('*').eq('id', id).single();
+      if (data) {
+        const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', id).order('booked_at', {ascending:false});
+        setSessionEmail(email); setSessionRole('customer');
+        setCustAcc({...data, bookings: bdata||[]});
+      }
     }
   };
 
-  // ── displayed vehicles (merge owner fleets + base)
+  // ── displayed vehicles — filter from allVehicles state
   useEffect(() => {
-    const ownerVehicles: RawVehicle[] = Object.values(getOwnerAccs()).flatMap(a=>(a.fleet||[]).filter(v=>v.isAvailable));
-    const baseAvail = allVehicles.filter(v=>v.isAvailable && !ownerVehicles.find(ov=>ov.id===v.id));
-    let merged = [...ownerVehicles, ...baseAvail];
-    if (filterCity!=='All Sri Lanka') merged=merged.filter(v=>v.location.toLowerCase()===filterCity.toLowerCase());
-    if (filterType!=='all') merged=merged.filter(v=>v.type===filterType);
-    setDisplayed(merged);
-  }, [allVehicles, filterCity, filterType, ownerFleet]);
+    let filtered = allVehicles.filter(v => (v as any).isAvailable !== false && (v as any).is_available !== false);
+    if (filterCity !== 'All Sri Lanka') filtered = filtered.filter(v => v.location?.toLowerCase() === filterCity.toLowerCase());
+    if (filterType !== 'all') filtered = filtered.filter(v => v.type === filterType);
+    setDisplayed(filtered);
+  }, [allVehicles, filterCity, filterType]);
 
   useEffect(() => {
     if (filterPickup && filterReturn) {
@@ -185,7 +196,7 @@ export default function Home() {
 
   // ── logout
   const logout = () => {
-    localStorage.removeItem(SESSION_KEY);
+    clearSession();
     setSessionEmail(null); setSessionRole(null); setOwnerAcc(null); setCustAcc(null);
     setOwnerFleet([]); setOwnerBookings([]); resetToHome(); showToast('Logged out');
   };
@@ -200,60 +211,59 @@ export default function Home() {
   };
 
   // ── owner login/register
-  const handleOwnerLogin = () => {
+  const handleOwnerLogin = async () => {
     setLoginError('');
-    const key = loginEmail.toLowerCase().trim(); const accs = getOwnerAccs();
-    if (!accs[key]) { setLoginError('Account not found. Please register.'); return; }
-    if (accs[key].password !== loginPassword) { setLoginError('Wrong password.'); return; }
-    localStorage.setItem(SESSION_KEY, JSON.stringify({email:key,role:'owner'}));
-    setSessionEmail(key); setSessionRole('owner'); setOwnerAcc(accs[key]);
-    setOwnerFleet(accs[key].fleet||[]); setOwnerBookings(accs[key].bookings||[]);
-    setView('ownerDash'); showToast(`Welcome, ${accs[key].profile.shopName}! 👋`);
+    if (!loginEmail.trim() || !loginPassword.trim()) { setLoginError('Email and password required'); return; }
+    const { data, error } = await loginOwner(loginEmail, loginPassword);
+    if (error || !data) { setLoginError(error || 'Login failed'); return; }
+    saveSession({ id: data.id!, email: data.email, role: 'owner' });
+    await restoreSession(data.id!, data.email, 'owner');
+    setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 👋`);
   };
-  const handleOwnerRegister = () => {
+
+  const handleOwnerRegister = async () => {
     setRegError('');
     if (!regEmail.trim()) { setRegError('Email required'); return; }
-    if (regPassword.length<6) { setRegError('Password min 6 chars'); return; }
-    if (regPassword!==regConfirm) { setRegError('Passwords do not match'); return; }
+    if (regPassword.length < 6) { setRegError('Password min 6 chars'); return; }
+    if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; }
     if (!regShop.trim()) { setRegError('Shop name required'); return; }
     if (!regPhone.trim()) { setRegError('Phone required'); return; }
-    const key = regEmail.toLowerCase().trim(); const accs = getOwnerAccs();
-    if (accs[key]) { setRegError('Email already registered.'); return; }
-    const newAcc: OwnerAccount = { email:key, password:regPassword,
-      profile:{shopName:regShop,ownerName:regFirst+' '+regLast,phone:regPhone,whatsapp:regPhone,city:regCity},
-      fleet:[], bookings:[] };
-    accs[key]=newAcc; saveOwnerAccs(accs);
-    localStorage.setItem(SESSION_KEY, JSON.stringify({email:key,role:'owner'}));
-    setSessionEmail(key); setSessionRole('owner'); setOwnerAcc(newAcc);
-    setOwnerFleet([]); setOwnerBookings([]);
-    setView('ownerDash'); showToast(`Welcome, ${regShop}! 🎉`);
+    const { data, error } = await registerOwner(regEmail, regPassword, {
+      shopName: regShop, ownerName: regFirst + ' ' + regLast,
+      phone: regPhone, whatsapp: regPhone, city: regCity,
+    });
+    if (error || !data) { setRegError(error || 'Registration failed'); return; }
+    saveSession({ id: data.id!, email: data.email, role: 'owner' });
+    setSessionEmail(data.email); setSessionRole('owner');
+    setOwnerAcc({...data, fleet:[], bookings:[]}); setOwnerFleet([]); setOwnerBookings([]);
+    setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 🎉`);
   };
 
   // ── customer login/register
-  const handleCustLogin = () => {
+  const handleCustLogin = async () => {
     setLoginError('');
-    const key = loginEmail.toLowerCase().trim(); const accs = getCustAccs();
-    if (!accs[key]) { setLoginError('Account not found. Please register.'); return; }
-    if (accs[key].password !== loginPassword) { setLoginError('Wrong password.'); return; }
-    localStorage.setItem(SESSION_KEY, JSON.stringify({email:key,role:'customer'}));
-    setSessionEmail(key); setSessionRole('customer'); setCustAcc(accs[key]);
-    setView('custDash'); showToast(`Welcome back, ${accs[key].profile.firstName}! 👋`);
+    const { data, error } = await loginCustomer(loginEmail, loginPassword);
+    if (error || !data) { setLoginError(error || 'Login failed'); return; }
+    saveSession({ id: data.id!, email: data.email, role: 'customer' });
+    await restoreSession(data.id!, data.email, 'customer');
+    setView('custDash'); showToast(`Welcome back, ${data.first_name}! 👋`);
   };
-  const handleCustRegister = () => {
+
+  const handleCustRegister = async () => {
     setRegError('');
     if (!regEmail.trim()) { setRegError('Email required'); return; }
-    if (regPassword.length<6) { setRegError('Password min 6 chars'); return; }
-    if (regPassword!==regConfirm) { setRegError('Passwords do not match'); return; }
+    if (regPassword.length < 6) { setRegError('Password min 6 chars'); return; }
+    if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; }
     if (!regFirst.trim()) { setRegError('First name required'); return; }
     if (!regPhone.trim()) { setRegError('Phone required'); return; }
-    const key = regEmail.toLowerCase().trim(); const accs = getCustAccs();
-    if (accs[key]) { setRegError('Email already registered.'); return; }
-    const newAcc: CustomerAccount = { email:key, password:regPassword,
-      profile:{firstName:regFirst,lastName:regLast,phone:regPhone,city:regCity}, bookings:[] };
-    accs[key]=newAcc; saveCustAccs(accs);
-    localStorage.setItem(SESSION_KEY, JSON.stringify({email:key,role:'customer'}));
-    setSessionEmail(key); setSessionRole('customer'); setCustAcc(newAcc);
-    setView('custDash'); showToast(`Welcome, ${regFirst}! 🎉`);
+    const { data, error } = await registerCustomer(regEmail, regPassword, {
+      firstName: regFirst, lastName: regLast, phone: regPhone, city: regCity,
+    });
+    if (error || !data) { setRegError(error || 'Registration failed'); return; }
+    saveSession({ id: data.id!, email: data.email, role: 'customer' });
+    setSessionEmail(data.email); setSessionRole('customer');
+    setCustAcc({...data, bookings:[]});
+    setView('custDash'); showToast(`Welcome, ${data.first_name}! 🎉`);
   };
 
   const handleLogin    = () => authMode==='owner' ? handleOwnerLogin()    : handleCustLogin();
@@ -268,41 +278,69 @@ export default function Home() {
   }, [sessionEmail]);
 
   // ── vehicle submit
-  const handleVehicleSubmit = (e: React.FormEvent) => {
+  const handleVehicleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newV.name.trim()) { showToast('Vehicle name required!','err'); return; }
     if (photos.length < 3) { showToast('Minimum 3 photos required!','err'); return; }
-    const img = photos[0];
+
+    const ownerId = ownerAcc?.id;
+    if (!ownerId) { showToast('Please login again','err'); return; }
 
     if (editingId) {
-      const next = ownerFleet.map(v => v.id===editingId
-        ? {...v,...newV,type:newV.type as any,pricePerDay:Number(newV.pricePerDay),
-           image:img, images:[...photos], mapLink:newV.mapLink||undefined} : v);
-      saveOwnerFleet(next); showToast('Vehicle updated ✓');
+      const { error } = await updateVehicle(editingId, {
+        name: newV.name, type: newV.type as any,
+        transmission: newV.transmission, fuel: newV.fuel,
+        price_per_day: Number(newV.pricePerDay),
+        description: newV.description, map_link: newV.mapLink,
+      }, photos);
+      if (error) { showToast(error, 'err'); return; }
+      showToast('Vehicle updated ✓');
     } else {
-      const fresh: RawVehicle = {
-        id:`v-${Date.now()}`, name:newV.name, type:newV.type as any,
-        transmission:newV.transmission, fuel:newV.fuel, pricePerDay:Number(newV.pricePerDay),
-        shopName:ownerAcc?.profile.shopName||'', location:ownerAcc?.profile.city||'Colombo',
-        rating:5.0, image:img, images:[...photos],
-        description:newV.description||'', isAvailable:true,
-        mapLink:newV.mapLink||undefined,
-      };
-      saveOwnerFleet([fresh,...ownerFleet]); showToast('Vehicle published! 🚀');
+      const { id, error } = await addVehicle({
+        owner_id: ownerId,
+        name: newV.name, type: newV.type as any,
+        transmission: newV.transmission, fuel: newV.fuel,
+        price_per_day: Number(newV.pricePerDay),
+        location: ownerAcc?.city || 'Colombo',
+        shop_name: ownerAcc?.shop_name || '',
+        description: newV.description, map_link: newV.mapLink,
+      }, photos);
+      if (error || !id) { showToast(error || 'Failed', 'err'); return; }
+      showToast('Vehicle published! 🚀');
     }
+
+    // Refresh fleet
+    const vehicles = await getOwnerVehicles(ownerId);
+    const fleet: RawVehicle[] = vehicles.map(v => ({
+      ...v, image: v.vehicle_photos?.[0]?.storage_url || '',
+      images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
+      isAvailable: v.is_available, mapLink: v.map_link,
+    }));
+    setOwnerFleet(fleet);
+    setAllVehicles(await getAvailableVehicles().then(vs => vs.map(v => ({
+      ...v, image: v.vehicle_photos?.[0]?.storage_url||'',
+      images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
+      isAvailable: v.is_available, mapLink: v.map_link,
+    }))));
+
     setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:''});
     setPhotos([]); setShowAddForm(false); setEditingId(null);
   };
 
-  const toggleAvail = (id:string) => {
-    const next = ownerFleet.map(v => v.id===id ? {...v,isAvailable:!v.isAvailable} : v);
-    saveOwnerFleet(next);
-    const v = ownerFleet.find(v=>v.id===id);
-    showToast(v?.isAvailable ? `"${v.name}" hidden` : `"${v?.name}" is now live!`);
+  const toggleAvail = async (id: string) => {
+    const v = ownerFleet.find(v => v.id === id);
+    if (!v) return;
+    await toggleVehicleAvailability(id, !vAvail(v));
+    const updated = ownerFleet.map(x => x.id === id ? {...x, isAvailable: !x.isAvailable} : x);
+    setOwnerFleet(updated);
+    showToast(vAvail(v) ? `"${v.name}" hidden` : `"${v.name}" is now live!`);
   };
-  const deleteVehicle = (id:string) => {
-    if (!confirm('Delete?')) return;
-    saveOwnerFleet(ownerFleet.filter(v=>v.id!==id)); showToast('Deleted','err');
+
+  const deleteVehicle = async (id: string) => {
+    if (!confirm('Delete this vehicle?')) return;
+    await dbDeleteVehicle(id);
+    setOwnerFleet(ownerFleet.filter(v => v.id !== id));
+    showToast('Deleted','err');
   };
   const processImg = (file: File) => {
     if (photos.length >= 5) { showToast('Maximum 5 photos allowed', 'err'); return; }
@@ -325,33 +363,35 @@ export default function Home() {
   };
 
   // ── confirm booking (customer)
-  const base   = selectedVehicle ? selectedVehicle.pricePerDay*days : 0;
+  const base   = selectedVehicle ? (selectedVehicle.price_per_day || (selectedVehicle as any).pricePerDay || 0) * days : 0;
   const delFee = deliveryType==='delivery' ? 1500 : 0;
   const total  = base+delFee;
 
-  const confirmBooking = () => {
+  const confirmBooking = async () => {
     if (!selectedVehicle) return;
-    const booking: Booking = {
-      id:`b-${Date.now()}`, vehicleId:selectedVehicle.id,
-      vehicleName:selectedVehicle.name, vehicleImg:selectedVehicle.image,
-      shopName:selectedVehicle.shopName, location:selectedVehicle.location,
-      pickupDate:filterPickup||new Date().toISOString().split('T')[0],
-      returnDate:filterReturn||new Date(Date.now()+days*86400000).toISOString().split('T')[0],
-      days, deliveryType, pricePerDay:selectedVehicle.pricePerDay, total,
-      status:'pending', bookedAt:new Date().toISOString(),
+    const today = new Date().toISOString().split('T')[0];
+    const booking = {
+      vehicle_id: selectedVehicle.id,
+      owner_id: selectedVehicle.owner_id,
+      customer_id: sessionRole === 'customer' ? custAcc?.id : undefined,
+      vehicle_name: selectedVehicle.name || '',
+      vehicle_img: selectedVehicle.image || '',
+      shop_name: selectedVehicle.shop_name || vShop(selectedVehicle) || '',
+      location: selectedVehicle.location || '',
+      pickup_date: filterPickup || today,
+      return_date: filterReturn || today,
+      days, delivery_type: deliveryType,
+      price_per_day: selectedVehicle.price_per_day || vPrice(selectedVehicle) || 0,
+      total, status: 'pending' as const,
     };
-    if (sessionRole==='customer' && sessionEmail) {
-      const caccs = getCustAccs();
-      if (caccs[sessionEmail]) {
-        caccs[sessionEmail].bookings = [booking,...(caccs[sessionEmail].bookings||[])];
-        saveCustAccs(caccs); setCustAcc({...caccs[sessionEmail]});
-      }
+    const { error } = await createBooking(booking);
+    if (error) { showToast('Booking failed: ' + error, 'err'); return; }
+    if (sessionRole === 'customer' && custAcc?.id) {
+      const bdata = await getCustomerBookings(custAcc.id);
+      setCustAcc(prev => prev ? {...prev, bookings: bdata} : prev);
     }
-    const oaccs = getOwnerAccs();
-    const ownerEntry = Object.values(oaccs).find(a=>a.profile.shopName===selectedVehicle.shopName);
-    if (ownerEntry) { ownerEntry.bookings=[booking,...(ownerEntry.bookings||[])]; oaccs[ownerEntry.email]=ownerEntry; saveOwnerAccs(oaccs); }
+    await trackBookingInDB().catch(()=>{});
     setBookingDone(true);
-    trackBooking(); // track for admin analytics
   };
 
   // ══════════════════════════════════════════════════════════════════
@@ -693,7 +733,7 @@ export default function Home() {
                 <div className="hidden sm:flex items-center gap-3 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
                   <span>{ownerFleet.length} {t.total}</span>
                   <span className="text-slate-300">|</span>
-                  <span className="text-emerald-600">{ownerFleet.filter(v=>v.isAvailable).length} {t.live}</span>
+                  <span className="text-emerald-600">{ownerFleet.filter(v=>vAvail(v)).length} {t.live}</span>
                   <span className="text-slate-300">|</span>
                   <span className="text-amber-500">{ownerBookings.filter(b=>b.status==='pending').length} {t.pending}</span>
                 </div>
@@ -886,7 +926,7 @@ export default function Home() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-black text-slate-800 text-base">{t.yourFleet}</h3>
-                    <span className="text-xs font-bold text-slate-500">{ownerFleet.filter(v=>v.isAvailable).length} {t.live} · {ownerFleet.filter(v=>!v.isAvailable).length} {t.hidden}</span>
+                    <span className="text-xs font-bold text-slate-500">{ownerFleet.filter(v=>vAvail(v)).length} {t.live} · {ownerFleet.filter(v=>!vAvail(v)).length} {t.hidden}</span>
                   </div>
                   {ownerFleet.length===0 ? (
                     <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20">
@@ -896,21 +936,21 @@ export default function Home() {
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                       {ownerFleet.map(v=>(
-                        <div key={v.id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition ${v.isAvailable?'border-slate-200':'border-slate-200 opacity-70'}`}>
+                        <div key={v.id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition ${vAvail(v)?'border-slate-200':'border-slate-200 opacity-70'}`}>
                           <div className="relative aspect-[16/9] bg-slate-100 overflow-hidden">
                             <img src={v.image} alt={v.name} className="w-full h-full object-cover"/>
-                            <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shadow-sm ${v.isAvailable?'bg-emerald-500 text-white':'bg-slate-700 text-white'}`}>{v.isAvailable?t.liveLabel:t.hiddenLabel}</div>
+                            <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shadow-sm ${vAvail(v)?'bg-emerald-500 text-white':'bg-slate-700 text-white'}`}>{vAvail(v)?t.liveLabel:t.hiddenLabel}</div>
                             <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-black">{typeIcon(v.type)}</div>
                           </div>
                           <div className="p-4">
                             <div className="flex items-start justify-between gap-2 mb-1">
                               <h4 className="font-black text-slate-900 text-sm leading-tight">{v.name}</h4>
-                              <div className="text-right flex-shrink-0"><p className="font-black text-slate-900 text-sm">Rs.{v.pricePerDay.toLocaleString()}</p><p className="text-[10px] text-slate-400">/day</p></div>
+                              <div className="text-right flex-shrink-0"><p className="font-black text-slate-900 text-sm">Rs.{vPrice(v).toLocaleString()}</p><p className="text-[10px] text-slate-400">/day</p></div>
                             </div>
                             <p className="text-xs text-slate-400 mb-3">{v.transmission} · {v.fuel} · {v.location}</p>
                             <div className="flex gap-2 pt-3 border-t border-slate-100">
-                              <button onClick={()=>toggleAvail(v.id)} className={`flex-1 py-2 rounded-xl font-black text-[11px] uppercase tracking-wide border transition ${v.isAvailable?'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600':'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>{v.isAvailable?t.hide:t.goLive}</button>
-                              <button onClick={()=>{ setEditingId(v.id); setShowAddForm(false); setNewV({name:v.name,type:v.type,transmission:v.transmission,fuel:v.fuel,pricePerDay:v.pricePerDay,description:v.description||'',mapLink:(v as any).mapLink||''}); setPhotos(v.images&&v.images.length>0?[...v.images]:[v.image]); window.scrollTo({top:0,behavior:'smooth'}); }} className="flex-1 py-2 rounded-xl font-black text-[11px] uppercase border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition">Edit</button>
+                              <button onClick={()=>toggleAvail(v.id)} className={`flex-1 py-2 rounded-xl font-black text-[11px] uppercase tracking-wide border transition ${vAvail(v)?'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600':'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>{vAvail(v)?t.hide:t.goLive}</button>
+                              <button onClick={()=>{ setEditingId(v.id); setShowAddForm(false); setNewV({name:v.name,type:v.type,transmission:v.transmission,fuel:v.fuel,pricePerDay:vPrice(v),description:v.description||'',mapLink:(v as any).mapLink||''}); setPhotos(v.images&&v.images.length>0?[...v.images]:[v.image]); window.scrollTo({top:0,behavior:'smooth'}); }} className="flex-1 py-2 rounded-xl font-black text-[11px] uppercase border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition">Edit</button>
                               <button onClick={()=>deleteVehicle(v.id)} className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition">🗑</button>
                             </div>
                           </div>
@@ -990,10 +1030,10 @@ export default function Home() {
                             <span className="text-[9px] font-extrabold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase ml-auto">{v.location}</span>
                           </div>
                           <h3 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-red-500 transition-colors">{v.name}</h3>
-                          <p className="text-xs text-slate-400 mt-1">{v.shopName}</p>
+                          <p className="text-xs text-slate-400 mt-1">{vShop(v)}</p>
                         </div>
                         <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100">
-                          <div><p className="text-[10px] text-slate-400 font-bold uppercase">{t.perDay}</p><span className="text-base font-black text-slate-900">{fmt(v.pricePerDay)}</span></div>
+                          <div><p className="text-[10px] text-slate-400 font-bold uppercase">{t.perDay}</p><span className="text-base font-black text-slate-900">{fmt(vPrice(v))}</span></div>
                           <div className="flex items-center gap-1"><span className="text-amber-400 text-xs">★</span><span className="text-xs font-bold text-slate-700">{v.rating.toFixed(1)}</span></div>
                         </div>
                       </div>
@@ -1032,7 +1072,7 @@ export default function Home() {
                 <div className="max-w-md mx-auto text-center py-16">
                   <div className="text-6xl mb-4">🎉</div>
                   <h2 className="text-2xl font-black text-slate-900 mb-2">{t.bookingSent}</h2>
-                  <p className="text-slate-500 text-sm mb-6">{selectedVehicle.shopName} will contact you via WhatsApp within 30 minutes.</p>
+                  <p className="text-slate-500 text-sm mb-6">{vShop(selectedVehicle)} will contact you via WhatsApp within 30 minutes.</p>
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-sm space-y-2 mb-6">
                     {([[t.vehicleRented,selectedVehicle.name],['Days',`${days} day${days>1?'s':''}`],[t.total,`Rs. ${total.toLocaleString()}`]] as [string,string][]).map(([k,v])=>(
                       <div key={k} className="flex justify-between"><span className="text-slate-500">{k}</span><span className="font-bold">{v}</span></div>
@@ -1054,7 +1094,7 @@ export default function Home() {
                         <span className="text-xs text-amber-500 font-bold">★ {selectedVehicle.rating.toFixed(1)}</span>
                       </div>
                       <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{selectedVehicle.name}</h2>
-                      <p className="text-sm text-slate-500 mt-1">{selectedVehicle.shopName} · <span className="text-blue-600 font-medium">{selectedVehicle.location}</span></p>
+                      <p className="text-sm text-slate-500 mt-1">{vShop(selectedVehicle)} · <span className="text-blue-600 font-medium">{selectedVehicle.location}</span></p>
                       {(selectedVehicle as any).mapLink && (
                         <a href={(selectedVehicle as any).mapLink} target="_blank" rel="noopener noreferrer"
                           className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition shadow-sm">
@@ -1086,7 +1126,7 @@ export default function Home() {
                   <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl space-y-4 lg:sticky lg:top-24">
                     <div className="flex items-baseline justify-between">
                       <h3 className="font-black text-lg text-slate-900">{t.bookThisRide}</h3>
-                      <span className="text-sm font-black text-red-500">{fmt(selectedVehicle.pricePerDay)}<span className="text-xs font-semibold text-slate-400">/{t.perDay.toLowerCase()}</span></span>
+                      <span className="text-sm font-black text-red-500">{fmt(vPrice(selectedVehicle))}<span className="text-xs font-semibold text-slate-400">/{t.perDay.toLowerCase()}</span></span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.pickupDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterPickup} onChange={e=>setFilterPickup(e.target.value)}/></div>
@@ -1109,7 +1149,7 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
-                      <div className="flex justify-between"><span>{fmt(selectedVehicle.pricePerDay)} × {days}d</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
+                      <div className="flex justify-between"><span>{fmt(vPrice(selectedVehicle))} × {days}d</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
                       {deliveryType==='delivery' && <div className="flex justify-between"><span>{t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
                       <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>{t.total}</span><span className="text-red-500">{fmt(total)}</span></div>
                     </div>
