@@ -391,6 +391,35 @@ export default function Home() {
       setCustAcc(prev => prev ? {...prev, bookings: bdata} : prev);
     }
     await trackBookingInDB().catch(()=>{});
+
+    // ── Send SMS notifications
+    try {
+      // Get owner phone from DB
+      const { data: ownerData } = await supabase
+        .from('owners')
+        .select('phone, whatsapp')
+        .eq('id', selectedVehicle.owner_id)
+        .single();
+
+      await fetch('/api/sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'booking',
+          ownerPhone:    ownerData?.whatsapp || ownerData?.phone || '',
+          customerPhone: sessionRole === 'customer' ? (custAcc?.phone || '') : '',
+          vehicleName:   selectedVehicle.name,
+          shopName:      selectedVehicle.shop_name || '',
+          pickupDate:    filterPickup || new Date().toISOString().split('T')[0],
+          returnDate:    filterReturn || new Date().toISOString().split('T')[0],
+          days,
+          total,
+        }),
+      });
+    } catch (smsErr) {
+      console.log('SMS failed (non-critical):', smsErr);
+    }
+
     setBookingDone(true);
   };
 
