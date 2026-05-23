@@ -837,9 +837,16 @@ export default function Home() {
                     <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none cursor-pointer" value={ownerEditData.city} onChange={e=>setOwnerEditData({...ownerEditData,city:e.target.value})}>
                       {SL_CITIES.slice(1).map(c=><option key={c}>{c}</option>)}
                     </select></div>
-                  <button onClick={()=>{
-                    if(!sessionEmail) return;
-                    const accs=getOwnerAccs(); if(accs[sessionEmail]){ accs[sessionEmail].profile=ownerEditData; saveOwnerAccs(accs); setOwnerAcc({...accs[sessionEmail]}); }
+                  <button onClick={async ()=>{
+                    if(!sessionEmail || !ownerAcc?.id) return;
+                    await supabase.from('owners').update({
+                      shop_name: ownerEditData.shopName,
+                      owner_name: ownerEditData.ownerName,
+                      phone: ownerEditData.phone,
+                      whatsapp: ownerEditData.whatsapp,
+                      city: ownerEditData.city,
+                    }).eq('id', ownerAcc.id);
+                    setOwnerAcc({...ownerAcc, shop_name:ownerEditData.shopName, owner_name:ownerEditData.ownerName, phone:ownerEditData.phone, whatsapp:ownerEditData.whatsapp, city:ownerEditData.city});
                     setOwnerEditOpen(false); showToast(t.profileUpdated);
                   }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.saveProfile}</button>
                 </div>
@@ -870,9 +877,22 @@ export default function Home() {
                       </div>
                     </div>
                     {b.status==='pending' && (
-                      <div className="border-t border-slate-100 px-4 py-2.5 flex gap-2">
-                        <button onClick={()=>updateBookingStatus(b.id,'confirmed')} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase transition">{t.accept}</button>
-                        <button className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">{t.decline}</button>
+                      <div className="border-t border-slate-100 px-4 py-3 space-y-2">
+                        <div className="flex gap-2">
+                          <button onClick={()=>updateBookingStatus(b.id,'confirmed')}
+                            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-black text-xs uppercase tracking-wide transition shadow-sm flex items-center justify-center gap-1.5">
+                            ✓ {t.accept}
+                          </button>
+                          <button onClick={async ()=>{
+                            await updateBookingStatus_db(b.id, 'pending');
+                            const next = ownerBookings.filter(x => x.id !== b.id);
+                            setOwnerBookings(next);
+                            showToast('Booking declined');
+                          }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
+                            ✕ {t.decline}
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 text-center">Accept karama customer ekata SMS yannawa automatically</p>
                       </div>
                     )}
                     {b.status==='confirmed' && (
@@ -1138,14 +1158,34 @@ export default function Home() {
                   <div className="text-6xl mb-4">🎉</div>
                   <h2 className="text-2xl font-black text-slate-900 mb-2">{t.bookingSent}</h2>
                   <p className="text-slate-500 text-sm mb-6">{vShop(selectedVehicle)} will contact you via WhatsApp within 30 minutes.</p>
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-sm space-y-2 mb-6">
+
+                  {/* Booking summary */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-sm space-y-2 mb-4">
                     {([[t.vehicleRented,selectedVehicle.name],['Days',`${days} day${days>1?'s':''}`],[t.total,`Rs. ${total.toLocaleString()}`]] as [string,string][]).map(([k,v])=>(
                       <div key={k} className="flex justify-between"><span className="text-slate-500">{k}</span><span className="font-bold">{v}</span></div>
                     ))}
                   </div>
+
+                  {/* Get Directions button */}
+                  {vMap(selectedVehicle) && (
+                    <a href={vMap(selectedVehicle)} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full py-3 mb-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm transition shadow-md">
+                      📍 Get Directions to Pickup Location
+                    </a>
+                  )}
+
+                  {/* WhatsApp contact */}
+                  {ownerAcc?.whatsapp && (
+                    <a href={`https://wa.me/94${(ownerAcc.whatsapp||'').replace(/^0/,'').replace(/[^0-9]/g,'')}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full py-3 mb-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-sm transition shadow-md">
+                      💬 Contact Shop on WhatsApp
+                    </a>
+                  )}
+
                   {sessionRole==='customer' && <p className="text-xs text-emerald-600 font-bold mb-4">✓ Saved to your booking history</p>}
                   <div className="flex gap-3 justify-center flex-wrap">
-                    {sessionRole==='customer' && <button onClick={()=>setView('custDash')} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-blue-700 transition">{t.myBookings}</button>}
+                    {sessionRole==='customer' && <button onClick={()=>setView('custDash')} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.myBookings}</button>}
                     <button onClick={resetToHome} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.backToHome}</button>
                   </div>
                 </div>
