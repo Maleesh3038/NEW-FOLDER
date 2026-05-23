@@ -361,39 +361,55 @@ export default function Home() {
     // Update local state
     const updatedBookings = ownerBookings.map(b => b.id === bookingId ? {...b, status} : b);
     setOwnerBookings(updatedBookings);
+
+    const booking = ownerBookings.find(b => b.id === bookingId);
+
+    // When ACCEPTED — mark vehicle as unavailable (prevent double booking)
+    if (status === 'confirmed' && booking?.vehicle_id) {
+      await supabase.from('vehicles').update({ is_available: false }).eq('id', booking.vehicle_id);
+      // Refresh available vehicles on homepage
+      const vehicles = await getAvailableVehicles();
+      setAllVehicles(vehicles.map(v => ({
+        ...v, image: v.vehicle_photos?.[0]?.storage_url||'',
+        images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
+        isAvailable: v.is_available, mapLink: v.map_link,
+      })));
+    }
+
+    // When COMPLETED — mark vehicle as available again
+    if (status === 'completed' && booking?.vehicle_id) {
+      await supabase.from('vehicles').update({ is_available: true }).eq('id', booking.vehicle_id);
+    }
+
     showToast(`Booking ${status} ✓`);
 
     // Send SMS when confirmed
-    if (status === 'confirmed') {
-      const booking = ownerBookings.find(b => b.id === bookingId);
-      if (booking) {
-        try {
-          // Get customer phone from DB
-          let customerPhone = '';
-          if (booking.customer_id) {
-            const { data: custData } = await supabase
-              .from('customers').select('phone').eq('id', booking.customer_id).single();
-            customerPhone = custData?.phone || '';
-          }
-
-          await fetch('/api/sms', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'confirmed',
-              ownerPhone: ownerAcc?.whatsapp || ownerAcc?.phone || '',
-              customerPhone,
-              vehicleName: booking.vehicle_name || '',
-              shopName: ownerAcc?.shop_name || '',
-              pickupDate: booking.pickup_date || '',
-              returnDate: booking.return_date || '',
-              days: booking.days || 1,
-              total: booking.total || 0,
-            }),
-          });
-        } catch (e) {
-          console.log('SMS failed:', e);
+    if (status === 'confirmed' && booking) {
+      try {
+        let customerPhone = '';
+        if (booking.customer_id) {
+          const { data: custData } = await supabase
+            .from('customers').select('phone').eq('id', booking.customer_id).single();
+          customerPhone = custData?.phone || '';
         }
+
+        await fetch('/api/sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'confirmed',
+            ownerPhone: ownerAcc?.whatsapp || ownerAcc?.phone || '',
+            customerPhone,
+            vehicleName: booking.vehicle_name || '',
+            shopName: ownerAcc?.shop_name || '',
+            pickupDate: booking.pickup_date || '',
+            returnDate: booking.return_date || '',
+            days: booking.days || 1,
+            total: booking.total || 0,
+          }),
+        });
+      } catch (e) {
+        console.log('SMS failed:', e);
       }
     }
   };
@@ -406,6 +422,22 @@ export default function Home() {
   const confirmBooking = async () => {
     if (!selectedVehicle) return;
     const today = new Date().toISOString().split('T')[0];
+
+    // Check if vehicle is still available
+    const { data: vehicleCheck } = await supabase
+      .from('vehicles').select('is_available').eq('id', selectedVehicle.id).single();
+    if (!vehicleCheck?.is_available) {
+      showToast('Sorry, this vehicle is no longer available. Please choose another.', 'err');
+      setView('home'); setSelectedVehicle(null);
+      // Refresh vehicles
+      const vehicles = await getAvailableVehicles();
+      setAllVehicles(vehicles.map(v => ({
+        ...v, image: v.vehicle_photos?.[0]?.storage_url||'',
+        images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
+        isAvailable: v.is_available, mapLink: v.map_link,
+      })));
+      return;
+    }
     const booking = {
       vehicle_id: selectedVehicle.id,
       owner_id: selectedVehicle.owner_id,
@@ -892,7 +924,7 @@ export default function Home() {
                             ✕ {t.decline}
                           </button>
                         </div>
-                        <p className="text-[10px] text-slate-400 text-center">Accept karama customer ekata SMS yannawa automatically</p>
+                        <p className="text-[10px] text-slate-400 text-center">The customer will receive an SMS confirmation automatically when you accept</p>
                       </div>
                     )}
                     {b.status==='confirmed' && (
