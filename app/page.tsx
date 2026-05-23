@@ -9,6 +9,27 @@ import {
   getOwnerAccs, getCustAccs, saveOwnerAccs, saveCustAccs,
 } from './types';
 
+// ── Traffic helpers (shared with admin)
+const TRAFFIC_KEY = 'drivo_traffic_v1';
+function trackVisit() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const entries: {date:string;visits:number;bookings:number}[] = JSON.parse(localStorage.getItem(TRAFFIC_KEY)||'[]');
+    const idx = entries.findIndex(e => e.date === today);
+    if (idx > -1) { entries[idx].visits += 1; } else { entries.push({date:today,visits:1,bookings:0}); }
+    localStorage.setItem(TRAFFIC_KEY, JSON.stringify(entries.slice(-30)));
+  } catch {}
+}
+function trackBooking() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const entries: {date:string;visits:number;bookings:number}[] = JSON.parse(localStorage.getItem(TRAFFIC_KEY)||'[]');
+    const idx = entries.findIndex(e => e.date === today);
+    if (idx > -1) { entries[idx].bookings += 1; } else { entries.push({date:today,visits:0,bookings:1}); }
+    localStorage.setItem(TRAFFIC_KEY, JSON.stringify(entries.slice(-30)));
+  } catch {}
+}
+
 function DrivoLogo({ className = 'w-9 h-9' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -77,8 +98,8 @@ export default function Home() {
   // ── vehicle form
   const [showAddForm,      setShowAddForm]      = useState(false);
   const [editingId,        setEditingId]        = useState<string|null>(null);
-  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:''});
-  const [imgPreview,       setImgPreview]       = useState('');
+  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:''});
+  const [photos,           setPhotos]           = useState<string[]>([]); // base64 array, min 3 max 5
   const [isDragging,       setIsDragging]       = useState(false);
 
   // ── profile edit modals
@@ -109,10 +130,17 @@ export default function Home() {
 
   // ── bootstrap
   useEffect(() => {
+    trackVisit();
     try {
+      // Clear old mock vehicle data — v4 key = clean slate
+      const CLEAN_KEY = 'drivo_fleet_v4_clean';
+      if (!localStorage.getItem(CLEAN_KEY)) {
+        localStorage.removeItem(FLEET_KEY);
+        localStorage.setItem(CLEAN_KEY, 'true');
+      }
       const raw = localStorage.getItem(FLEET_KEY);
-      const base: RawVehicle[] = raw ? JSON.parse(raw) : mockVehicles.map(v=>({...v,isAvailable:true}));
-      if (!raw) localStorage.setItem(FLEET_KEY, JSON.stringify(base));
+      const base: RawVehicle[] = raw ? JSON.parse(raw) : [];
+      if (!raw) localStorage.setItem(FLEET_KEY, JSON.stringify([]));
       setAllVehicles(base);
     } catch {}
     try {
@@ -243,22 +271,27 @@ export default function Home() {
   const handleVehicleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newV.name.trim()) { showToast('Vehicle name required!','err'); return; }
-    const img = imgPreview || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?q=80&w=600';
+    if (photos.length < 3) { showToast('Minimum 3 photos required!','err'); return; }
+    const img = photos[0];
+
     if (editingId) {
       const next = ownerFleet.map(v => v.id===editingId
-        ? {...v,...newV,type:newV.type as any,pricePerDay:Number(newV.pricePerDay),image:imgPreview||v.image} : v);
+        ? {...v,...newV,type:newV.type as any,pricePerDay:Number(newV.pricePerDay),
+           image:img, images:[...photos], mapLink:newV.mapLink||undefined} : v);
       saveOwnerFleet(next); showToast('Vehicle updated ✓');
     } else {
       const fresh: RawVehicle = {
         id:`v-${Date.now()}`, name:newV.name, type:newV.type as any,
         transmission:newV.transmission, fuel:newV.fuel, pricePerDay:Number(newV.pricePerDay),
         shopName:ownerAcc?.profile.shopName||'', location:ownerAcc?.profile.city||'Colombo',
-        rating:5.0, image:img, images:[img], description:newV.description||'', isAvailable:true,
+        rating:5.0, image:img, images:[...photos],
+        description:newV.description||'', isAvailable:true,
+        mapLink:newV.mapLink||undefined,
       };
       saveOwnerFleet([fresh,...ownerFleet]); showToast('Vehicle published! 🚀');
     }
-    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:''});
-    setImgPreview(''); setShowAddForm(false); setEditingId(null);
+    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:''});
+    setPhotos([]); setShowAddForm(false); setEditingId(null);
   };
 
   const toggleAvail = (id:string) => {
@@ -271,8 +304,15 @@ export default function Home() {
     if (!confirm('Delete?')) return;
     saveOwnerFleet(ownerFleet.filter(v=>v.id!==id)); showToast('Deleted','err');
   };
-  const processImg = (file:File) => {
-    const r=new FileReader(); r.onloadend=()=>setImgPreview(r.result as string); r.readAsDataURL(file);
+  const processImg = (file: File) => {
+    if (photos.length >= 5) { showToast('Maximum 5 photos allowed', 'err'); return; }
+    const r = new FileReader();
+    r.onloadend = () => setPhotos(prev => [...prev, r.result as string]);
+    r.readAsDataURL(file);
+  };
+  const removePhoto = (idx: number) => setPhotos(prev => prev.filter((_, i) => i !== idx));
+  const movePhoto   = (from: number, to: number) => {
+    setPhotos(prev => { const a = [...prev]; const [item] = a.splice(from, 1); a.splice(to, 0, item); return a; });
   };
 
   // ── update booking status (owner)
@@ -311,6 +351,7 @@ export default function Home() {
     const ownerEntry = Object.values(oaccs).find(a=>a.profile.shopName===selectedVehicle.shopName);
     if (ownerEntry) { ownerEntry.bookings=[booking,...(ownerEntry.bookings||[])]; oaccs[ownerEntry.email]=ownerEntry; saveOwnerAccs(oaccs); }
     setBookingDone(true);
+    trackBooking(); // track for admin analytics
   };
 
   // ══════════════════════════════════════════════════════════════════
@@ -657,7 +698,7 @@ export default function Home() {
                   <span className="text-amber-500">{ownerBookings.filter(b=>b.status==='pending').length} {t.pending}</span>
                 </div>
                 <button onClick={()=>{ setOwnerEditData(ownerAcc.profile); setOwnerEditOpen(true); }} className="text-xs font-bold px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition">{t.editProfile}</button>
-                <button onClick={()=>{ setShowAddForm(true); setEditingId(null); setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:''}); setImgPreview(''); }}
+                <button onClick={()=>{ setShowAddForm(true); setEditingId(null); setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:''}); setPhotos([]); }}
                   className="text-xs font-black px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition flex items-center gap-1.5 shadow-sm">
                   <span className="text-lg leading-none">+</span> {t.addVehicle}
                 </button>
@@ -745,7 +786,7 @@ export default function Home() {
                   <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="flex items-center justify-between px-6 py-4 border-b bg-slate-50">
                       <h3 className="font-black text-slate-900">{editingId?t.editVehicle:t.addNew}</h3>
-                      <button onClick={()=>{ setShowAddForm(false); setEditingId(null); setImgPreview(''); }} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 font-black text-xl transition">×</button>
+                      <button onClick={()=>{ setShowAddForm(false); setEditingId(null); setPhotos([]); }} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 font-black text-xl transition">×</button>
                     </div>
                     <form onSubmit={handleVehicleSubmit} className="p-6 space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -766,21 +807,77 @@ export default function Home() {
                         <div className="col-span-2"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.priceDay} <span className="text-red-400">*</span></label>
                           <input type="number" required min="500" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={newV.pricePerDay} onChange={e=>setNewV({...newV,pricePerDay:Number(e.target.value)})}/></div>
                       </div>
+
+                      {/* ── MULTI PHOTO UPLOAD (min 3, max 5) ── */}
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Photo</label>
-                        <div onDragOver={e=>{e.preventDefault();setIsDragging(true);}} onDragLeave={()=>setIsDragging(false)}
-                          onDrop={e=>{e.preventDefault();setIsDragging(false);if(e.dataTransfer.files[0])processImg(e.dataTransfer.files[0]);}}
-                          className={`border-2 border-dashed rounded-2xl relative min-h-[120px] flex items-center justify-center transition cursor-pointer ${isDragging?'border-emerald-500 bg-emerald-50':'border-slate-200 bg-slate-50 hover:border-slate-400'}`}>
-                          <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={e=>{if(e.target.files?.[0])processImg(e.target.files[0]);}}/>
-                          {imgPreview
-                            ? <div className="p-3 w-full flex items-center gap-4"><div className="w-32 aspect-video rounded-xl overflow-hidden border border-slate-200 flex-shrink-0"><img src={imgPreview} className="w-full h-full object-cover" alt=""/></div><div><p className="text-sm font-bold text-slate-700">{t.photoReady}</p><p className="text-xs text-slate-400 mt-1">Click to replace</p></div></div>
-                            : <div className="text-center py-4"><p className="text-3xl mb-1.5">📸</p><p className="text-sm font-black text-slate-700">{t.dragPhoto}</p></div>}
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                            Vehicle Photos
+                          </label>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${photos.length < 3 ? 'bg-red-50 text-red-500 border border-red-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
+                            {photos.length}/5 · min 3 required
+                          </span>
                         </div>
+
+                        {/* Uploaded photos grid */}
+                        {photos.length > 0 && (
+                          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
+                            {photos.map((p, i) => (
+                              <div key={i} className="relative group aspect-video rounded-xl overflow-hidden border border-slate-200">
+                                <img src={p} className="w-full h-full object-cover" alt={`Photo ${i+1}`}/>
+                                {i === 0 && <span className="absolute top-1 left-1 text-[9px] bg-slate-900 text-white font-black px-1.5 py-0.5 rounded uppercase">Cover</span>}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
+                                  {i > 0 && <button type="button" onClick={()=>movePhoto(i,i-1)} className="w-6 h-6 bg-white rounded-full text-slate-700 text-xs font-black flex items-center justify-center">←</button>}
+                                  <button type="button" onClick={()=>removePhoto(i)} className="w-6 h-6 bg-red-500 rounded-full text-white text-xs font-black flex items-center justify-center">×</button>
+                                  {i < photos.length-1 && <button type="button" onClick={()=>movePhoto(i,i+1)} className="w-6 h-6 bg-white rounded-full text-slate-700 text-xs font-black flex items-center justify-center">→</button>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Upload zone (hide when 5 reached) */}
+                        {photos.length < 5 && (
+                          <div
+                            onDragOver={e=>{e.preventDefault();setIsDragging(true);}}
+                            onDragLeave={()=>setIsDragging(false)}
+                            onDrop={e=>{e.preventDefault();setIsDragging(false);Array.from(e.dataTransfer.files).slice(0,5-photos.length).forEach(f=>processImg(f));}}
+                            className={`border-2 border-dashed rounded-2xl relative flex items-center justify-center transition cursor-pointer py-5 ${isDragging?'border-emerald-500 bg-emerald-50':'border-slate-200 bg-slate-50 hover:border-slate-400'}`}>
+                            <input type="file" accept="image/*" multiple className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              onChange={e=>{if(e.target.files) Array.from(e.target.files).slice(0,5-photos.length).forEach(f=>processImg(f));}}/>
+                            <div className="text-center pointer-events-none">
+                              <p className="text-2xl mb-1">📸</p>
+                              <p className="text-sm font-black text-slate-700">Drag & drop or click to add photos</p>
+                              <p className="text-xs text-slate-400 mt-0.5">{5-photos.length} more can be added · First photo = cover</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
+
+                      {/* ── GOOGLE MAPS LOCATION ── */}
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                          Pickup Location (Google Maps)
+                        </label>
+                        <input type="url"
+                          placeholder="Paste Google Maps link — e.g. https://maps.google.com/?q=..."
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition"
+                          value={newV.mapLink} onChange={e=>setNewV({...newV,mapLink:e.target.value})}/>
+                        <p className="text-[10px] text-slate-400 mt-1.5">
+                          Google Maps eke "Share" → "Copy link" karala paste karanna · Optional but recommended
+                        </p>
+                        {newV.mapLink && (
+                          <a href={newV.mapLink} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-blue-600 hover:underline">
+                            📍 Preview location →
+                          </a>
+                        )}
+                      </div>
+
                       <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.description}</label>
                         <textarea rows={2} placeholder="AC, helmet, insurance..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition resize-none" value={newV.description} onChange={e=>setNewV({...newV,description:e.target.value})}/></div>
                       <div className="flex gap-3">
-                        <button type="button" onClick={()=>{ setShowAddForm(false); setEditingId(null); setImgPreview(''); }} className="px-6 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-sm text-slate-700 transition">{t.cancel}</button>
+                        <button type="button" onClick={()=>{ setShowAddForm(false); setEditingId(null); setPhotos([]); }} className="px-6 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-sm text-slate-700 transition">{t.cancel}</button>
                         <button type="submit" className="flex-1 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white py-3 rounded-xl font-black text-sm uppercase tracking-wide transition shadow-md">{editingId?t.saveChanges:t.publishLive}</button>
                       </div>
                     </form>
@@ -813,7 +910,7 @@ export default function Home() {
                             <p className="text-xs text-slate-400 mb-3">{v.transmission} · {v.fuel} · {v.location}</p>
                             <div className="flex gap-2 pt-3 border-t border-slate-100">
                               <button onClick={()=>toggleAvail(v.id)} className={`flex-1 py-2 rounded-xl font-black text-[11px] uppercase tracking-wide border transition ${v.isAvailable?'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600':'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>{v.isAvailable?t.hide:t.goLive}</button>
-                              <button onClick={()=>{ setEditingId(v.id); setShowAddForm(false); setNewV({name:v.name,type:v.type,transmission:v.transmission,fuel:v.fuel,pricePerDay:v.pricePerDay,description:v.description||''}); setImgPreview(v.image); window.scrollTo({top:0,behavior:'smooth'}); }} className="flex-1 py-2 rounded-xl font-black text-[11px] uppercase border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition">Edit</button>
+                              <button onClick={()=>{ setEditingId(v.id); setShowAddForm(false); setNewV({name:v.name,type:v.type,transmission:v.transmission,fuel:v.fuel,pricePerDay:v.pricePerDay,description:v.description||'',mapLink:(v as any).mapLink||''}); setPhotos(v.images&&v.images.length>0?[...v.images]:[v.image]); window.scrollTo({top:0,behavior:'smooth'}); }} className="flex-1 py-2 rounded-xl font-black text-[11px] uppercase border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition">Edit</button>
                               <button onClick={()=>deleteVehicle(v.id)} className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition">🗑</button>
                             </div>
                           </div>
@@ -903,9 +1000,18 @@ export default function Home() {
                     </article>
                   ))}
                   {displayed.length===0 && (
-                    <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
-                      <p className="text-4xl mb-3">🔍</p><p className="text-sm font-bold text-slate-600">{t.noVehiclesFound}</p>
-                      <button onClick={()=>{ setFilterCity('All Sri Lanka'); setFilterType('all'); }} className="mt-3 text-xs font-bold text-red-500 underline">{t.clearFilters}</button>
+                    <div className="col-span-full text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
+                      <p className="text-5xl mb-4">🚗</p>
+                      <p className="text-base font-black text-slate-700">
+                        {filterCity !== 'All Sri Lanka' || filterType !== 'all'
+                          ? t.noVehiclesFound
+                          : 'No vehicles listed yet'}
+                      </p>
+                      <p className="text-sm text-slate-400 mt-2 max-w-xs mx-auto">
+                        {filterCity !== 'All Sri Lanka' || filterType !== 'all'
+                          ? <button onClick={()=>{ setFilterCity('All Sri Lanka'); setFilterType('all'); }} className="text-red-500 underline font-bold">{t.clearFilters}</button>
+                          : 'Vehicle owners can list their cars, bikes & tuk-tuks via Partner Hub'}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -949,10 +1055,19 @@ export default function Home() {
                       </div>
                       <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{selectedVehicle.name}</h2>
                       <p className="text-sm text-slate-500 mt-1">{selectedVehicle.shopName} · <span className="text-blue-600 font-medium">{selectedVehicle.location}</span></p>
+                      {(selectedVehicle as any).mapLink && (
+                        <a href={(selectedVehicle as any).mapLink} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition shadow-sm">
+                          📍 Get Directions on Google Maps
+                        </a>
+                      )}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {(selectedVehicle.images||[selectedVehicle.image]).map((img,i)=>(
-                        <div key={i} className="aspect-[16/10] bg-slate-200 rounded-2xl overflow-hidden"><img src={img} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/></div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {(selectedVehicle.images&&selectedVehicle.images.length>0?selectedVehicle.images:[selectedVehicle.image]).map((img,i)=>(
+                        <div key={i} className={`relative bg-slate-200 rounded-2xl overflow-hidden ${i===0?'col-span-2 sm:col-span-2 aspect-[16/9]':'aspect-video'}`}>
+                          <img src={img} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
+                          {i===0 && <span className="absolute top-2 left-2 text-[10px] bg-slate-900/70 text-white font-black px-2 py-0.5 rounded uppercase backdrop-blur-sm">Cover photo</span>}
+                        </div>
                       ))}
                     </div>
                     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
