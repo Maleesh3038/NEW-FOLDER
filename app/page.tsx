@@ -354,51 +354,50 @@ export default function Home() {
   };
 
   // ── update booking status (owner)
-  const updateBookingStatus = async (bookingId: string, status: 'confirmed'|'completed') => {
-    // Update in Supabase
-    await updateBookingStatus_db(bookingId, status);
+  // ── Helper: refresh all vehicles
+  const refreshVehicles = async () => {
+    const vehicles = await getAvailableVehicles();
+    setAllVehicles(vehicles.map(v => ({
+      ...v,
+      image: v.vehicle_photos?.[0]?.storage_url || '',
+      images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url) || [],
+      isAvailable: v.is_available,
+      mapLink: v.map_link,
+    })));
+  };
 
-    // Update local state
+  // ── Owner: accept / complete booking
+  const updateBookingStatus = async (bookingId: string, status: 'confirmed'|'completed') => {
+    await updateBookingStatus_db(bookingId, status);
+    const booking = ownerBookings.find(b => b.id === bookingId);
     const updatedBookings = ownerBookings.map(b => b.id === bookingId ? {...b, status} : b);
     setOwnerBookings(updatedBookings);
 
-    const booking = ownerBookings.find(b => b.id === bookingId);
-
-    // When ACCEPTED — mark vehicle as unavailable (prevent double booking)
     if (status === 'confirmed' && booking?.vehicle_id) {
+      // Hide vehicle from homepage — already rented
       await supabase.from('vehicles').update({ is_available: false }).eq('id', booking.vehicle_id);
-      // Refresh available vehicles on homepage
-      const vehicles = await getAvailableVehicles();
-      setAllVehicles(vehicles.map(v => ({
-        ...v, image: v.vehicle_photos?.[0]?.storage_url||'',
-        images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
-        isAvailable: v.is_available, mapLink: v.map_link,
-      })));
-    }
+      // Decline all other pending bookings for same vehicle
+      const otherPending = ownerBookings.filter(b => b.id !== bookingId && b.vehicle_id === booking.vehicle_id && b.status === 'pending');
+      for (const ob of otherPending) {
+        await updateBookingStatus_db(ob.id, 'pending');
+        await supabase.from('bookings').update({ status: 'declined' as any }).eq('id', ob.id);
+      }
+      await refreshVehicles();
+      showToast('Booking confirmed! Vehicle hidden from homepage. ✓');
 
-    // When COMPLETED — mark vehicle as available again
-    if (status === 'completed' && booking?.vehicle_id) {
-      await supabase.from('vehicles').update({ is_available: true }).eq('id', booking.vehicle_id);
-    }
-
-    showToast(`Booking ${status} ✓`);
-
-    // Send SMS when confirmed
-    if (status === 'confirmed' && booking) {
+      // SMS to customer
       try {
         let customerPhone = '';
         if (booking.customer_id) {
-          const { data: custData } = await supabase
-            .from('customers').select('phone').eq('id', booking.customer_id).single();
-          customerPhone = custData?.phone || '';
+          const { data: cd } = await supabase.from('customers').select('phone').eq('id', booking.customer_id).single();
+          customerPhone = cd?.phone || '';
         }
-
         await fetch('/api/sms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'confirmed',
-            ownerPhone: ownerAcc?.whatsapp || ownerAcc?.phone || '',
+            ownerPhone: '',
             customerPhone,
             vehicleName: booking.vehicle_name || '',
             shopName: ownerAcc?.shop_name || '',
@@ -408,10 +407,43 @@ export default function Home() {
             total: booking.total || 0,
           }),
         });
-      } catch (e) {
-        console.log('SMS failed:', e);
-      }
+      } catch {}
     }
+
+    if (status === 'completed' && booking?.vehicle_id) {
+      // Return vehicle to homepage
+      await supabase.from('vehicles').update({ is_available: true }).eq('id', booking.vehicle_id);
+      await refreshVehicles();
+      showToast('Rental completed! Vehicle is available again. ✓');
+    }
+  };
+
+  // ── Owner: decline booking
+  const declineBooking = async (bookingId: string) => {
+    await supabase.from('bookings').update({ status: 'declined' as any }).eq('id', bookingId);
+    setOwnerBookings(ownerBookings.filter(b => b.id !== bookingId));
+    showToast('Booking declined.');
+  };
+
+  // ── Customer: cancel booking
+  const cancelBooking = async (bookingId: string) => {
+    if (!confirm('Are you sure you want to cancel this booking?')) return;
+    const booking = (custAcc?.bookings || []).find(b => b.id === bookingId);
+    if (booking?.status === 'confirmed') {
+      showToast('Cannot cancel a confirmed booking. Please contact the shop directly.', 'err');
+      return;
+    }
+    await supabase.from('bookings').update({ status: 'cancelled' as any }).eq('id', bookingId);
+    // If was confirmed, restore vehicle availability
+    if (booking?.vehicle_id) {
+      await supabase.from('vehicles').update({ is_available: true }).eq('id', booking.vehicle_id);
+      await refreshVehicles();
+    }
+    if (custAcc?.id) {
+      const bdata = await getCustomerBookings(custAcc.id);
+      setCustAcc(prev => prev ? {...prev, bookings: bdata} : prev);
+    }
+    showToast('Booking cancelled successfully.');
   };
 
   // ── confirm booking (customer)
@@ -423,70 +455,57 @@ export default function Home() {
     if (!selectedVehicle) return;
     const today = new Date().toISOString().split('T')[0];
 
-    // Check if vehicle is still available
-    const { data: vehicleCheck } = await supabase
-      .from('vehicles').select('is_available').eq('id', selectedVehicle.id).single();
-    if (!vehicleCheck?.is_available) {
-      showToast('Sorry, this vehicle is no longer available. Please choose another.', 'err');
+    // Verify vehicle still available
+    const { data: vCheck } = await supabase.from('vehicles').select('is_available').eq('id', selectedVehicle.id).single();
+    if (!vCheck?.is_available) {
+      showToast('Sorry, this vehicle is no longer available.', 'err');
       setView('home'); setSelectedVehicle(null);
-      // Refresh vehicles
-      const vehicles = await getAvailableVehicles();
-      setAllVehicles(vehicles.map(v => ({
-        ...v, image: v.vehicle_photos?.[0]?.storage_url||'',
-        images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
-        isAvailable: v.is_available, mapLink: v.map_link,
-      })));
+      await refreshVehicles();
       return;
     }
+
     const booking = {
       vehicle_id: selectedVehicle.id,
       owner_id: selectedVehicle.owner_id,
       customer_id: sessionRole === 'customer' ? custAcc?.id : undefined,
       vehicle_name: selectedVehicle.name || '',
       vehicle_img: selectedVehicle.image || '',
-      shop_name: selectedVehicle.shop_name || vShop(selectedVehicle) || '',
+      shop_name: vShop(selectedVehicle) || '',
       location: selectedVehicle.location || '',
       pickup_date: filterPickup || today,
       return_date: filterReturn || today,
       days, delivery_type: deliveryType,
-      price_per_day: selectedVehicle.price_per_day || vPrice(selectedVehicle) || 0,
+      price_per_day: vPrice(selectedVehicle) || 0,
       total, status: 'pending' as const,
     };
+
     const { error } = await createBooking(booking);
     if (error) { showToast('Booking failed: ' + error, 'err'); return; }
+
     if (sessionRole === 'customer' && custAcc?.id) {
       const bdata = await getCustomerBookings(custAcc.id);
       setCustAcc(prev => prev ? {...prev, bookings: bdata} : prev);
     }
     await trackBookingInDB().catch(()=>{});
 
-    // ── Send SMS notifications
+    // SMS to owner
     try {
-      // Get owner phone from DB
-      const { data: ownerData } = await supabase
-        .from('owners')
-        .select('phone, whatsapp')
-        .eq('id', selectedVehicle.owner_id)
-        .single();
-
+      const { data: ownerData } = await supabase.from('owners').select('phone, whatsapp').eq('id', selectedVehicle.owner_id).single();
       await fetch('/api/sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'booking',
-          ownerPhone:    ownerData?.whatsapp || ownerData?.phone || '',
+          ownerPhone: ownerData?.whatsapp || ownerData?.phone || '',
           customerPhone: sessionRole === 'customer' ? (custAcc?.phone || '') : '',
-          vehicleName:   selectedVehicle.name,
-          shopName:      selectedVehicle.shop_name || '',
-          pickupDate:    filterPickup || new Date().toISOString().split('T')[0],
-          returnDate:    filterReturn || new Date().toISOString().split('T')[0],
-          days,
-          total,
+          vehicleName: selectedVehicle.name,
+          shopName: vShop(selectedVehicle),
+          pickupDate: filterPickup || today,
+          returnDate: filterReturn || today,
+          days, total,
         }),
       });
-    } catch (smsErr) {
-      console.log('SMS failed (non-critical):', smsErr);
-    }
+    } catch {}
 
     setBookingDone(true);
   };
@@ -802,9 +821,17 @@ export default function Home() {
                         </div>
                       </div>
                     </div>
-                    <div className="border-t border-slate-100 px-4 py-2.5 flex justify-between items-center">
+                    <div className="border-t border-slate-100 px-4 py-2.5 flex justify-between items-center gap-2">
                       <span className="text-[10px] text-slate-400">{t.bookedOn}: {b.booked_at ? new Date(b.booked_at).toLocaleDateString() : ''}</span>
-                      <button onClick={()=>setSelectedBooking(b)} className="text-xs font-black text-slate-600 hover:text-slate-900 transition">{t.bookingDetails} →</button>
+                      <div className="flex items-center gap-2">
+                        {(b.status === 'pending') && (
+                          <button onClick={()=>cancelBooking(b.id)}
+                            className="text-xs font-black text-red-500 hover:text-red-700 transition border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg">
+                            Cancel
+                          </button>
+                        )}
+                        <button onClick={()=>setSelectedBooking(b)} className="text-xs font-black text-slate-600 hover:text-slate-900 transition">{t.bookingDetails} →</button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -916,10 +943,8 @@ export default function Home() {
                             ✓ {t.accept}
                           </button>
                           <button onClick={async ()=>{
-                            await updateBookingStatus_db(b.id, 'pending');
-                            const next = ownerBookings.filter(x => x.id !== b.id);
-                            setOwnerBookings(next);
-                            showToast('Booking declined');
+                            if(!confirm('Decline this booking?')) return;
+                            await declineBooking(b.id);
                           }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
                             ✕ {t.decline}
                           </button>
