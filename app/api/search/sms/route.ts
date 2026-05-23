@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const NOTIFY_API_KEY  = process.env.NOTIFY_API_KEY!;
-const NOTIFY_USER_ID  = process.env.NOTIFY_USER_ID!;
-const NOTIFY_SENDER   = process.env.NOTIFY_SENDER_ID || 'DRIVO';
+const NOTIFY_API_KEY = process.env.NOTIFY_API_KEY!;
+const NOTIFY_USER_ID = process.env.NOTIFY_USER_ID!;
+const NOTIFY_SENDER  = process.env.NOTIFY_SENDER_ID || 'DRIVO';
 
 async function sendSMS(to: string, message: string): Promise<boolean> {
   try {
-    // Clean phone number — remove spaces, add 94 prefix
-    let phone = to.replace(/\s+/g, '').replace(/^0/, '94');
+    if (!to || !NOTIFY_API_KEY || !NOTIFY_USER_ID) return false;
+    let phone = to.replace(/\s+/g, '').replace(/[^0-9]/g, '');
+    if (phone.startsWith('0')) phone = '94' + phone.slice(1);
     if (!phone.startsWith('94')) phone = '94' + phone;
 
     const params = new URLSearchParams({
@@ -18,11 +19,7 @@ async function sendSMS(to: string, message: string): Promise<boolean> {
       message:   message,
     });
 
-    const res = await fetch(
-      `https://app.notify.lk/api/v1/send?${params.toString()}`,
-      { method: 'GET' }
-    );
-
+    const res = await fetch(`https://app.notify.lk/api/v1/send?${params}`, { method: 'GET' });
     const data = await res.json();
     console.log('SMS result:', data);
     return data.status === 'success';
@@ -34,34 +31,45 @@ async function sendSMS(to: string, message: string): Promise<boolean> {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { type, ownerPhone, customerPhone, vehicleName, pickupDate, returnDate, days, total, shopName } = body;
+    const { type, ownerPhone, customerPhone, vehicleName, pickupDate, returnDate, days, total, shopName } = await req.json();
+    const results: Record<string, boolean> = {};
 
-    const results: { owner?: boolean; customer?: boolean } = {};
-
-    // ── Owner SMS
-    if (ownerPhone) {
-      const ownerMsg =
-        `DRIVO - New Booking!\n` +
-        `Vehicle: ${vehicleName}\n` +
-        `Dates: ${pickupDate} to ${returnDate} (${days} day${days>1?'s':''})\n` +
-        `Total: Rs.${Number(total).toLocaleString()}\n` +
-        `Login: thedrivo.com/admin`;
-
-      results.owner = await sendSMS(ownerPhone, ownerMsg);
+    if (type === 'booking') {
+      // ── New booking received — notify owner
+      if (ownerPhone) {
+        results.owner = await sendSMS(ownerPhone,
+          `DRIVO - Booking Request!\n` +
+          `Vehicle: ${vehicleName}\n` +
+          `Dates: ${pickupDate} - ${returnDate} (${days}d)\n` +
+          `Amount: Rs.${Number(total).toLocaleString()}\n` +
+          `Login to accept: thedrivo.com`
+        );
+      }
+      // ── Notify customer booking received
+      if (customerPhone) {
+        results.customer = await sendSMS(customerPhone,
+          `DRIVO - Booking Received!\n` +
+          `Vehicle: ${vehicleName}\n` +
+          `Shop: ${shopName}\n` +
+          `Dates: ${pickupDate} - ${returnDate}\n` +
+          `Amount: Rs.${Number(total).toLocaleString()}\n` +
+          `Awaiting shop confirmation.`
+        );
+      }
     }
 
-    // ── Customer SMS
-    if (customerPhone) {
-      const custMsg =
-        `DRIVO - Booking Received!\n` +
-        `Vehicle: ${vehicleName}\n` +
-        `Shop: ${shopName}\n` +
-        `Dates: ${pickupDate} to ${returnDate}\n` +
-        `Total: Rs.${Number(total).toLocaleString()}\n` +
-        `thedrivo.com`;
-
-      results.customer = await sendSMS(customerPhone, custMsg);
+    if (type === 'confirmed') {
+      // ── Owner confirmed — notify customer
+      if (customerPhone) {
+        results.customer = await sendSMS(customerPhone,
+          `DRIVO - Booking CONFIRMED! ✓\n` +
+          `Vehicle: ${vehicleName}\n` +
+          `Shop: ${shopName}\n` +
+          `Dates: ${pickupDate} - ${returnDate}\n` +
+          `Total: Rs.${Number(total).toLocaleString()}\n` +
+          `thedrivo.com`
+        );
+      }
     }
 
     return NextResponse.json({ success: true, results });

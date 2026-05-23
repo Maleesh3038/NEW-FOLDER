@@ -11,7 +11,7 @@ import {
   getAvailableVehicles, getOwnerVehicles,
   addVehicle, updateVehicle, deleteVehicle as dbDeleteVehicle,
   toggleVehicleAvailability,
-  createBooking, getCustomerBookings, getOwnerBookings, updateBookingStatus,
+  createBooking, getCustomerBookings, getOwnerBookings, updateBookingStatus as updateBookingStatus_db,
   trackVisitInDB, trackBookingInDB,
   uploadPhoto,
   saveSession, getSession, clearSession,
@@ -354,12 +354,48 @@ export default function Home() {
   };
 
   // ── update booking status (owner)
-  const updateBookingStatus = (bookingId:string, status:'confirmed'|'completed') => {
-    if (!sessionEmail) return;
-    const accs = getOwnerAccs(); if (!accs[sessionEmail]) return;
-    accs[sessionEmail].bookings = (accs[sessionEmail].bookings||[]).map(b=>b.id===bookingId?{...b,status}:b);
-    saveOwnerAccs(accs); setOwnerBookings(accs[sessionEmail].bookings); setOwnerAcc({...accs[sessionEmail]});
+  const updateBookingStatus = async (bookingId: string, status: 'confirmed'|'completed') => {
+    // Update in Supabase
+    await updateBookingStatus_db(bookingId, status);
+
+    // Update local state
+    const updatedBookings = ownerBookings.map(b => b.id === bookingId ? {...b, status} : b);
+    setOwnerBookings(updatedBookings);
     showToast(`Booking ${status} ✓`);
+
+    // Send SMS when confirmed
+    if (status === 'confirmed') {
+      const booking = ownerBookings.find(b => b.id === bookingId);
+      if (booking) {
+        try {
+          // Get customer phone from DB
+          let customerPhone = '';
+          if (booking.customer_id) {
+            const { data: custData } = await supabase
+              .from('customers').select('phone').eq('id', booking.customer_id).single();
+            customerPhone = custData?.phone || '';
+          }
+
+          await fetch('/api/sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'confirmed',
+              ownerPhone: ownerAcc?.whatsapp || ownerAcc?.phone || '',
+              customerPhone,
+              vehicleName: booking.vehicle_name || '',
+              shopName: ownerAcc?.shop_name || '',
+              pickupDate: booking.pickup_date || '',
+              returnDate: booking.return_date || '',
+              days: booking.days || 1,
+              total: booking.total || 0,
+            }),
+          });
+        } catch (e) {
+          console.log('SMS failed:', e);
+        }
+      }
+    }
   };
 
   // ── confirm booking (customer)
