@@ -430,15 +430,37 @@ export default function Home() {
     if (!confirm('Are you sure you want to cancel this booking?')) return;
     const booking = (custAcc?.bookings || []).find(b => b.id === bookingId);
     if (booking?.status === 'confirmed') {
-      showToast('Cannot cancel a confirmed booking. Please contact the shop directly.', 'err');
+      showToast('This booking is already confirmed. Please contact the shop directly to cancel.', 'err');
       return;
     }
     await supabase.from('bookings').update({ status: 'cancelled' as any }).eq('id', bookingId);
-    // If was confirmed, restore vehicle availability
     if (booking?.vehicle_id) {
       await supabase.from('vehicles').update({ is_available: true }).eq('id', booking.vehicle_id);
       await refreshVehicles();
     }
+    // Notify owner via SMS
+    try {
+      if (booking?.owner_id) {
+        const { data: od } = await supabase.from('owners').select('phone,whatsapp').eq('id', booking.owner_id).single();
+        if (od?.phone || od?.whatsapp) {
+          await fetch('/api/sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'customer_cancelled',
+              ownerPhone: od?.whatsapp || od?.phone || '',
+              customerPhone: '',
+              vehicleName: booking.vehicle_name || '',
+              shopName: booking.shop_name || '',
+              pickupDate: booking.pickup_date || '',
+              returnDate: booking.return_date || '',
+              days: booking.days || 1,
+              total: booking.total || 0,
+            }),
+          });
+        }
+      }
+    } catch {}
     if (custAcc?.id) {
       const bdata = await getCustomerBookings(custAcc.id);
       setCustAcc(prev => prev ? {...prev, bookings: bdata} : prev);
@@ -953,8 +975,51 @@ export default function Home() {
                       </div>
                     )}
                     {b.status==='confirmed' && (
-                      <div className="border-t border-slate-100 px-4 py-2.5">
-                        <button onClick={()=>updateBookingStatus(b.id,'completed')} className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase transition">{t.completed} ✓</button>
+                      <div className="border-t border-slate-100 px-4 py-3 space-y-2">
+                        <div className="flex gap-2">
+                          <button onClick={()=>updateBookingStatus(b.id,'completed')}
+                            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase transition">
+                            ✓ Mark Completed
+                          </button>
+                          <button onClick={async ()=>{
+                            if(!confirm('Cancel this confirmed booking? The vehicle will become available again.')) return;
+                            // Cancel booking
+                            await supabase.from('bookings').update({ status: 'cancelled' as any }).eq('id', b.id);
+                            // Restore vehicle availability
+                            if (b.vehicle_id) {
+                              await supabase.from('vehicles').update({ is_available: true }).eq('id', b.vehicle_id);
+                              await refreshVehicles();
+                            }
+                            // Notify customer via SMS
+                            try {
+                              if (b.customer_id) {
+                                const { data: cd } = await supabase.from('customers').select('phone').eq('id', b.customer_id).single();
+                                if (cd?.phone) {
+                                  await fetch('/api/sms', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      type: 'cancelled',
+                                      customerPhone: cd.phone,
+                                      vehicleName: b.vehicle_name || '',
+                                      shopName: ownerAcc?.shop_name || '',
+                                      pickupDate: b.pickup_date || '',
+                                      returnDate: b.return_date || '',
+                                      days: b.days || 1,
+                                      total: b.total || 0,
+                                      ownerPhone: '',
+                                    }),
+                                  });
+                                }
+                              }
+                            } catch {}
+                            setOwnerBookings(ownerBookings.filter(x => x.id !== b.id));
+                            showToast('Booking cancelled. Vehicle is available again.');
+                          }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
+                            ✕ Cancel
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 text-center">Cancelling will notify the customer via SMS and make the vehicle available again</p>
                       </div>
                     )}
                   </div>
