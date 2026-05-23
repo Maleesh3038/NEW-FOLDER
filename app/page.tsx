@@ -92,9 +92,16 @@ export default function Home() {
   const showToast = (msg:string, type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null), 3200); };
 
   // ── currency helpers
-  const rate = currency==='USD'?0.0033:currency==='AED'?0.012:1;
-  const sign = currency==='USD'?'$':currency==='AED'?'AED':'Rs.';
-  const fmt  = (p:number) => `${sign} ${(p*rate).toLocaleString(undefined,{maximumFractionDigits:currency==='LKR'?0:1})}`;
+  const CURRENCIES: Record<string,{rate:number;sign:string;dec:number}> = {
+    LKR: {rate:1,      sign:'Rs.', dec:0},
+    USD: {rate:0.0033, sign:'$',   dec:2},
+    EUR: {rate:0.0030, sign:'€',   dec:2},
+    GBP: {rate:0.0026, sign:'£',   dec:2},
+    RUB: {rate:0.30,   sign:'₽',   dec:0},
+    AED: {rate:0.012,  sign:'AED', dec:2},
+  };
+  const curr = CURRENCIES[currency] ?? CURRENCIES['LKR'];
+  const fmt  = (p:number) => `${curr.sign} ${(p*curr.rate).toLocaleString(undefined,{minimumFractionDigits:curr.dec,maximumFractionDigits:curr.dec})}`;
 
   const typeIcon = (tp:string) => tp==='car'?'🚙':tp==='bike'?'🏍️':'🛺';
   const statusColor = (s:string) => s==='confirmed'?'bg-emerald-50 text-emerald-700 border-emerald-200':s==='completed'?'bg-blue-50 text-blue-700 border-blue-200':'bg-amber-50 text-amber-700 border-amber-200';
@@ -310,7 +317,7 @@ export default function Home() {
   //  RENDER
   // ══════════════════════════════════════════════════════════════════
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800 antialiased font-sans">
+    <main dir={t.dir} className={`min-h-screen bg-slate-50 text-slate-800 antialiased font-sans ${t.dir==='rtl'?'text-right':''}`}>
 
       {/* TOAST */}
       {toast && (
@@ -337,9 +344,17 @@ export default function Home() {
               <option value="EN">🇬🇧 EN</option>
               <option value="SI">🇱🇰 සිං</option>
               <option value="RU">🇷🇺 RU</option>
+              <option value="DE">🇩🇪 DE</option>
+              <option value="FR">🇫🇷 FR</option>
+              <option value="AR">🇦🇪 AR</option>
             </select>
             <select value={currency} onChange={e=>setCurrency(e.target.value)} className="bg-slate-100 text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer">
-              <option value="LKR">LKR</option><option value="USD">USD</option><option value="AED">AED</option>
+              <option value="LKR">🇱🇰 LKR</option>
+              <option value="USD">🇺🇸 USD</option>
+              <option value="EUR">🇪🇺 EUR</option>
+              <option value="GBP">🇬🇧 GBP</option>
+              <option value="RUB">🇷🇺 RUB</option>
+              <option value="AED">🇦🇪 AED</option>
             </select>
             <button className="md:hidden p-2 rounded-lg hover:bg-slate-100" onClick={()=>setMobileMenuOpen(!mobileMenuOpen)}>
               <span className="block w-5 h-0.5 bg-slate-700 mb-1"/><span className="block w-5 h-0.5 bg-slate-700 mb-1"/><span className="block w-5 h-0.5 bg-slate-700"/>
