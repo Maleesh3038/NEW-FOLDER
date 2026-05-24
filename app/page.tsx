@@ -52,7 +52,7 @@ function FaqSection() {
 
   const faqs = {
     general: [
-      { q: 'How does Drivo work?', a: 'Drivo is Sri Lanka's vehicle rental marketplace. Browse verified cars, bikes & tuk-tuks from local owners. Select your dates, confirm booking, and pay directly to the shop. No middleman payments — we only charge a 10% booking fee.' },
+      { q: 'How does Drivo work?', a: 'Drivo is Sri Lanka vehicle rental marketplace. Browse verified cars, bikes & tuk-tuks from local owners. Select your dates, confirm booking, and pay directly to the shop. No middleman payments — we only charge a 10% booking fee.' },
       { q: 'Are all vehicles verified?', a: 'Yes. Every vehicle listed on Drivo is verified by our team. Owners must provide vehicle documents, photos, and their business details before going live.' },
       { q: 'Do I need to create an account to book?', a: 'Yes. To protect both renters and owners, you must register with your NIC/Passport and Driving License. This ensures only verified drivers can book vehicles.' },
       { q: 'Is Drivo available island-wide?', a: 'Yes! Drivo covers all major cities in Sri Lanka including Colombo, Galle, Kandy, Negombo, Ella, Mirissa and more. New locations are added regularly.' },
@@ -60,11 +60,11 @@ function FaqSection() {
     booking: [
       { q: 'How do I confirm a booking?', a: 'Select your vehicle, choose pickup date, return date, pickup time and method (self-pickup or delivery). Click "Confirm Booking" — the shop will receive an SMS and confirm within 30 minutes via WhatsApp.' },
       { q: 'Can I cancel my booking?', a: 'Yes. You can cancel a pending or confirmed booking from your dashboard. The shop will be notified via SMS and the vehicle will become available again.' },
-      { q: 'What if the shop doesn't respond?', a: 'If you don't receive a WhatsApp confirmation within 2 hours, contact us via thedrivo.com. We will follow up with the owner on your behalf.' },
+      { q: 'What if the shop does not respond?', a: 'If you do not receive a WhatsApp confirmation within 2 hours, contact us via thedrivo.com. We will follow up with the owner on your behalf.' },
       { q: 'Can I extend my rental period?', a: 'Yes — contact the shop directly via WhatsApp to discuss an extension. If the vehicle is available, they can approve it for additional days.' },
     ],
     price: [
-      { q: 'What is the Drivo booking fee?', a: 'Drivo charges a 10% booking fee on each rental. This fee is included in the displayed price — you don't pay extra. The shop receives 90% of the total, and Drivo earns 10%.' },
+      { q: 'What is the Drivo booking fee?', a: 'Drivo charges a 10% booking fee on each rental. This fee is included in the displayed price — you do not pay extra. The shop receives 90% of the total, and Drivo earns 10%.' },
       { q: 'When do I pay?', a: 'Payment is made directly to the shop at pickup — cash or bank transfer. There is no online payment required through Drivo at this stage.' },
       { q: 'Is there a security deposit?', a: 'Most vehicles on Drivo do not require a deposit. However, some owners may request one. This will be mentioned in the vehicle description or confirmed via WhatsApp.' },
       { q: 'What does the delivery fee cover?', a: 'If you select delivery, the shop will bring the vehicle to your location for an additional Rs. 1,500. This covers the delivery cost for the owner.' },
@@ -527,7 +527,7 @@ export default function Home() {
     if (status === 'confirmed') {
       const res = await bookingAPI('accept', { bookingId });
       if (res.error) { showToast(res.error, 'err'); return; }
-      // Refresh bookings from DB (declined ones won't appear due to filter)
+      // Refresh bookings from DB (declined ones will not appear due to filter)
       if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
       await refreshVehicles(ownerAcc?.id);
       showToast('Booking confirmed! Customer notified via SMS. ✓');
@@ -1588,7 +1588,7 @@ export default function Home() {
                       { icon: '🛡️', title: 'Secure Booking', desc: 'NIC & license verified renters. Your vehicle is in safe hands' },
                       { icon: '💬', title: 'WhatsApp Support', desc: 'Direct contact with the shop. 24/7 communication guaranteed' },
                       { icon: '🗺️', title: 'GPS Pickup Location', desc: 'Every listing has a Google Maps pin. No confusion at pickup' },
-                      { icon: '🚗', title: 'Cars, Bikes & Tuk-tuks', desc: 'Sri Lanka's largest multi-vehicle rental marketplace' },
+                      { icon: '🚗', title: 'Cars, Bikes & Tuk-tuks', desc: 'Sri Lanka largest multi-vehicle rental marketplace' },
                       { icon: '💸', title: 'No Hidden Fees', desc: 'Transparent pricing. Only a 10% booking fee, nothing more' },
                       { icon: '🇱🇰', title: 'Support Local', desc: 'Every booking supports a local Sri Lankan vehicle owner' },
                       { icon: '⚡', title: 'Book in 60 Seconds', desc: 'Pick dates, select time, confirm. Instant booking request sent' },
