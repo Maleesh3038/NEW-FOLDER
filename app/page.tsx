@@ -1184,49 +1184,46 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            {(custAcc.bookings||[]).length===0 ? (
+            {ownerSubTab === 'favourites' ? (
+              <div>
+                {wishlist.length === 0 ? (
+                  <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20">
+                    <p className="text-5xl mb-3">🤍</p>
+                    <p className="font-black text-slate-700">No favourites yet</p>
+                    <button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">Browse Vehicles</button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {allVehicles.filter(v => wishlist.includes(v.id)).map(v => (
+                      <div key={v.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
+                        onClick={()=>{ setSelectedVehicle(v); setView('detail'); }}>
+                        <div className="relative aspect-video bg-slate-100 overflow-hidden">
+                          <img src={v.image} alt={v.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
+                          <button onClick={e=>{ e.stopPropagation(); toggleWishlist(v.id); }}
+                            className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition">
+                            ❤️
+                          </button>
+                        </div>
+                        <div className="p-3">
+                          <p className="font-black text-slate-900 text-sm">{v.name}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{vShop(v)} · {v.location}</p>
+                          <p className="font-black text-slate-900 text-sm mt-2">Rs. {vPrice(v).toLocaleString()} <span className="text-xs font-normal text-slate-400">/day</span></p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (custAcc.bookings||[]).length === 0 ? (
               <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20">
                 <p className="text-5xl mb-3">🗓️</p>
                 <p className="font-black text-slate-700">{t.noBookings}</p>
                 <button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.browseVehicles}</button>
               </div>
             ) : (
-              {ownerSubTab === 'favourites' && (
-                <div>
-                  {wishlist.length === 0 ? (
-                    <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20">
-                      <p className="text-5xl mb-3">🤍</p>
-                      <p className="font-black text-slate-700">No favourites yet</p>
-                      <button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">Browse Vehicles</button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {allVehicles.filter(v => wishlist.includes(v.id)).map(v => (
-                        <div key={v.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
-                          onClick={()=>{ setSelectedVehicle(v); setView('detail'); }}>
-                          <div className="relative aspect-video bg-slate-100 overflow-hidden">
-                            <img src={v.image} alt={v.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
-                            <button onClick={e=>{ e.stopPropagation(); toggleWishlist(v.id); }}
-                              className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition">
-                              ❤️
-                            </button>
-                          </div>
-                          <div className="p-3">
-                            <p className="font-black text-slate-900 text-sm">{v.name}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">{vShop(v)} · {v.location}</p>
-                            <p className="font-black text-slate-900 text-sm mt-2">Rs. {vPrice(v).toLocaleString()} <span className="text-xs font-normal text-slate-400">/day</span></p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
               <div className="space-y-3">
                 {(custAcc.bookings||[])
                   .filter(b=> ownerSubTab==='all'?true:ownerSubTab==='upcoming'?b.status!=='completed'&&b.status!=='cancelled':b.status==='completed'||b.status==='cancelled')
-                  .filter(()=> ownerSubTab !== 'favourites')
                   .map(b=>(
                   <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden">
                     <div className="flex gap-4 p-4">
