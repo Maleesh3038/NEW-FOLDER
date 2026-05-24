@@ -1543,34 +1543,6 @@ export default function Home() {
                   )}
                 </div>
               </section>
-              {/* ══ BROWSE BY CITY ══ */}
-              <section className="bg-slate-50 py-12 px-4 border-t border-slate-100">
-                <div className="max-w-5xl mx-auto">
-                  <div className="text-center mb-8">
-                    <h2 className="text-2xl font-black text-slate-900">Browse by City</h2>
-                    <p className="text-slate-500 text-sm mt-1">Select a location to see available vehicles near you</p>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                      { city:'Colombo',  img:'https://images.unsplash.com/photo-1566552881560-0be862a7c445?w=400&q=80', from:'Rs. 3,500' },
-                      { city:'Galle',    img:'https://images.unsplash.com/photo-1586974490912-f4098d278ef8?w=400&q=80', from:'Rs. 3,000' },
-                      { city:'Kandy',    img:'https://images.unsplash.com/photo-1575994532903-e3df47e6dc72?w=400&q=80', from:'Rs. 2,500' },
-                      { city:'Negombo',  img:'https://images.unsplash.com/photo-1589308078059-be1415eab4c3?w=400&q=80', from:'Rs. 2,800' },
-                    ].map(c=>(
-                      <button key={c.city} onClick={()=>{ setFilterCity(c.city); setFilterType('all'); window.scrollTo({top:0,behavior:'smooth'}); }}
-                        className="relative rounded-2xl overflow-hidden aspect-[4/3] group cursor-pointer shadow-md hover:shadow-xl transition-all duration-300">
-                        <img src={c.img} alt={c.city} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"/>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"/>
-                        <div className="absolute bottom-0 left-0 right-0 p-3 text-left">
-                          <p className="text-white font-black text-sm">{c.city}</p>
-                          <p className="text-white/70 text-[11px] font-semibold">From {c.from}/day</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
               {/* ══ FAQ SECTION ══ */}
               <FaqSection />
 
