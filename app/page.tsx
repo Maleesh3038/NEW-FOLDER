@@ -102,6 +102,7 @@ export default function Home() {
   const [days,         setDays]         = useState(1);
   const [deliveryType, setDeliveryType] = useState<'pickup'|'delivery'>('pickup');
   const [bookingDone,  setBookingDone]  = useState(false);
+  const [pickupTime,   setPickupTime]   = useState('09:00');
 
   // ── currency
   const [currency, setCurrency] = useState('LKR');
@@ -245,9 +246,20 @@ export default function Home() {
   useEffect(() => {
     if (filterPickup && filterReturn) {
       const d = Math.ceil((new Date(filterReturn).getTime()-new Date(filterPickup).getTime())/86400000);
-      if (d>0) setDays(d);
+      if (d > 0) setDays(d);
+      else if (d <= 0) setFilterReturn(''); // clear invalid return date
     }
   }, [filterPickup, filterReturn]);
+
+  // Auto-set return date when days change
+  useEffect(() => {
+    if (filterPickup && days > 0) {
+      const pickup = new Date(filterPickup);
+      pickup.setDate(pickup.getDate() + days);
+      const ret = pickup.toISOString().split('T')[0];
+      if (ret !== filterReturn) setFilterReturn(ret);
+    }
+  }, [days, filterPickup]);
 
   // ── reset
   const resetToHome = () => {
@@ -511,6 +523,7 @@ export default function Home() {
       location: selectedVehicle.location || '',
       pickup_date: filterPickup || today,
       return_date: filterReturn || today,
+      pickup_time: pickupTime,
       days,
       delivery_type: deliveryType,
       price_per_day: vPrice(selectedVehicle) || 0,
@@ -869,6 +882,7 @@ export default function Home() {
                   <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100">
                     {([
                       [t.rentalPeriod, `${selectedBooking.pickup_date||''} → ${selectedBooking.return_date||''}`],
+                      ['Pickup Time', (selectedBooking as any).pickup_time || '—'],
                       ['Days', `${selectedBooking.days} day${selectedBooking.days>1?'s':''}`],
                       [t.pickupType, (selectedBooking.delivery_type||'pickup')==='delivery'?t.delivery:t.selfPickup],
                       [t.vehicleRented, `Rs. ${(selectedBooking.price_per_day||0).toLocaleString()} /day`],
@@ -1071,6 +1085,7 @@ export default function Home() {
                   <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100">
                     {([
                       [t.rentalPeriod, `${ownerSelectedBooking.pickup_date||''} → ${ownerSelectedBooking.return_date||''}`],
+                      ['Pickup Time', (ownerSelectedBooking as any).pickup_time || '—'],
                       ['Days', `${ownerSelectedBooking.days} day${ownerSelectedBooking.days>1?'s':''}`],
                       [t.pickupType, (ownerSelectedBooking.delivery_type||'pickup')==='delivery'?t.delivery:t.selfPickup],
                       ['Rate', `Rs. ${(ownerSelectedBooking.price_per_day||0).toLocaleString()} /day`],
@@ -1454,7 +1469,7 @@ export default function Home() {
                   <h2 className="text-2xl font-black text-slate-900 mb-2">{t.bookingSent}</h2>
                   <p className="text-slate-500 text-sm mb-6">{vShop(selectedVehicle)} will contact you via WhatsApp within 30 minutes.</p>
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-sm space-y-2 mb-4">
-                    {([[t.vehicleRented,selectedVehicle.name],['Days',`${days} day${days>1?'s':''}`],[t.total,`Rs. ${total.toLocaleString()}`]] as [string,string][]).map(([k,v])=>(
+                    {([[t.vehicleRented,selectedVehicle.name],['Pickup Date',`${filterPickup} at ${pickupTime}`],['Return Date',filterReturn],['Days',`${days} day${days>1?'s':''}`],[t.total,`Rs. ${total.toLocaleString()}`]] as [string,string][]).map(([k,v])=>(
                       <div key={k} className="flex justify-between"><span className="text-slate-500">{k}</span><span className="font-bold">{v}</span></div>
                     ))}
                   </div>
@@ -1527,6 +1542,18 @@ export default function Home() {
                       </div>
                     </div>
                     <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">⏰ Pickup Time</label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'].map(t=>(
+                          <button key={t} onClick={()=>setPickupTime(t)}
+                            className={`py-2 rounded-xl text-[11px] font-black border transition ${pickupTime===t?'bg-slate-900 text-white border-slate-900':'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'}`}>
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1.5">Selected: <span className="font-black text-slate-700">{pickupTime}</span> · Confirm with shop via WhatsApp</p>
+                    </div>
+                    <div>
                       <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.pickupMethod}</label>
                       <div className="grid grid-cols-2 gap-2">
                         {([['pickup','📍 '+t.selfPickup,'Free'],['delivery','🚚 '+t.delivery,'+Rs.1,500']] as [string,string,string][]).map(([val,label,note])=>(
@@ -1537,8 +1564,10 @@ export default function Home() {
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
                       <div className="flex justify-between"><span>{fmt(vPrice(selectedVehicle))} × {days}d</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
                       {deliveryType==='delivery' && <div className="flex justify-between"><span>{t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
-                      <div className="flex justify-between text-blue-600"><span>🔒 Platform fee (10%)</span><span className="font-bold">{fmt(Math.round((base+delFee)*0.10))}</span></div>
-                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>{t.total}</span><span className="text-red-500">{fmt(Math.round((base+delFee)*1.10))}</span></div>
+                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>{t.total}</span><span className="text-red-500">{fmt(total)}</span></div>
+                      <div className="flex items-center gap-1.5 pt-1 text-[10px] text-slate-400 font-medium border-t border-slate-100">
+                        <span>💳</span><span>Pay directly to shop · Drivo charges 0% to renters</span>
+                      </div>
                     </div>
                     <button onClick={confirmBooking} className="w-full bg-red-500 hover:bg-red-600 active:scale-95 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition">Confirm Booking →</button>
                     <p className="text-[10px] text-center text-slate-400">{t.noPayment}</p>
