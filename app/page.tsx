@@ -65,8 +65,9 @@ export default function Home() {
   const [selectedVehicle, setSelectedVehicle] = useState<RawVehicle|null>(null);
   const [detailTab,       setDetailTab]       = useState<'details'|'docs'|'faq'>('details');
   const [mobileMenuOpen,  setMobileMenuOpen]  = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<Booking|null>(null);
-  const [ownerSubTab,     setOwnerSubTab]     = useState<'fleet'|'bookings'>('fleet');
+  const [selectedBooking,      setSelectedBooking]      = useState<Booking|null>(null);
+  const [ownerSelectedBooking, setOwnerSelectedBooking] = useState<Booking|null>(null);
+  const [ownerSubTab,          setOwnerSubTab]          = useState<'fleet'|'bookings'>('fleet');
 
   // ── booking
   const [days,         setDays]         = useState(1);
@@ -778,6 +779,23 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Cancel button inside modal — only for active bookings */}
+                  {(selectedBooking.status === 'pending' || selectedBooking.status === 'confirmed') && (
+                    <button
+                      onClick={async () => {
+                        await cancelBooking(selectedBooking.id, 'customer');
+                        setSelectedBooking(null);
+                      }}
+                      className="w-full py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-sm uppercase tracking-wide transition flex items-center justify-center gap-2">
+                      ✕ Cancel This Booking
+                    </button>
+                  )}
+                  <button
+                    onClick={()=>setSelectedBooking(null)}
+                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition">
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
@@ -913,6 +931,78 @@ export default function Home() {
             </div>
           )}
 
+          {/* ── Owner Booking Detail Modal ── */}
+          {ownerSelectedBooking && (
+            <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center px-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 border-b">
+                  <h3 className="font-black text-slate-900">{t.bookingDetails}</h3>
+                  <button onClick={()=>setOwnerSelectedBooking(null)} className="text-slate-400 text-2xl hover:text-slate-700">×</button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="flex gap-4">
+                    <img src={ownerSelectedBooking.vehicle_img||''} className="w-28 h-20 rounded-xl object-cover flex-shrink-0" alt=""/>
+                    <div>
+                      <p className="font-black text-slate-900">{ownerSelectedBooking.vehicle_name||''}</p>
+                      <p className="text-xs text-slate-500 mt-1">{ownerSelectedBooking.shop_name||''} · {ownerSelectedBooking.location}</p>
+                      <span className={`inline-block mt-2 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${statusColor(ownerSelectedBooking.status)}`}>{statusLabel(ownerSelectedBooking.status)}</span>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100">
+                    {([
+                      [t.rentalPeriod, `${ownerSelectedBooking.pickup_date||''} → ${ownerSelectedBooking.return_date||''}`],
+                      ['Days', `${ownerSelectedBooking.days} day${ownerSelectedBooking.days>1?'s':''}`],
+                      [t.pickupType, (ownerSelectedBooking.delivery_type||'pickup')==='delivery'?t.delivery:t.selfPickup],
+                      ['Rate', `Rs. ${(ownerSelectedBooking.price_per_day||0).toLocaleString()} /day`],
+                      ...((ownerSelectedBooking.delivery_type||'pickup')==='delivery' ? [['Delivery Fee','Rs. 1,500']] : []),
+                      ['Total Earned', `Rs. ${(ownerSelectedBooking.total||0).toLocaleString()}`],
+                      [t.status, statusLabel(ownerSelectedBooking.status)],
+                      ['Booked On', ownerSelectedBooking.booked_at ? new Date(ownerSelectedBooking.booked_at).toLocaleDateString() : ''],
+                    ] as [string,string][]).map(([k,v])=>(
+                      <div key={k} className="flex justify-between px-4 py-2.5 text-xs">
+                        <span className="text-slate-500 font-semibold">{k}</span>
+                        <span className="font-black text-slate-900">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Action buttons inside modal */}
+                  {ownerSelectedBooking.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <button onClick={async ()=>{ await updateBookingStatus(ownerSelectedBooking.id,'confirmed'); setOwnerSelectedBooking(null); }}
+                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wide transition flex items-center justify-center gap-1.5">
+                        ✓ Accept Booking
+                      </button>
+                      <button onClick={async ()=>{
+                        if(!confirm('Decline this booking?')) return;
+                        await declineBooking(ownerSelectedBooking.id);
+                        setOwnerSelectedBooking(null);
+                      }} className="px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
+                        ✕ Decline
+                      </button>
+                    </div>
+                  )}
+                  {ownerSelectedBooking.status === 'confirmed' && (
+                    <div className="flex gap-2">
+                      <button onClick={async ()=>{ await updateBookingStatus(ownerSelectedBooking.id,'completed'); setOwnerSelectedBooking(null); }}
+                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase transition">
+                        ✓ Mark Completed
+                      </button>
+                      <button onClick={async ()=>{ await cancelBooking(ownerSelectedBooking.id,'owner'); setOwnerSelectedBooking(null); }}
+                        className="px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
+                        ✕ Cancel
+                      </button>
+                    </div>
+                  )}
+                  <button onClick={()=>setOwnerSelectedBooking(null)}
+                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
             {ownerSubTab==='bookings' && (
               <div className="space-y-3">
@@ -948,6 +1038,10 @@ export default function Home() {
                           }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
                             ✕ {t.decline}
                           </button>
+                          <button onClick={()=>setOwnerSelectedBooking(b)}
+                            className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">
+                            Details
+                          </button>
                         </div>
                         <p className="text-[10px] text-slate-400 text-center">The customer will receive an SMS confirmation automatically when you accept</p>
                       </div>
@@ -963,8 +1057,20 @@ export default function Home() {
                             className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
                             ✕ Cancel
                           </button>
+                          <button onClick={()=>setOwnerSelectedBooking(b)}
+                            className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">
+                            Details
+                          </button>
                         </div>
                         <p className="text-[10px] text-slate-400 text-center">Cancelling will notify the customer via SMS and make the vehicle available again</p>
+                      </div>
+                    )}
+                    {(b.status==='completed'||b.status==='cancelled') && (
+                      <div className="border-t border-slate-100 px-4 py-2.5 flex justify-end">
+                        <button onClick={()=>setOwnerSelectedBooking(b)}
+                          className="text-xs font-black text-slate-500 hover:text-slate-900 transition">
+                          {t.bookingDetails} →
+                        </button>
                       </div>
                     )}
                   </div>
