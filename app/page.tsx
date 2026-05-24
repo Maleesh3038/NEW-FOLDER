@@ -45,6 +45,35 @@ function mapVehicle(v: any): RawVehicle {
   };
 }
 
+// ── Customer Detail Card for Owner Booking Modal
+function CustomerDetailCard({ customerId }: { customerId: string }) {
+  const [cust, setCust] = useState<any>(null);
+  useEffect(() => {
+    supabase.from('customers').select('first_name,last_name,phone,nic,driving_license,city').eq('id', customerId).single()
+      .then(({ data }) => setCust(data));
+  }, [customerId]);
+  if (!cust) return <div className="text-xs text-slate-400 text-center py-2">Loading customer info...</div>;
+  return (
+    <div className="bg-blue-50 rounded-xl border border-blue-100 p-4 space-y-2">
+      <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider">Renter Details</p>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        {[
+          ['Name', `${cust.first_name||''} ${cust.last_name||''}`],
+          ['Phone', cust.phone||'—'],
+          ['City', cust.city||'—'],
+          ['NIC / Passport', cust.nic||'—'],
+          ['Driving License', cust.driving_license||'—'],
+        ].map(([k,v])=>(
+          <div key={k}>
+            <p className="text-[9px] text-slate-400 font-bold uppercase">{k}</p>
+            <p className="font-black text-slate-800">{v}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [lang, setLang]   = useState<LangKey>('EN');
   const t = T[lang];
@@ -98,8 +127,14 @@ export default function Home() {
   const [regShop,     setRegShop]     = useState('');
   const [regPhone,    setRegPhone]    = useState('');
   const [regCity,     setRegCity]     = useState('Colombo');
+  const [regNic,      setRegNic]      = useState('');
+  const [regLicense,  setRegLicense]  = useState('');
+  const [regIsForeign,setRegIsForeign]= useState(false);
   const [regError,    setRegError]    = useState('');
   const [showRegPw,   setShowRegPw]   = useState(false);
+
+  // login prompt modal
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
 
   // ── vehicle form
   const [showAddForm,      setShowAddForm]      = useState(false);
@@ -233,7 +268,8 @@ export default function Home() {
     setAuthMode(mode); setAuthTab(tab);
     setLoginEmail(''); setLoginPassword(''); setLoginError('');
     setRegEmail(''); setRegPassword(''); setRegConfirm('');
-    setRegFirst(''); setRegLast(''); setRegShop(''); setRegPhone(''); setRegError('');
+    setRegFirst(''); setRegLast(''); setRegShop(''); setRegPhone('');
+    setRegNic(''); setRegLicense(''); setRegIsForeign(false); setRegError('');
     setView('auth'); setMobileMenuOpen(false);
   };
 
@@ -283,8 +319,11 @@ export default function Home() {
     if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; }
     if (!regFirst.trim()) { setRegError('First name required'); return; }
     if (!regPhone.trim()) { setRegError('Phone required'); return; }
+    if (!regNic.trim()) { setRegError(regIsForeign ? 'Passport number required' : 'NIC number required'); return; }
+    if (!regLicense.trim()) { setRegError(regIsForeign ? 'International driving license required' : 'Driving license number required'); return; }
     const { data, error } = await registerCustomer(regEmail, regPassword, {
       firstName: regFirst, lastName: regLast, phone: regPhone, city: regCity,
+      nic: regNic, drivingLicense: regLicense,
     });
     if (error || !data) { setRegError(error || 'Registration failed'); return; }
     saveSession({ id: data.id!, email: data.email, role: 'customer' });
@@ -455,6 +494,11 @@ export default function Home() {
 
   const confirmBooking = async () => {
     if (!selectedVehicle) return;
+    // Require login to book
+    if (sessionRole !== 'customer') {
+      setLoginPromptOpen(true);
+      return;
+    }
     const today = new Date().toISOString().split('T')[0];
 
     const bookingData = {
@@ -564,7 +608,7 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  <button onClick={()=>openAuth('customer')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition">{t.customerLogin}</button>
+                  <button onClick={()=>openAuth('customer')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition">🚗 Rent a Vehicle</button>
                   <button onClick={()=>openAuth('owner')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 transition">{t.partnerLogin}</button>
                 </>
               )}
@@ -580,13 +624,44 @@ export default function Home() {
               </>
             ) : (
               <>
-                <button onClick={()=>openAuth('customer')} className="w-full py-2.5 text-sm font-bold bg-slate-100 rounded-xl">{t.customerLogin}</button>
+                <button onClick={()=>openAuth('customer')} className="w-full py-2.5 text-sm font-bold bg-slate-100 rounded-xl">🚗 Rent a Vehicle</button>
                 <button onClick={()=>openAuth('owner')} className="w-full py-2.5 text-sm font-black bg-slate-900 text-white rounded-xl">{t.partnerLogin}</button>
               </>
             )}
           </div>
         )}
       </nav>
+
+
+      {/* ══ LOGIN PROMPT MODAL (shown when guest tries to book) ══ */}
+      {loginPromptOpen && (
+        <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center px-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-slate-900 px-6 py-6 text-center">
+              <DrivoLogo className="w-10 h-10 mx-auto mb-2"/>
+              <h2 className="text-white text-xl font-black">Login Required</h2>
+              <p className="text-slate-400 text-xs mt-1">You need an account to book a vehicle</p>
+            </div>
+            <div className="p-6 space-y-3">
+              <button onClick={()=>{ setLoginPromptOpen(false); openAuth('customer','login'); }}
+                className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase tracking-wide transition shadow-md">
+                🔑 Sign In to My Account
+              </button>
+              <button onClick={()=>{ setLoginPromptOpen(false); openAuth('customer','register'); }}
+                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm uppercase tracking-wide transition">
+                ✨ Create New Account
+              </button>
+              <p className="text-center text-[11px] text-slate-400 pt-1">
+                Free account · Takes 1 minute · NIC &amp; license required
+              </p>
+              <button onClick={()=>setLoginPromptOpen(false)}
+                className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ AUTH PAGE ══ */}
       {view==='auth' && (
@@ -668,6 +743,35 @@ export default function Home() {
                             <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.lastName}</label><input type="text" placeholder="Perera" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regLast} onChange={e=>setRegLast(e.target.value)}/></div>
                           </div>
                           <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.phone} <span className="text-red-400">*</span></label><input type="tel" placeholder="077XXXXXXX" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regPhone} onChange={e=>setRegPhone(e.target.value)}/></div>
+
+                          {/* Foreigner toggle */}
+                          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                            <input type="checkbox" id="isForeign" checked={regIsForeign} onChange={e=>setRegIsForeign(e.target.checked)} className="w-4 h-4 accent-slate-900 cursor-pointer"/>
+                            <label htmlFor="isForeign" className="text-xs font-black text-slate-700 cursor-pointer">I am a foreign national (tourist/expat)</label>
+                          </div>
+
+                          {/* ID Document */}
+                          <div>
+                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                              {regIsForeign ? 'Passport Number' : 'NIC Number'} <span className="text-red-400">*</span>
+                            </label>
+                            <input type="text"
+                              placeholder={regIsForeign ? 'e.g. A12345678' : 'e.g. 200012345678 or 991234567V'}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
+                              value={regNic} onChange={e=>setRegNic(e.target.value)}/>
+                          </div>
+
+                          {/* Driving License */}
+                          <div>
+                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                              {regIsForeign ? 'International Driving License No.' : 'Driving License No.'} <span className="text-red-400">*</span>
+                            </label>
+                            <input type="text"
+                              placeholder={regIsForeign ? 'International license number' : 'e.g. B1234567'}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
+                              value={regLicense} onChange={e=>setRegLicense(e.target.value)}/>
+                            <p className="text-[10px] text-slate-400 mt-1">⚠️ Your name on ID &amp; license must match. Required for verification.</p>
+                          </div>
                         </>
                       )}
                       <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.city}</label>
@@ -981,6 +1085,11 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Customer details — fetched from DB */}
+                  {ownerSelectedBooking.customer_id && (
+                    <CustomerDetailCard customerId={ownerSelectedBooking.customer_id} />
+                  )}
 
                   {/* Action buttons inside modal */}
                   {ownerSelectedBooking.status === 'pending' && (
@@ -1428,9 +1537,10 @@ export default function Home() {
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
                       <div className="flex justify-between"><span>{fmt(vPrice(selectedVehicle))} × {days}d</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
                       {deliveryType==='delivery' && <div className="flex justify-between"><span>{t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
-                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>{t.total}</span><span className="text-red-500">{fmt(total)}</span></div>
+                      <div className="flex justify-between text-blue-600"><span>🔒 Platform fee (10%)</span><span className="font-bold">{fmt(Math.round((base+delFee)*0.10))}</span></div>
+                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>{t.total}</span><span className="text-red-500">{fmt(Math.round((base+delFee)*1.10))}</span></div>
                     </div>
-                    <button onClick={confirmBooking} className="w-full bg-red-500 hover:bg-red-600 active:scale-95 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition">{t.confirmBooking} →</button>
+                    <button onClick={confirmBooking} className="w-full bg-red-500 hover:bg-red-600 active:scale-95 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition">Confirm Booking →</button>
                     <p className="text-[10px] text-center text-slate-400">{t.noPayment}</p>
                   </div>
                 </div>
