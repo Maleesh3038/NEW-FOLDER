@@ -502,9 +502,11 @@ export default function Home() {
   };
 
   // ── confirm booking (customer)
-  const base   = selectedVehicle ? (selectedVehicle.price_per_day || (selectedVehicle as any).pricePerDay || 0) * days : 0;
-  const delFee = deliveryType==='delivery' ? 1500 : 0;
-  const total  = base+delFee;
+  const base           = selectedVehicle ? (selectedVehicle.price_per_day || (selectedVehicle as any).pricePerDay || 0) * days : 0;
+  const delFee         = deliveryType==='delivery' ? 1500 : 0;
+  const total          = base + delFee;
+  const platformFeeAmt = Math.round(total * 0.10);   // Drivo's cut (hidden from customer)
+  const ownerPayoutAmt = total - platformFeeAmt;      // what owner receives
 
   const confirmBooking = async () => {
     if (!selectedVehicle) return;
@@ -1093,8 +1095,8 @@ export default function Home() {
                       ['Rate', `Rs. ${(ownerSelectedBooking.price_per_day||0).toLocaleString()} /day`],
                       ...((ownerSelectedBooking.delivery_type||'pickup')==='delivery' ? [['Delivery Fee','Rs. 1,500']] : []),
                       ['Customer Pays', `Rs. ${(ownerSelectedBooking.total||0).toLocaleString()}`],
-                      ['Drivo Fee (10%)', `− Rs. ${((ownerSelectedBooking as any).platform_fee || platformFee(ownerSelectedBooking.total||0)).toLocaleString()}`],
-                      ['✅ Your Payout', `Rs. ${((ownerSelectedBooking as any).owner_payout || ownerPayout(ownerSelectedBooking.total||0)).toLocaleString()}`],
+                      ['Drivo Fee (10%)', `− Rs. ${((ownerSelectedBooking as any).platform_fee || Math.round((ownerSelectedBooking.total||0)*0.10)).toLocaleString()}`],
+                      ['✅ Your Payout', `Rs. ${((ownerSelectedBooking as any).owner_payout || Math.round((ownerSelectedBooking.total||0)*0.90)).toLocaleString()}`],
                       [t.status, statusLabel(ownerSelectedBooking.status)],
                       ['Booked On', ownerSelectedBooking.booked_at ? new Date(ownerSelectedBooking.booked_at).toLocaleDateString() : ''],
                     ] as [string,string][]).map(([k,v])=>(
@@ -1174,7 +1176,7 @@ export default function Home() {
                           <div>
                             <p className="font-black text-slate-900 text-sm">{b.vehicle_name||''}</p>
                             <p className="text-xs text-slate-400 mt-0.5">📅 {b.pickup_date||''} → {b.return_date||''} · {b.days}d</p>
-                            <p className="text-xs text-slate-400">{(b.delivery_type||'pickup')==='delivery'?'🚚 '+t.delivery:'📍 '+t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span> · <span className="text-emerald-600 font-black">You get Rs. {((b as any).owner_payout || ownerPayout(b.total)).toLocaleString()}</span></p>
+                            <p className="text-xs text-slate-400">{(b.delivery_type||'pickup')==='delivery'?'🚚 '+t.delivery:'📍 '+t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span> · <span className="text-emerald-600 font-black">You get Rs. {((b as any).owner_payout || Math.round(b.total*0.90)).toLocaleString()}</span></p>
                           </div>
                           <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span>
                         </div>
@@ -1348,7 +1350,7 @@ export default function Home() {
                               <h4 className="font-black text-slate-900 text-sm leading-tight">{v.name}</h4>
                               <div className="text-right flex-shrink-0">
                               <p className="font-black text-slate-900 text-sm">Rs.{vPrice(v).toLocaleString()}</p>
-                              <p className="text-[10px] text-emerald-600 font-bold">You get Rs.{ownerPayout(vPrice(v)).toLocaleString()}</p>
+                              <p className="text-[10px] text-emerald-600 font-bold">You get Rs.{Math.round(vPrice(v)*0.90).toLocaleString()}/day</p>
                             </div>
                             </div>
                             <p className="text-xs text-slate-400 mb-3">{v.transmission} · {v.fuel} · {v.location}</p>
@@ -1476,8 +1478,17 @@ export default function Home() {
                   <h2 className="text-2xl font-black text-slate-900 mb-2">{t.bookingSent}</h2>
                   <p className="text-slate-500 text-sm mb-6">{vShop(selectedVehicle)} will contact you via WhatsApp within 30 minutes.</p>
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-sm space-y-2 mb-4">
-                    {([[t.vehicleRented,selectedVehicle.name],['Pickup Date',`${filterPickup} at ${pickupTime}`],['Return Date',filterReturn],['Days',`${days} day${days>1?'s':''}`],[t.total,`Rs. ${total.toLocaleString()}`]] as [string,string][]).map(([k,v])=>(
-                      <div key={k} className="flex justify-between"><span className="text-slate-500">{k}</span><span className="font-bold">{v}</span></div>
+                    {([
+                      [t.vehicleRented, selectedVehicle.name],
+                      ['Pickup Date', `${filterPickup} at ${pickupTime}`],
+                      ['Return Date', filterReturn],
+                      ['Days', `${days} day${days>1?'s':''}`],
+                      ['Total to Pay', `Rs. ${total.toLocaleString()}`],
+                    ] as [string,string][]).map(([k,v])=>(
+                      <div key={k} className={`flex justify-between ${k==='Total to Pay'?'font-black text-slate-900 border-t border-slate-200 pt-2 mt-1':''}`}>
+                        <span className="text-slate-500">{k}</span>
+                        <span className={k==='Total to Pay'?'text-red-500 font-black':'font-bold'}>{v}</span>
+                      </div>
                     ))}
                   </div>
                   {vMap(selectedVehicle) && (
@@ -1570,8 +1581,8 @@ export default function Home() {
                     </div>
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
                       <div className="flex justify-between"><span>{fmt(vPrice(selectedVehicle))} × {days}d</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
-                      {deliveryType==='delivery' && <div className="flex justify-between"><span>{t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
-                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>{t.total}</span><span className="text-red-500">{fmt(total)}</span></div>
+                      {deliveryType==='delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
+                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Total</span><span className="text-red-500">{fmt(total)}</span></div>
                       <div className="flex items-center gap-1.5 pt-1 text-[10px] text-slate-400 font-medium border-t border-slate-100">
                         <span>💳</span><span>Pay directly to shop · No online payment needed</span>
                       </div>
