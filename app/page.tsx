@@ -32,6 +32,19 @@ function DrivoLogo({ className = 'w-9 h-9' }: { className?: string }) {
   );
 }
 
+// ── Helper: map DB vehicle to RawVehicle
+function mapVehicle(v: any): RawVehicle {
+  return {
+    ...v,
+    image: v.vehicle_photos?.[0]?.storage_url || '',
+    images: v.vehicle_photos
+      ?.sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+      .map((p: any) => p.storage_url) || [],
+    isAvailable: v.is_available,
+    mapLink: v.map_link,
+  };
+}
+
 export default function Home() {
   const [lang, setLang]   = useState<LangKey>('EN');
   const t = T[lang];
@@ -91,7 +104,7 @@ export default function Home() {
   const [showAddForm,      setShowAddForm]      = useState(false);
   const [editingId,        setEditingId]        = useState<string|null>(null);
   const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:''});
-  const [photos,           setPhotos]           = useState<string[]>([]); // base64 array, min 3 max 5
+  const [photos,           setPhotos]           = useState<string[]>([]);
   const [isDragging,       setIsDragging]       = useState(false);
 
   // ── profile edit modals
@@ -116,7 +129,7 @@ export default function Home() {
   const curr = CURRENCIES[currency] ?? CURRENCIES['LKR'];
   const fmt  = (p:number) => `${curr.sign} ${(p*curr.rate).toLocaleString(undefined,{minimumFractionDigits:curr.dec,maximumFractionDigits:curr.dec})}`;
 
-  // ── Normalize vehicle fields (DB uses snake_case, some UI uses camelCase)
+  // ── Normalize vehicle fields
   const vPrice  = (v: any) => v?.price_per_day || v?.pricePerDay || 0;
   const vShop   = (v: any) => v?.shop_name || v?.shopName || '';
   const vAvail  = (v: any) => v?.isAvailable !== false && v?.is_available !== false;
@@ -124,24 +137,30 @@ export default function Home() {
   const vImg    = (v: any) => v?.image || (v?.images?.[0]) || v?.vehicle_photos?.[0]?.storage_url || '';
 
   const typeIcon = (tp:string) => tp==='car'?'🚙':tp==='bike'?'🏍️':'🛺';
-  const statusColor = (s:string) => s==='confirmed'?'bg-emerald-50 text-emerald-700 border-emerald-200':s==='completed'?'bg-blue-50 text-blue-700 border-blue-200':'bg-amber-50 text-amber-700 border-amber-200';
-  const statusLabel = (s:string) => s==='confirmed'?t.confirmed:s==='completed'?t.completed:t.pending;
+  const statusColor = (s:string) => s==='confirmed'?'bg-emerald-50 text-emerald-700 border-emerald-200':s==='completed'?'bg-blue-50 text-blue-700 border-blue-200':s==='cancelled'?'bg-slate-50 text-slate-500 border-slate-200':'bg-amber-50 text-amber-700 border-amber-200';
+  const statusLabel = (s:string) => s==='confirmed'?t.confirmed:s==='completed'?t.completed:s==='cancelled'?'Cancelled':t.pending;
+
+  // ── FIX 1: Unified vehicle refresh — updates BOTH allVehicles and ownerFleet
+  const refreshVehicles = useCallback(async (ownerId?: string) => {
+    // Refresh public listing (only available vehicles)
+    const vehicles = await getAvailableVehicles();
+    setAllVehicles(vehicles.map(mapVehicle));
+
+    // If owner id provided, also refresh their full fleet (including unavailable)
+    if (ownerId) {
+      const ownerVehicles = await getOwnerVehicles(ownerId);
+      const fleet = ownerVehicles.map(mapVehicle);
+      setOwnerFleet(fleet);
+      setOwnerAcc(prev => prev ? { ...prev, fleet } : prev);
+    }
+  }, []);
 
   // ── bootstrap
   useEffect(() => {
     trackVisitInDB().catch(()=>{});
-    // Load vehicles from Supabase
     getAvailableVehicles().then(vehicles => {
-      const mapped: RawVehicle[] = vehicles.map(v => ({
-        ...v,
-        image: v.vehicle_photos?.[0]?.storage_url || '',
-        images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url) || [],
-        isAvailable: v.is_available,
-        mapLink: v.map_link,
-      }));
-      setAllVehicles(mapped);
+      setAllVehicles(vehicles.map(mapVehicle));
     }).catch(()=>{});
-    // Restore session
     const s = getSession();
     if (s) restoreSession(s.id, s.email, s.role);
   }, []);
@@ -151,29 +170,37 @@ export default function Home() {
       const { data } = await supabase.from('owners').select('*').eq('id', id).single();
       if (data) {
         const vehicles = await getOwnerVehicles(id);
-        const fleet: RawVehicle[] = vehicles.map(v => ({
-          ...v, image: v.vehicle_photos?.[0]?.storage_url || '',
-          images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
-          isAvailable: v.is_available, mapLink: v.map_link,
-        }));
-        const { data: bdata } = await supabase.from('bookings').select('*').eq('owner_id', id).order('booked_at', {ascending:false});
+        const fleet = vehicles.map(mapVehicle);
+        // FIX 2: Fetch ALL bookings for owner (not just pending) ordered newest first
+        const { data: bdata } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('owner_id', id)
+          .not('status', 'eq', 'declined')
+          .order('booked_at', { ascending: false });
         setSessionEmail(email); setSessionRole('owner');
-        setOwnerAcc({...data, fleet, bookings: bdata||[]});
-        setOwnerFleet(fleet); setOwnerBookings(bdata||[]);
+        setOwnerAcc({ ...data, fleet, bookings: bdata || [] });
+        setOwnerFleet(fleet);
+        setOwnerBookings(bdata || []);
       }
     } else {
       const { data } = await supabase.from('customers').select('*').eq('id', id).single();
       if (data) {
-        const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', id).order('booked_at', {ascending:false});
+        const { data: bdata } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('customer_id', id)
+          .not('status', 'eq', 'declined')
+          .order('booked_at', { ascending: false });
         setSessionEmail(email); setSessionRole('customer');
-        setCustAcc({...data, bookings: bdata||[]});
+        setCustAcc({ ...data, bookings: bdata || [] });
       }
     }
   };
 
-  // ── displayed vehicles — filter from allVehicles state
+  // ── FIX 1b: Filter displayed from allVehicles — only show is_available = true
   useEffect(() => {
-    let filtered = allVehicles.filter(v => (v as any).isAvailable !== false && (v as any).is_available !== false);
+    let filtered = allVehicles.filter(v => v.is_available === true || v.isAvailable === true);
     if (filterCity !== 'All Sri Lanka') filtered = filtered.filter(v => v.location?.toLowerCase() === filterCity.toLowerCase());
     if (filterType !== 'all') filtered = filtered.filter(v => v.type === filterType);
     setDisplayed(filtered);
@@ -268,14 +295,6 @@ export default function Home() {
   const handleLogin    = () => authMode==='owner' ? handleOwnerLogin()    : handleCustLogin();
   const handleRegister = () => authMode==='owner' ? handleOwnerRegister() : handleCustRegister();
 
-  // ── save owner fleet
-  const saveOwnerFleet = useCallback((next: RawVehicle[]) => {
-    if (!sessionEmail) return;
-    const accs = getOwnerAccs(); if (!accs[sessionEmail]) return;
-    accs[sessionEmail].fleet = next; saveOwnerAccs(accs);
-    setOwnerAcc({...accs[sessionEmail]}); setOwnerFleet(next);
-  }, [sessionEmail]);
-
   // ── vehicle submit
   const handleVehicleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -308,20 +327,8 @@ export default function Home() {
       showToast('Vehicle published! 🚀');
     }
 
-    // Refresh fleet
-    const vehicles = await getOwnerVehicles(ownerId);
-    const fleet: RawVehicle[] = vehicles.map(v => ({
-      ...v, image: v.vehicle_photos?.[0]?.storage_url || '',
-      images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
-      isAvailable: v.is_available, mapLink: v.map_link,
-    }));
-    setOwnerFleet(fleet);
-    setAllVehicles(await getAvailableVehicles().then(vs => vs.map(v => ({
-      ...v, image: v.vehicle_photos?.[0]?.storage_url||'',
-      images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url)||[],
-      isAvailable: v.is_available, mapLink: v.map_link,
-    }))));
-
+    // FIX 1: Use unified refresh that updates both states
+    await refreshVehicles(ownerId);
     setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:''});
     setPhotos([]); setShowAddForm(false); setEditingId(null);
   };
@@ -329,18 +336,26 @@ export default function Home() {
   const toggleAvail = async (id: string) => {
     const v = ownerFleet.find(v => v.id === id);
     if (!v) return;
-    await toggleVehicleAvailability(id, !vAvail(v));
-    const updated = ownerFleet.map(x => x.id === id ? {...x, isAvailable: !x.isAvailable} : x);
+    const newAvail = !vAvail(v);
+    await toggleVehicleAvailability(id, newAvail);
+    // Update ownerFleet state immediately (optimistic)
+    const updated = ownerFleet.map(x => x.id === id ? { ...x, isAvailable: newAvail, is_available: newAvail } : x);
     setOwnerFleet(updated);
-    showToast(vAvail(v) ? `"${v.name}" hidden` : `"${v.name}" is now live!`);
+    // Also refresh public listing
+    const vehicles = await getAvailableVehicles();
+    setAllVehicles(vehicles.map(mapVehicle));
+    showToast(newAvail ? `"${v.name}" is now live!` : `"${v.name}" hidden`);
   };
 
   const deleteVehicle = async (id: string) => {
     if (!confirm('Delete this vehicle?')) return;
     await dbDeleteVehicle(id);
     setOwnerFleet(ownerFleet.filter(v => v.id !== id));
+    const vehicles = await getAvailableVehicles();
+    setAllVehicles(vehicles.map(mapVehicle));
     showToast('Deleted','err');
   };
+
   const processImg = (file: File) => {
     if (photos.length >= 5) { showToast('Maximum 5 photos allowed', 'err'); return; }
     const r = new FileReader();
@@ -352,7 +367,6 @@ export default function Home() {
     setPhotos(prev => { const a = [...prev]; const [item] = a.splice(from, 1); a.splice(to, 0, item); return a; });
   };
 
-  // ── update booking status (owner)
   // ── Helper: call booking API
   const bookingAPI = async (action: string, params: Record<string,any>) => {
     const res = await fetch('/api/booking', {
@@ -363,46 +377,46 @@ export default function Home() {
     return res.json();
   };
 
-  // ── Helper: refresh all vehicles
-  const refreshVehicles = async () => {
-    const vehicles = await getAvailableVehicles();
-    setAllVehicles(vehicles.map(v => ({
-      ...v,
-      image: v.vehicle_photos?.[0]?.storage_url || '',
-      images: v.vehicle_photos?.sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).map(p=>p.storage_url) || [],
-      isAvailable: v.is_available,
-      mapLink: v.map_link,
-    })));
+  // ── FIX 2: Owner refresh bookings from DB (source of truth)
+  const refreshOwnerBookings = async (ownerId: string) => {
+    const { data } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('owner_id', ownerId)
+      .not('status', 'eq', 'declined')
+      .order('booked_at', { ascending: false });
+    setOwnerBookings(data || []);
+    setOwnerAcc(prev => prev ? { ...prev, bookings: data || [] } : prev);
   };
 
-  // ── Owner: accept booking
+  // ── FIX 3: Owner accept booking — refresh from DB after action
   const updateBookingStatus = async (bookingId: string, status: 'confirmed'|'completed') => {
     if (status === 'confirmed') {
       const res = await bookingAPI('accept', { bookingId });
       if (res.error) { showToast(res.error, 'err'); return; }
-      const updated = ownerBookings.map(b => b.id === bookingId ? {...b, status:'confirmed'} : b.vehicle_id === ownerBookings.find(x=>x.id===bookingId)?.vehicle_id && b.status==='pending' ? {...b,status:'declined'} : b);
-      setOwnerBookings(updated.filter(b => b.status !== 'declined'));
-      await refreshVehicles();
+      // Refresh bookings from DB (declined ones won't appear due to filter)
+      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
+      await refreshVehicles(ownerAcc?.id);
       showToast('Booking confirmed! Customer notified via SMS. ✓');
     } else {
       const res = await bookingAPI('complete', { bookingId });
       if (res.error) { showToast(res.error, 'err'); return; }
-      setOwnerBookings(ownerBookings.map(b => b.id === bookingId ? {...b, status:'completed'} : b));
-      await refreshVehicles();
+      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
+      await refreshVehicles(ownerAcc?.id);
       showToast('Rental completed! Vehicle is available again. ✓');
     }
   };
 
-  // ── Owner: decline booking
+  // ── FIX 3: Owner decline — refresh from DB after action
   const declineBooking = async (bookingId: string) => {
     const res = await bookingAPI('decline', { bookingId });
     if (res.error) { showToast(res.error, 'err'); return; }
-    setOwnerBookings(ownerBookings.filter(b => b.id !== bookingId));
-    await refreshVehicles();
+    if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
+    await refreshVehicles(ownerAcc?.id);
     showToast('Booking declined. Vehicle is available again.');
   };
 
-  // ── Owner or Customer: cancel booking
+  // ── FIX 4: Cancel booking — refresh customer bookings from DB after action
   const cancelBooking = async (bookingId: string, role: 'owner'|'customer') => {
     const msg = role === 'owner'
       ? 'Cancel this booking? The customer will be notified and the vehicle will become available again.'
@@ -417,12 +431,19 @@ export default function Home() {
     if (res.error) { showToast(res.error, 'err'); return; }
 
     if (role === 'owner') {
-      setOwnerBookings(ownerBookings.filter(b => b.id !== bookingId));
+      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
+      await refreshVehicles(ownerAcc?.id);
     } else if (custAcc?.id) {
-      const bdata = await getCustomerBookings(custAcc.id);
-      setCustAcc(prev => prev ? {...prev, bookings: bdata} : prev);
+      // FIX 4: Re-fetch from DB instead of relying on stale state
+      const { data: bdata } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('customer_id', custAcc.id)
+        .not('status', 'eq', 'declined')
+        .order('booked_at', { ascending: false });
+      setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev);
+      await refreshVehicles();
     }
-    await refreshVehicles();
     showToast('Booking cancelled. Vehicle is available again.');
   };
 
@@ -468,9 +489,15 @@ export default function Home() {
       return;
     }
 
+    // FIX 4: Re-fetch customer bookings from DB
     if (sessionRole === 'customer' && custAcc?.id) {
-      const bdata = await getCustomerBookings(custAcc.id);
-      setCustAcc(prev => prev ? {...prev, bookings: bdata} : prev);
+      const { data: bdata } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('customer_id', custAcc.id)
+        .not('status', 'eq', 'declined')
+        .order('booked_at', { ascending: false });
+      setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev);
     }
     await refreshVehicles();
     await trackBookingInDB().catch(()=>{});
@@ -665,10 +692,10 @@ export default function Home() {
           <div className="bg-white border-b border-slate-200 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl">{custAcc.first_name||"".charAt(0)}</div>
+                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl">{(custAcc.first_name||'U').charAt(0)}</div>
                 <div>
-                  <p className="font-black text-slate-900 text-base">{custAcc.first_name||""} {custAcc.last_name||""}</p>
-                  <p className="text-xs text-slate-500">{custAcc.city||""} · {custAcc.phone||""}</p>
+                  <p className="font-black text-slate-900 text-base">{custAcc.first_name||''} {custAcc.last_name||''}</p>
+                  <p className="text-xs text-slate-500">{custAcc.city||''} · {custAcc.phone||''}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -702,9 +729,15 @@ export default function Home() {
                     <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none cursor-pointer" value={custEditData.city} onChange={e=>setCustEditData({...custEditData,city:e.target.value})}>
                       {SL_CITIES.slice(1).map(c=><option key={c}>{c}</option>)}
                     </select></div>
-                  <button onClick={()=>{
-                    if(!sessionEmail) return;
-                    const accs=getCustAccs(); if(accs[sessionEmail]){ accs[sessionEmail].profile=custEditData; saveCustAccs(accs); setCustAcc({...accs[sessionEmail]}); }
+                  <button onClick={async ()=>{
+                    if (!custAcc?.id) return;
+                    await supabase.from('customers').update({
+                      first_name: custEditData.firstName,
+                      last_name: custEditData.lastName,
+                      phone: custEditData.phone,
+                      city: custEditData.city,
+                    }).eq('id', custAcc.id);
+                    setCustAcc(prev => prev ? {...prev, first_name:custEditData.firstName, last_name:custEditData.lastName, phone:custEditData.phone, city:custEditData.city} : prev);
                     setCustEditOpen(false); showToast(t.profileUpdated);
                   }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.saveProfile}</button>
                 </div>
@@ -721,10 +754,10 @@ export default function Home() {
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="flex gap-4">
-                    <img src={selectedBooking.vehicle_img||""} className="w-28 h-20 rounded-xl object-cover flex-shrink-0" alt=""/>
+                    <img src={selectedBooking.vehicle_img||''} className="w-28 h-20 rounded-xl object-cover flex-shrink-0" alt=""/>
                     <div>
-                      <p className="font-black text-slate-900">{selectedBooking.vehicle_name||""}</p>
-                      <p className="text-xs text-slate-500 mt-1">{selectedBooking.shop_name||""} · {selectedBooking.location}</p>
+                      <p className="font-black text-slate-900">{selectedBooking.vehicle_name||''}</p>
+                      <p className="text-xs text-slate-500 mt-1">{selectedBooking.shop_name||''} · {selectedBooking.location}</p>
                       <span className={`inline-block mt-2 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${statusColor(selectedBooking.status)}`}>{statusLabel(selectedBooking.status)}</span>
                     </div>
                   </div>
@@ -768,23 +801,23 @@ export default function Home() {
             ) : (
               <div className="space-y-3">
                 {(custAcc.bookings||[])
-                  .filter(b=> ownerSubTab==='all'?true:ownerSubTab==='upcoming'?b.status!=='completed':b.status==='completed')
+                  .filter(b=> ownerSubTab==='all'?true:ownerSubTab==='upcoming'?b.status!=='completed'&&b.status!=='cancelled':b.status==='completed'||b.status==='cancelled')
                   .map(b=>(
                   <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden">
                     <div className="flex gap-4 p-4">
-                      <img src={b.vehicle_img||""} className="w-24 h-16 rounded-xl object-cover flex-shrink-0" alt=""/>
+                      <img src={b.vehicle_img||''} className="w-24 h-16 rounded-xl object-cover flex-shrink-0" alt=""/>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="font-black text-slate-900 text-sm">{b.vehicle_name||""}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">{b.shop_name||""} · {b.location}</p>
+                            <p className="font-black text-slate-900 text-sm">{b.vehicle_name||''}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{b.shop_name||''} · {b.location}</p>
                           </div>
                           <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span>
                         </div>
                         <div className="flex items-center gap-4 mt-1.5 flex-wrap">
-                          <span className="text-xs text-slate-500">📅 {b.pickup_date||""} → {b.return_date||""}</span>
+                          <span className="text-xs text-slate-500">📅 {b.pickup_date||''} → {b.return_date||''}</span>
                           <span className="text-xs font-black text-slate-900">Rs. {b.total.toLocaleString()}</span>
-                          <span className="text-xs text-slate-400">{b.days}d · {b.delivery_type||"pickup"}</span>
+                          <span className="text-xs text-slate-400">{b.days}d · {b.delivery_type||'pickup'}</span>
                         </div>
                       </div>
                     </div>
@@ -814,10 +847,10 @@ export default function Home() {
           <div className="bg-white border-b border-slate-200 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-xl">{ownerAcc.shop_name||"".charAt(0).toUpperCase()}</div>
+                <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-xl">{(ownerAcc.shop_name||'S').charAt(0).toUpperCase()}</div>
                 <div>
-                  <p className="font-black text-slate-900 text-base">{ownerAcc.shop_name||""}</p>
-                  <p className="text-xs text-slate-500">{ownerAcc.city||""} · {ownerAcc.phone||""}</p>
+                  <p className="font-black text-slate-900 text-base">{ownerAcc.shop_name||''}</p>
+                  <p className="text-xs text-slate-500">{ownerAcc.city||''} · {ownerAcc.phone||''}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -890,13 +923,13 @@ export default function Home() {
                 ) : ownerBookings.map(b=>(
                   <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="flex gap-4 p-4">
-                      <img src={b.vehicle_img||""} className="w-20 h-14 rounded-xl object-cover flex-shrink-0" alt=""/>
+                      <img src={b.vehicle_img||''} className="w-20 h-14 rounded-xl object-cover flex-shrink-0" alt=""/>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="font-black text-slate-900 text-sm">{b.vehicle_name||""}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">📅 {b.pickup_date||""} → {b.return_date||""} · {b.days}d</p>
-                            <p className="text-xs text-slate-400">{b.delivery_type||"pickup"==='delivery'?'🚚 '+t.delivery:'📍 '+t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span></p>
+                            <p className="font-black text-slate-900 text-sm">{b.vehicle_name||''}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">📅 {b.pickup_date||''} → {b.return_date||''} · {b.days}d</p>
+                            <p className="text-xs text-slate-400">{(b.delivery_type||'pickup')==='delivery'?'🚚 '+t.delivery:'📍 '+t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span></p>
                           </div>
                           <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span>
                         </div>
@@ -967,18 +1000,13 @@ export default function Home() {
                           <input type="number" required min="500" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={newV.pricePerDay} onChange={e=>setNewV({...newV,pricePerDay:Number(e.target.value)})}/></div>
                       </div>
 
-                      {/* ── MULTI PHOTO UPLOAD (min 3, max 5) ── */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                            Vehicle Photos
-                          </label>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Vehicle Photos</label>
                           <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${photos.length < 3 ? 'bg-red-50 text-red-500 border border-red-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
                             {photos.length}/5 · min 3 required
                           </span>
                         </div>
-
-                        {/* Uploaded photos grid */}
                         {photos.length > 0 && (
                           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
                             {photos.map((p, i) => (
@@ -994,8 +1022,6 @@ export default function Home() {
                             ))}
                           </div>
                         )}
-
-                        {/* Upload zone (hide when 5 reached) */}
                         {photos.length < 5 && (
                           <div
                             onDragOver={e=>{e.preventDefault();setIsDragging(true);}}
@@ -1013,18 +1039,13 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* ── GOOGLE MAPS LOCATION ── */}
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
-                          Pickup Location (Google Maps)
-                        </label>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Pickup Location (Google Maps)</label>
                         <input type="url"
                           placeholder="Paste Google Maps link — e.g. https://maps.google.com/?q=..."
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition"
                           value={newV.mapLink} onChange={e=>setNewV({...newV,mapLink:e.target.value})}/>
-                        <p className="text-[10px] text-slate-400 mt-1.5">
-                          Google Maps eke "Share" → "Copy link" karala paste karanna · Optional but recommended
-                        </p>
+                        <p className="text-[10px] text-slate-400 mt-1.5">Google Maps eke "Share" → "Copy link" karala paste karanna · Optional but recommended</p>
                         {newV.mapLink && (
                           <a href={newV.mapLink} target="_blank" rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-blue-600 hover:underline">
@@ -1162,9 +1183,7 @@ export default function Home() {
                     <div className="col-span-full text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
                       <p className="text-5xl mb-4">🚗</p>
                       <p className="text-base font-black text-slate-700">
-                        {filterCity !== 'All Sri Lanka' || filterType !== 'all'
-                          ? t.noVehiclesFound
-                          : 'No vehicles listed yet'}
+                        {filterCity !== 'All Sri Lanka' || filterType !== 'all' ? t.noVehiclesFound : 'No vehicles listed yet'}
                       </p>
                       <p className="text-sm text-slate-400 mt-2 max-w-xs mx-auto">
                         {filterCity !== 'All Sri Lanka' || filterType !== 'all'
@@ -1192,31 +1211,17 @@ export default function Home() {
                   <div className="text-6xl mb-4">🎉</div>
                   <h2 className="text-2xl font-black text-slate-900 mb-2">{t.bookingSent}</h2>
                   <p className="text-slate-500 text-sm mb-6">{vShop(selectedVehicle)} will contact you via WhatsApp within 30 minutes.</p>
-
-                  {/* Booking summary */}
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-sm space-y-2 mb-4">
                     {([[t.vehicleRented,selectedVehicle.name],['Days',`${days} day${days>1?'s':''}`],[t.total,`Rs. ${total.toLocaleString()}`]] as [string,string][]).map(([k,v])=>(
                       <div key={k} className="flex justify-between"><span className="text-slate-500">{k}</span><span className="font-bold">{v}</span></div>
                     ))}
                   </div>
-
-                  {/* Get Directions button */}
                   {vMap(selectedVehicle) && (
                     <a href={vMap(selectedVehicle)} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 w-full py-3 mb-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm transition shadow-md">
                       📍 Get Directions to Pickup Location
                     </a>
                   )}
-
-                  {/* WhatsApp contact */}
-                  {ownerAcc?.whatsapp && (
-                    <a href={`https://wa.me/94${(ownerAcc.whatsapp||'').replace(/^0/,'').replace(/[^0-9]/g,'')}`}
-                      target="_blank" rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 w-full py-3 mb-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-sm transition shadow-md">
-                      💬 Contact Shop on WhatsApp
-                    </a>
-                  )}
-
                   {sessionRole==='customer' && <p className="text-xs text-emerald-600 font-bold mb-4">✓ Saved to your booking history</p>}
                   <div className="flex gap-3 justify-center flex-wrap">
                     {sessionRole==='customer' && <button onClick={()=>setView('custDash')} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.myBookings}</button>}
