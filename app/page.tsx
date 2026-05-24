@@ -791,6 +791,22 @@ export default function Home() {
                       ✕ Cancel This Booking
                     </button>
                   )}
+                  {(selectedBooking.status === 'completed' || selectedBooking.status === 'cancelled') && (
+                    <button onClick={async ()=>{
+                      if (!confirm('Remove this booking from your history?')) return;
+                      await supabase.from('bookings').update({ customer_id: null }).eq('id', selectedBooking.id);
+                      const { data: bdata } = await supabase
+                        .from('bookings').select('*')
+                        .eq('customer_id', custAcc.id)
+                        .not('status','eq','declined')
+                        .order('booked_at',{ascending:false});
+                      setCustAcc(prev => prev ? {...prev, bookings: bdata||[]} : prev);
+                      setSelectedBooking(null);
+                      showToast('Removed from history');
+                    }} className="w-full py-3 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl font-black text-xs uppercase transition">
+                      🗑 Remove from History
+                    </button>
+                  )}
                   <button
                     onClick={()=>setSelectedBooking(null)}
                     className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition">
@@ -993,6 +1009,17 @@ export default function Home() {
                         ✕ Cancel
                       </button>
                     </div>
+                  )}
+                  {(ownerSelectedBooking.status === 'completed' || ownerSelectedBooking.status === 'cancelled') && (
+                    <button onClick={async ()=>{
+                      if (!confirm('Remove this booking from history?')) return;
+                      await supabase.from('bookings').delete().eq('id', ownerSelectedBooking.id);
+                      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
+                      setOwnerSelectedBooking(null);
+                      showToast('Booking removed from history');
+                    }} className="w-full py-3 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl font-black text-xs uppercase transition">
+                      🗑 Remove from History
+                    </button>
                   )}
                   <button onClick={()=>setOwnerSelectedBooking(null)}
                     className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition">
