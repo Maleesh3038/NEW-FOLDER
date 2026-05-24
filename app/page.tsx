@@ -173,6 +173,8 @@ export default function Home() {
   const vMap    = (v: any) => v?.mapLink || v?.map_link || '';
   const vImg    = (v: any) => v?.image || (v?.images?.[0]) || v?.vehicle_photos?.[0]?.storage_url || '';
 
+  const platformFee = (amount: number) => Math.round(amount * 0.10);
+  const ownerPayout = (amount: number) => Math.round(amount * 0.90);
   const typeIcon = (tp:string) => tp==='car'?'🚙':tp==='bike'?'🏍️':'🛺';
   const statusColor = (s:string) => s==='confirmed'?'bg-emerald-50 text-emerald-700 border-emerald-200':s==='completed'?'bg-blue-50 text-blue-700 border-blue-200':s==='cancelled'?'bg-slate-50 text-slate-500 border-slate-200':'bg-amber-50 text-amber-700 border-amber-200';
   const statusLabel = (s:string) => s==='confirmed'?t.confirmed:s==='completed'?t.completed:s==='cancelled'?'Cancelled':t.pending;
@@ -1090,7 +1092,9 @@ export default function Home() {
                       [t.pickupType, (ownerSelectedBooking.delivery_type||'pickup')==='delivery'?t.delivery:t.selfPickup],
                       ['Rate', `Rs. ${(ownerSelectedBooking.price_per_day||0).toLocaleString()} /day`],
                       ...((ownerSelectedBooking.delivery_type||'pickup')==='delivery' ? [['Delivery Fee','Rs. 1,500']] : []),
-                      ['Total Earned', `Rs. ${(ownerSelectedBooking.total||0).toLocaleString()}`],
+                      ['Customer Pays', `Rs. ${(ownerSelectedBooking.total||0).toLocaleString()}`],
+                      ['Drivo Fee (10%)', `− Rs. ${((ownerSelectedBooking as any).platform_fee || platformFee(ownerSelectedBooking.total||0)).toLocaleString()}`],
+                      ['✅ Your Payout', `Rs. ${((ownerSelectedBooking as any).owner_payout || ownerPayout(ownerSelectedBooking.total||0)).toLocaleString()}`],
                       [t.status, statusLabel(ownerSelectedBooking.status)],
                       ['Booked On', ownerSelectedBooking.booked_at ? new Date(ownerSelectedBooking.booked_at).toLocaleDateString() : ''],
                     ] as [string,string][]).map(([k,v])=>(
@@ -1170,7 +1174,7 @@ export default function Home() {
                           <div>
                             <p className="font-black text-slate-900 text-sm">{b.vehicle_name||''}</p>
                             <p className="text-xs text-slate-400 mt-0.5">📅 {b.pickup_date||''} → {b.return_date||''} · {b.days}d</p>
-                            <p className="text-xs text-slate-400">{(b.delivery_type||'pickup')==='delivery'?'🚚 '+t.delivery:'📍 '+t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span></p>
+                            <p className="text-xs text-slate-400">{(b.delivery_type||'pickup')==='delivery'?'🚚 '+t.delivery:'📍 '+t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span> · <span className="text-emerald-600 font-black">You get Rs. {((b as any).owner_payout || ownerPayout(b.total)).toLocaleString()}</span></p>
                           </div>
                           <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span>
                         </div>
@@ -1342,7 +1346,10 @@ export default function Home() {
                           <div className="p-4">
                             <div className="flex items-start justify-between gap-2 mb-1">
                               <h4 className="font-black text-slate-900 text-sm leading-tight">{v.name}</h4>
-                              <div className="text-right flex-shrink-0"><p className="font-black text-slate-900 text-sm">Rs.{vPrice(v).toLocaleString()}</p><p className="text-[10px] text-slate-400">/day</p></div>
+                              <div className="text-right flex-shrink-0">
+                              <p className="font-black text-slate-900 text-sm">Rs.{vPrice(v).toLocaleString()}</p>
+                              <p className="text-[10px] text-emerald-600 font-bold">You get Rs.{ownerPayout(vPrice(v)).toLocaleString()}</p>
+                            </div>
                             </div>
                             <p className="text-xs text-slate-400 mb-3">{v.transmission} · {v.fuel} · {v.location}</p>
                             <div className="flex gap-2 pt-3 border-t border-slate-100">
@@ -1566,7 +1573,7 @@ export default function Home() {
                       {deliveryType==='delivery' && <div className="flex justify-between"><span>{t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
                       <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>{t.total}</span><span className="text-red-500">{fmt(total)}</span></div>
                       <div className="flex items-center gap-1.5 pt-1 text-[10px] text-slate-400 font-medium border-t border-slate-100">
-                        <span>💳</span><span>Pay directly to shop · Drivo charges 0% to renters</span>
+                        <span>💳</span><span>Pay directly to shop · No online payment needed</span>
                       </div>
                     </div>
                     <button onClick={confirmBooking} className="w-full bg-red-500 hover:bg-red-600 active:scale-95 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition">Confirm Booking →</button>
