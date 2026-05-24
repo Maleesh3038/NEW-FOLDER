@@ -1464,6 +1464,52 @@ export default function Home() {
                   )}
                 </div>
               </section>
+              {/* ══ WHY BOOK WITH DRIVO ══ */}
+              <section className="bg-white py-16 px-4 border-t border-slate-100">
+                <div className="max-w-5xl mx-auto">
+                  <div className="text-center mb-12">
+                    <span className="text-xs font-black text-red-500 uppercase tracking-widest">All Inclusive with Drivo</span>
+                    <h2 className="text-3xl md:text-4xl font-black text-slate-900 mt-2">Why Book with Us?</h2>
+                    <p className="text-slate-500 mt-3 text-sm max-w-lg mx-auto">Every vehicle on Drivo is verified. Simply book, show up, and enjoy your ride.</p>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                    {[
+                      { icon: '✅', title: 'Verified Vehicles', desc: 'Every car, bike & tuk-tuk is inspected and verified by our team' },
+                      { icon: '🛡️', title: 'Secure Booking', desc: 'NIC & license verified renters. Your vehicle is in safe hands' },
+                      { icon: '💬', title: 'WhatsApp Support', desc: 'Direct contact with the shop. 24/7 communication guaranteed' },
+                      { icon: '🗺️', title: 'GPS Pickup Location', desc: 'Every listing has a Google Maps pin. No confusion at pickup' },
+                      { icon: '🚗', title: 'Cars, Bikes & Tuk-tuks', desc: 'Sri Lanka's largest multi-vehicle rental marketplace' },
+                      { icon: '💸', title: 'No Hidden Fees', desc: 'Transparent pricing. Only a 10% booking fee, nothing more' },
+                      { icon: '🇱🇰', title: 'Support Local', desc: 'Every booking supports a local Sri Lankan vehicle owner' },
+                      { icon: '⚡', title: 'Book in 60 Seconds', desc: 'Pick dates, select time, confirm. Instant booking request sent' },
+                    ].map(item => (
+                      <div key={item.title} className="text-center group">
+                        <div className="w-16 h-16 bg-slate-50 border-2 border-slate-100 group-hover:border-red-200 group-hover:bg-red-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 transition-all duration-300">
+                          {item.icon}
+                        </div>
+                        <h3 className="font-black text-slate-900 text-sm mb-1">{item.title}</h3>
+                        <p className="text-xs text-slate-400 leading-relaxed">{item.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Stats bar */}
+                  <div className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { num: '100%', label: 'Verified Listings' },
+                      { num: '60s', label: 'Average Booking Time' },
+                      { num: '0', label: 'Hidden Charges' },
+                      { num: '24/7', label: 'WhatsApp Support' },
+                    ].map(s => (
+                      <div key={s.label} className="bg-slate-900 rounded-2xl p-5 text-center">
+                        <p className="text-2xl font-black text-white">{s.num}</p>
+                        <p className="text-xs text-slate-400 mt-1 font-semibold">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
               <footer className="bg-slate-900 text-slate-500 py-8 px-4 text-center text-xs">
                 <div className="flex items-center justify-center gap-2 mb-2"><DrivoLogo className="w-6 h-6"/><span className="font-black text-white text-sm">drivo</span><span className="text-slate-700">·</span><span>Sri Lanka's Vehicle Rental Marketplace</span></div>
                 <p className="text-slate-700">© 2026 Drivo LK</p>
