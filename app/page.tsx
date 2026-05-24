@@ -45,6 +45,85 @@ function mapVehicle(v: any): RawVehicle {
   };
 }
 
+// ── FAQ Section Component
+function FaqSection() {
+  const [activeTab, setActiveTab] = useState<'general'|'booking'|'price'|'documents'>('general');
+  const [openIdx, setOpenIdx] = useState<number|null>(0);
+
+  const faqs: Record<string, {q:string;a:string}[]> = {
+    general: [
+      { q: 'How does Drivo work?', a: 'Drivo is Sri Lanka's vehicle rental marketplace. Browse verified cars, bikes & tuk-tuks from local owners. Select your dates, confirm booking, and pay directly to the shop. No middleman payments — we only charge a 10% booking fee.' },
+      { q: 'Are all vehicles verified?', a: 'Yes. Every vehicle listed on Drivo is verified by our team. Owners must provide vehicle documents, photos, and their business details before going live.' },
+      { q: 'Do I need to create an account to book?', a: 'Yes. To protect both renters and owners, you must register with your NIC/Passport and Driving License. This ensures only verified drivers can book vehicles.' },
+      { q: 'Is Drivo available island-wide?', a: 'Yes! Drivo covers all major cities in Sri Lanka including Colombo, Galle, Kandy, Negombo, Ella, Mirissa and more. New locations are added regularly.' },
+    ],
+    booking: [
+      { q: 'How do I confirm a booking?', a: 'Select your vehicle, choose pickup date, return date, pickup time and method (self-pickup or delivery). Click "Confirm Booking" — the shop will receive an SMS and confirm within 30 minutes via WhatsApp.' },
+      { q: 'Can I cancel my booking?', a: 'Yes. You can cancel a pending or confirmed booking from your dashboard. The shop will be notified via SMS and the vehicle will become available again.' },
+      { q: 'What if the shop doesn't respond?', a: 'If you don't receive a WhatsApp confirmation within 2 hours, contact us via thedrivo.com. We will follow up with the owner on your behalf.' },
+      { q: 'Can I extend my rental period?', a: 'Yes — contact the shop directly via WhatsApp to discuss an extension. If the vehicle is available, they can approve it for additional days.' },
+    ],
+    price: [
+      { q: 'What is the Drivo booking fee?', a: 'Drivo charges a 10% booking fee on each rental. This fee is included in the displayed price — you don't pay extra. The shop receives 90% of the total, and Drivo earns 10%.' },
+      { q: 'When do I pay?', a: 'Payment is made directly to the shop at pickup — cash or bank transfer. There is no online payment required through Drivo at this stage.' },
+      { q: 'Is there a security deposit?', a: 'Most vehicles on Drivo do not require a deposit. However, some owners may request one. This will be mentioned in the vehicle description or confirmed via WhatsApp.' },
+      { q: 'What does the delivery fee cover?', a: 'If you select delivery, the shop will bring the vehicle to your location for an additional Rs. 1,500. This covers the delivery cost for the owner.' },
+    ],
+    documents: [
+      { q: 'What documents do I need to rent?', a: 'You need: (1) National ID Card (NIC) or Passport for foreign nationals, (2) Valid Sri Lanka Driving License or International Driving Permit for foreigners. These must be uploaded during registration.' },
+      { q: 'Can foreigners rent vehicles on Drivo?', a: 'Yes! Foreign nationals can rent using their Passport and International Driving License. Select "I am a foreign national" during registration. Your documents will be verified before booking.' },
+      { q: 'Does my name on NIC need to match my license?', a: 'Yes. For verification purposes, the name on your NIC/Passport must match your Driving License. Mismatched documents will result in booking cancellation.' },
+      { q: 'Are my documents stored securely?', a: 'Your document numbers are stored securely in our database. We do not share your personal information with third parties. Document data is only visible to Drivo admins for verification.' },
+    ],
+  };
+
+  const tabs: {key: typeof activeTab; label: string}[] = [
+    { key: 'general',   label: 'General' },
+    { key: 'booking',   label: 'Booking' },
+    { key: 'price',     label: 'Pricing' },
+    { key: 'documents', label: 'Documents' },
+  ];
+
+  return (
+    <section className="bg-white py-16 px-4 border-t border-slate-100">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900">Frequently Asked Questions</h2>
+          <p className="text-slate-500 text-sm mt-2">Everything you need to know about renting with Drivo</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 justify-center flex-wrap mb-8">
+          {tabs.map(tab=>(
+            <button key={tab.key} onClick={()=>{ setActiveTab(tab.key); setOpenIdx(0); }}
+              className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-wide border transition ${activeTab===tab.key?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* FAQ Items */}
+        <div className="space-y-2">
+          {faqs[activeTab].map((item, idx)=>(
+            <div key={idx} className="border border-slate-200 rounded-2xl overflow-hidden">
+              <button onClick={()=>setOpenIdx(openIdx===idx?null:idx)}
+                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 transition">
+                <span className="font-black text-slate-900 text-sm pr-4">{item.q}</span>
+                <span className={`text-slate-400 text-xl font-bold flex-shrink-0 transition-transform duration-200 ${openIdx===idx?'rotate-45':''}`}>+</span>
+              </button>
+              {openIdx===idx && (
+                <div className="px-5 pb-4">
+                  <p className="text-sm text-slate-500 leading-relaxed">{item.a}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── Customer Detail Card for Owner Booking Modal
 function CustomerDetailCard({ customerId }: { customerId: string }) {
   const [cust, setCust] = useState<any>(null);
@@ -1464,6 +1543,37 @@ export default function Home() {
                   )}
                 </div>
               </section>
+              {/* ══ BROWSE BY CITY ══ */}
+              <section className="bg-slate-50 py-12 px-4 border-t border-slate-100">
+                <div className="max-w-5xl mx-auto">
+                  <div className="text-center mb-8">
+                    <h2 className="text-2xl font-black text-slate-900">Browse by City</h2>
+                    <p className="text-slate-500 text-sm mt-1">Select a location to see available vehicles near you</p>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[
+                      { city:'Colombo',  img:'https://images.unsplash.com/photo-1566552881560-0be862a7c445?w=400&q=80', from:'Rs. 3,500' },
+                      { city:'Galle',    img:'https://images.unsplash.com/photo-1586974490912-f4098d278ef8?w=400&q=80', from:'Rs. 3,000' },
+                      { city:'Kandy',    img:'https://images.unsplash.com/photo-1575994532903-e3df47e6dc72?w=400&q=80', from:'Rs. 2,500' },
+                      { city:'Negombo',  img:'https://images.unsplash.com/photo-1589308078059-be1415eab4c3?w=400&q=80', from:'Rs. 2,800' },
+                    ].map(c=>(
+                      <button key={c.city} onClick={()=>{ setFilterCity(c.city); setFilterType('all'); window.scrollTo({top:0,behavior:'smooth'}); }}
+                        className="relative rounded-2xl overflow-hidden aspect-[4/3] group cursor-pointer shadow-md hover:shadow-xl transition-all duration-300">
+                        <img src={c.img} alt={c.city} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"/>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"/>
+                        <div className="absolute bottom-0 left-0 right-0 p-3 text-left">
+                          <p className="text-white font-black text-sm">{c.city}</p>
+                          <p className="text-white/70 text-[11px] font-semibold">From {c.from}/day</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              {/* ══ FAQ SECTION ══ */}
+              <FaqSection />
+
               {/* ══ WHY BOOK WITH DRIVO ══ */}
               <section className="bg-white py-16 px-4 border-t border-slate-100">
                 <div className="max-w-5xl mx-auto">
