@@ -45,6 +45,57 @@ function mapVehicle(v: any): RawVehicle {
   };
 }
 
+// ── Vehicle Reviews Component
+function VehicleReviews({ vehicleId }: { vehicleId: string }) {
+  const [reviews, setReviews] = useState<any[]>([]);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/reviews?vehicle_id=eq.${vehicleId}&select=*,customers(first_name,last_name)&order=created_at.desc`, {
+      headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }
+    }).then(r=>r.json()).then(data=>{ if(Array.isArray(data)) setReviews(data); });
+  }, [vehicleId]);
+
+  if (reviews.length === 0) return (
+    <div className="mt-4 text-center py-8 bg-slate-50 rounded-xl border border-slate-200">
+      <p className="text-3xl mb-2">⭐</p>
+      <p className="text-sm font-black text-slate-600">No reviews yet</p>
+      <p className="text-xs text-slate-400 mt-1">Be the first to review after your rental!</p>
+    </div>
+  );
+
+  const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+        <span className="text-2xl">⭐</span>
+        <div>
+          <p className="font-black text-slate-900 text-lg">{avg.toFixed(1)} <span className="text-sm font-semibold text-slate-500">/ 5</span></p>
+          <p className="text-xs text-slate-500">{reviews.length} review{reviews.length > 1 ? 's' : ''}</p>
+        </div>
+      </div>
+      {reviews.map(r => (
+        <div key={r.id} className="bg-slate-50 rounded-xl border border-slate-200 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-slate-700 rounded-full flex items-center justify-center text-white text-xs font-black">
+                {(r.customers?.first_name || 'A').charAt(0)}
+              </div>
+              <p className="text-xs font-black text-slate-700">{r.customers?.first_name || 'Anonymous'}</p>
+            </div>
+            <div className="flex gap-0.5">
+              {[1,2,3,4,5].map(s => (
+                <span key={s} className={`text-sm ${s <= r.rating ? 'opacity-100' : 'opacity-20'}`}>⭐</span>
+              ))}
+            </div>
+          </div>
+          {r.comment && <p className="text-xs text-slate-600 leading-relaxed">{r.comment}</p>}
+          <p className="text-[10px] text-slate-400 mt-2">{r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── FAQ Section Component
 function FaqSection() {
   const [activeTab, setActiveTab] = useState<'general'|'booking'|'price'|'documents'>('general');
@@ -164,6 +215,17 @@ export default function Home() {
   const [filterType,  setFilterType]  = useState('all');
   const [filterPickup,setFilterPickup]= useState('');
   const [filterReturn,setFilterReturn]= useState('');
+  const [filterPriceMin, setFilterPriceMin] = useState(0);
+  const [filterPriceMax, setFilterPriceMax] = useState(50000);
+  const [filterAC,       setFilterAC]       = useState(false);
+  const [filterTrans,    setFilterTrans]     = useState('all'); // all/automatic/manual
+  const [filterFuel,     setFilterFuel]      = useState('all');
+  const [showAdvFilter,  setShowAdvFilter]   = useState(false);
+  const [wishlist,       setWishlist]        = useState<string[]>([]); // vehicle IDs
+  const [reviewModal,    setReviewModal]     = useState<{vehicleId:string;bookingId:string;vehicleName:string}|null>(null);
+  const [reviewRating,   setReviewRating]    = useState(5);
+  const [reviewComment,  setReviewComment]   = useState('');
+  const [vehicleReviews, setVehicleReviews]  = useState<Record<string,any[]>>({});
 
   // ── navigation
   type ViewType = 'home'|'detail'|'auth'|'ownerDash'|'custDash';
@@ -321,8 +383,20 @@ export default function Home() {
     let filtered = allVehicles.filter(v => v.is_available === true || v.isAvailable === true);
     if (filterCity !== 'All Sri Lanka') filtered = filtered.filter(v => v.location?.toLowerCase() === filterCity.toLowerCase());
     if (filterType !== 'all') filtered = filtered.filter(v => v.type === filterType);
+    if (filterPriceMin > 0) filtered = filtered.filter(v => vPrice(v) >= filterPriceMin);
+    if (filterPriceMax < 50000) filtered = filtered.filter(v => vPrice(v) <= filterPriceMax);
+    if (filterTrans !== 'all') filtered = filtered.filter(v => v.transmission?.toLowerCase() === filterTrans.toLowerCase());
+    if (filterFuel !== 'all') filtered = filtered.filter(v => v.fuel?.toLowerCase() === filterFuel.toLowerCase());
     setDisplayed(filtered);
-  }, [allVehicles, filterCity, filterType]);
+  }, [allVehicles, filterCity, filterType, filterPriceMin, filterPriceMax, filterTrans, filterFuel]);
+
+  // Load wishlist from Supabase on login
+  useEffect(() => {
+    if (sessionRole === 'customer' && custAcc?.id) {
+      supabase.from('wishlist').select('vehicle_id').eq('customer_id', custAcc.id)
+        .then(({ data }) => { if (data) setWishlist(data.map(w => w.vehicle_id)); });
+    }
+  }, [sessionRole, custAcc?.id]);
 
   useEffect(() => {
     if (filterPickup && filterReturn) {
@@ -580,6 +654,46 @@ export default function Home() {
     showToast('Booking cancelled. Vehicle is available again.');
   };
 
+  // ── Toggle wishlist
+  const toggleWishlist = async (vehicleId: string) => {
+    if (sessionRole !== 'customer' || !custAcc?.id) {
+      setLoginPromptOpen(true); return;
+    }
+    const isWishlisted = wishlist.includes(vehicleId);
+    if (isWishlisted) {
+      await supabase.from('wishlist').delete().eq('customer_id', custAcc.id).eq('vehicle_id', vehicleId);
+      setWishlist(prev => prev.filter(id => id !== vehicleId));
+      showToast('Removed from favourites');
+    } else {
+      await supabase.from('wishlist').insert({ customer_id: custAcc.id, vehicle_id: vehicleId });
+      setWishlist(prev => [...prev, vehicleId]);
+      showToast('Saved to favourites ❤️');
+    }
+  };
+
+  // ── Submit review
+  const submitReview = async () => {
+    if (!reviewModal || !custAcc?.id) return;
+    if (reviewRating < 1 || reviewRating > 5) { showToast('Select a rating', 'err'); return; }
+    const { error } = await supabase.from('reviews').insert({
+      vehicle_id: reviewModal.vehicleId,
+      customer_id: custAcc.id,
+      booking_id: reviewModal.bookingId,
+      owner_id: allVehicles.find(v => v.id === reviewModal.vehicleId)?.owner_id,
+      rating: reviewRating,
+      comment: reviewComment.trim(),
+    });
+    if (error) { showToast('Review failed: ' + error.message, 'err'); return; }
+    // Update vehicle rating in DB
+    const { data: reviews } = await supabase.from('reviews').select('rating').eq('vehicle_id', reviewModal.vehicleId);
+    if (reviews && reviews.length > 0) {
+      const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+      await supabase.from('vehicles').update({ rating: Math.round(avg * 10) / 10 }).eq('id', reviewModal.vehicleId);
+    }
+    setReviewModal(null); setReviewRating(5); setReviewComment('');
+    showToast('Review submitted! Thank you 🌟');
+  };
+
   // ── confirm booking (customer)
   const base           = selectedVehicle ? (selectedVehicle.price_per_day || (selectedVehicle as any).pricePerDay || 0) * days : 0;
   const delFee         = deliveryType==='delivery' ? 1500 : 0;
@@ -728,6 +842,49 @@ export default function Home() {
         )}
       </nav>
 
+
+      {/* ══ REVIEW MODAL ══ */}
+      {reviewModal && (
+        <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center px-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-slate-900 px-6 py-5 text-center">
+              <p className="text-2xl mb-1">⭐</p>
+              <h2 className="text-white text-lg font-black">Rate Your Ride</h2>
+              <p className="text-slate-400 text-xs mt-1">{reviewModal.vehicleName}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 text-center">Your Rating</p>
+                <div className="flex justify-center gap-2">
+                  {[1,2,3,4,5].map(star=>(
+                    <button key={star} onClick={()=>setReviewRating(star)}
+                      className={`text-3xl transition-transform hover:scale-110 ${star <= reviewRating ? '' : 'opacity-30'}`}>
+                      ⭐
+                    </button>
+                  ))}
+                </div>
+                <p className="text-center text-xs font-bold text-slate-500 mt-2">
+                  {reviewRating === 1 ? 'Poor' : reviewRating === 2 ? 'Fair' : reviewRating === 3 ? 'Good' : reviewRating === 4 ? 'Very Good' : 'Excellent!'}
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">Comment (optional)</label>
+                <textarea rows={3} placeholder="Tell others about your experience..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition resize-none"
+                  value={reviewComment} onChange={e=>setReviewComment(e.target.value)}/>
+              </div>
+              <button onClick={submitReview}
+                className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase tracking-wide transition">
+                Submit Review 🌟
+              </button>
+              <button onClick={()=>setReviewModal(null)}
+                className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ LOGIN PROMPT MODAL (shown when guest tries to book) ══ */}
       {loginPromptOpen && (
@@ -1019,11 +1176,11 @@ export default function Home() {
           )}
 
           <div className="max-w-7xl mx-auto px-4 py-6">
-            <div className="flex gap-2 mb-5">
-              {(['all','upcoming','past'] as const).map(tab=>(
+            <div className="flex gap-2 mb-5 flex-wrap">
+              {(['all','upcoming','past','favourites'] as const).map(tab=>(
                 <button key={tab} onClick={()=>setOwnerSubTab(tab as any)}
                   className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition ${ownerSubTab===tab?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
-                  {tab==='all'?t.myBookings:tab==='upcoming'?t.upcomingRentals:t.pastRentals}
+                  {tab==='all'?t.myBookings:tab==='upcoming'?t.upcomingRentals:tab==='past'?t.pastRentals:'❤️ Favourites'}
                 </button>
               ))}
             </div>
@@ -1034,9 +1191,42 @@ export default function Home() {
                 <button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.browseVehicles}</button>
               </div>
             ) : (
+              {ownerSubTab === 'favourites' && (
+                <div>
+                  {wishlist.length === 0 ? (
+                    <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20">
+                      <p className="text-5xl mb-3">🤍</p>
+                      <p className="font-black text-slate-700">No favourites yet</p>
+                      <button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">Browse Vehicles</button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {allVehicles.filter(v => wishlist.includes(v.id)).map(v => (
+                        <div key={v.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
+                          onClick={()=>{ setSelectedVehicle(v); setView('detail'); }}>
+                          <div className="relative aspect-video bg-slate-100 overflow-hidden">
+                            <img src={v.image} alt={v.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
+                            <button onClick={e=>{ e.stopPropagation(); toggleWishlist(v.id); }}
+                              className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition">
+                              ❤️
+                            </button>
+                          </div>
+                          <div className="p-3">
+                            <p className="font-black text-slate-900 text-sm">{v.name}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{vShop(v)} · {v.location}</p>
+                            <p className="font-black text-slate-900 text-sm mt-2">Rs. {vPrice(v).toLocaleString()} <span className="text-xs font-normal text-slate-400">/day</span></p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-3">
                 {(custAcc.bookings||[])
                   .filter(b=> ownerSubTab==='all'?true:ownerSubTab==='upcoming'?b.status!=='completed'&&b.status!=='cancelled':b.status==='completed'||b.status==='cancelled')
+                  .filter(()=> ownerSubTab !== 'favourites')
                   .map(b=>(
                   <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden">
                     <div className="flex gap-4 p-4">
@@ -1063,6 +1253,12 @@ export default function Home() {
                           <button onClick={()=>cancelBooking(b.id, 'customer')}
                             className="text-xs font-black text-red-500 hover:text-red-700 transition border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg">
                             Cancel
+                          </button>
+                        )}
+                        {b.status === 'completed' && (
+                          <button onClick={()=>{ setReviewModal({ vehicleId: b.vehicle_id, bookingId: b.id, vehicleName: b.vehicle_name||'' }); setReviewRating(5); setReviewComment(''); }}
+                            className="text-xs font-black text-amber-600 hover:text-amber-700 transition border border-amber-200 bg-amber-50 hover:bg-amber-100 px-3 py-1 rounded-lg">
+                            ⭐ Review
                           </button>
                         )}
                         <button onClick={()=>setSelectedBooking(b)} className="text-xs font-black text-slate-600 hover:text-slate-900 transition">{t.bookingDetails} →</button>
@@ -1488,6 +1684,58 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+              {/* ══ ADVANCED FILTERS ══ */}
+              <div className="bg-white border-b border-slate-200">
+                <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+                  <button onClick={()=>setShowAdvFilter(!showAdvFilter)}
+                    className={`flex items-center gap-2 text-xs font-black px-3 py-2 rounded-xl border transition ${showAdvFilter?'bg-slate-900 text-white border-slate-900':'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+                    ⚙️ Advanced Filters {showAdvFilter ? '▲' : '▼'}
+                  </button>
+                  {(filterPriceMax < 50000 || filterTrans !== 'all' || filterFuel !== 'all') && (
+                    <button onClick={()=>{ setFilterPriceMin(0); setFilterPriceMax(50000); setFilterTrans('all'); setFilterFuel('all'); }}
+                      className="text-xs font-bold text-red-500 hover:text-red-700 transition">Clear filters ×</button>
+                  )}
+                </div>
+                {showAdvFilter && (
+                  <div className="max-w-6xl mx-auto px-4 pb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Min Price (Rs.)</label>
+                      <input type="number" min="0" max="50000" step="500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-slate-900 transition"
+                        value={filterPriceMin || ''} placeholder="0"
+                        onChange={e=>setFilterPriceMin(Number(e.target.value)||0)}/>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Max Price (Rs.)</label>
+                      <input type="number" min="0" max="100000" step="500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-slate-900 transition"
+                        value={filterPriceMax === 50000 ? '' : filterPriceMax} placeholder="Any"
+                        onChange={e=>setFilterPriceMax(Number(e.target.value)||50000)}/>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Transmission</label>
+                      <select value={filterTrans} onChange={e=>setFilterTrans(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition">
+                        <option value="all">Any</option>
+                        <option value="automatic">Automatic</option>
+                        <option value="manual">Manual</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Fuel Type</label>
+                      <select value={filterFuel} onChange={e=>setFilterFuel(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition">
+                        <option value="all">Any</option>
+                        <option value="petrol">Petrol</option>
+                        <option value="diesel">Diesel</option>
+                        <option value="hybrid">Hybrid</option>
+                        <option value="electric">Electric</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <section className="max-w-7xl mx-auto px-4 pt-5 pb-3">
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
                   {[{label:t.allDeals,city:'All Sri Lanka',type:'all'},{label:'🚙 '+t.cars,city:'All Sri Lanka',type:'car'},{label:'🏍️ '+t.bikes,city:'All Sri Lanka',type:'bike'},{label:'🛺 '+t.tuks,city:'All Sri Lanka',type:'tuk'},{label:'📍 Colombo',city:'Colombo',type:'all'},{label:'📍 Galle',city:'Galle',type:'all'},{label:'📍 Kandy',city:'Kandy',type:'all'}].map(tag=>(
@@ -1505,7 +1753,13 @@ export default function Home() {
                       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
                         <img src={v.image} alt={v.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
                         <span className="absolute top-3 left-3 bg-green-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow uppercase">{t.verified}</span>
-                        <span className="absolute top-3 right-3 text-lg">{typeIcon(v.type)}</span>
+                        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                          <button onClick={e=>{ e.stopPropagation(); toggleWishlist(v.id); }}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${wishlist.includes(v.id)?'bg-red-500 text-white':'bg-white/90 text-slate-400 hover:text-red-500'}`}>
+                            {wishlist.includes(v.id) ? '❤️' : '🤍'}
+                          </button>
+                          <span className="text-lg">{typeIcon(v.type)}</span>
+                        </div>
                       </div>
                       <div className="p-4 flex-1 flex flex-col justify-between">
                         <div>
@@ -1671,6 +1925,7 @@ export default function Home() {
                         {detailTab==='details' && <div className="space-y-4"><div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">{([[t.transmission,selectedVehicle.transmission],[t.fuel,selectedVehicle.fuel],['AC','Included'],['Insurance','Full Cover']] as [string,string][]).map(([l,v])=>(<div key={l} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="text-[10px] text-slate-400 font-bold uppercase">{l}</p><p className="font-bold text-sm text-slate-800 mt-0.5">{v}</p></div>))}</div><p className="text-sm text-slate-600 leading-relaxed">{selectedVehicle.description}</p></div>}
                         {detailTab==='docs' && <div className="space-y-2 text-sm"><p className="font-bold text-slate-900 mb-3">Required at pickup:</p>{['National ID (NIC)','Valid Driving License','Phone for WhatsApp'].map(i=>(<div key={i} className="flex items-center gap-2 text-slate-700"><span className="text-emerald-500 font-bold">✓</span>{i}</div>))}</div>}
                         {detailTab==='faq' && <div className="space-y-3">{[['Is fuel included?','No — return with same level.'],['Can I extend?','Yes — WhatsApp the shop.'],['Security deposit?','Most vehicles: no deposit.']].map(([q,a])=>(<div key={q} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="font-bold text-slate-900 text-sm">{q}</p><p className="text-slate-500 mt-0.5 text-xs">{a}</p></div>))}</div>}
+                        {detailTab==='details' && selectedVehicle && <VehicleReviews vehicleId={selectedVehicle.id} />}
                       </div>
                     </div>
                   </div>
