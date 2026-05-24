@@ -1439,7 +1439,11 @@ export default function Home() {
                           <p className="text-xs text-slate-400 mt-1">{vShop(v)}</p>
                         </div>
                         <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100">
-                          <div><p className="text-[10px] text-slate-400 font-bold uppercase">{t.perDay}</p><span className="text-base font-black text-slate-900">{fmt(vPrice(v))}</span></div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase">{t.perDay}</p>
+                            <span className="text-base font-black text-slate-900">{fmt(vPrice(v))}</span>
+                            <p className="text-[9px] text-blue-500 font-bold mt-0.5">+{fmt(Math.round(vPrice(v)*0.10))} booking fee</p>
+                          </div>
                           <div className="flex items-center gap-1"><span className="text-amber-400 text-xs">★</span><span className="text-xs font-bold text-slate-700">{v.rating.toFixed(1)}</span></div>
                         </div>
                       </div>
@@ -1582,9 +1586,10 @@ export default function Home() {
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
                       <div className="flex justify-between"><span>{fmt(vPrice(selectedVehicle))} × {days}d</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
                       {deliveryType==='delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
-                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Total</span><span className="text-red-500">{fmt(total)}</span></div>
-                      <div className="flex items-center gap-1.5 pt-1 text-[10px] text-slate-400 font-medium border-t border-slate-100">
-                        <span>💳</span><span>Pay directly to shop · No online payment needed</span>
+                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Total to Shop</span><span className="text-slate-900">{fmt(total)}</span></div>
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 mt-1 space-y-1">
+                        <div className="flex justify-between text-blue-700"><span>🔒 Drivo booking fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div>
+                        <p className="text-[10px] text-blue-500 font-medium">Booking fee paid to Drivo · Rest goes to shop</p>
                       </div>
                     </div>
                     <button onClick={confirmBooking} className="w-full bg-red-500 hover:bg-red-600 active:scale-95 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition">Confirm Booking →</button>
