@@ -50,7 +50,7 @@ function FaqSection() {
   const [activeTab, setActiveTab] = useState<'general'|'booking'|'price'|'documents'>('general');
   const [openIdx, setOpenIdx] = useState<number|null>(0);
 
-  const faqs: Record<string, Array<{q:string; a:string}>> = {
+  const faqs = {
     general: [
       { q: 'How does Drivo work?', a: 'Drivo is Sri Lanka's vehicle rental marketplace. Browse verified cars, bikes & tuk-tuks from local owners. Select your dates, confirm booking, and pay directly to the shop. No middleman payments — we only charge a 10% booking fee.' },
       { q: 'Are all vehicles verified?', a: 'Yes. Every vehicle listed on Drivo is verified by our team. Owners must provide vehicle documents, photos, and their business details before going live.' },
