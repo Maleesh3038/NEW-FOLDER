@@ -163,8 +163,11 @@ export default function AdminPage() {
   // ── Computed stats
   const pendingBookings   = bookings.filter(b => b.status === 'pending');
   const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
-  const totalRevenue      = bookings.filter(b => b.status !== 'pending' && b.status !== 'cancelled').reduce((s, b) => s + (b.total || 0), 0);
-  const platformEarnings  = bookings.filter(b => b.status !== 'pending' && b.status !== 'cancelled').reduce((s, b) => s + (b.platform_fee || 0), 0);
+  // Only count COMPLETED bookings for revenue (not pending/confirmed/cancelled/declined)
+  const completedBookings = bookings.filter(b => b.status === 'completed');
+  const activeBookings    = bookings.filter(b => b.status !== 'cancelled' && b.status !== 'declined');
+  const totalRevenue      = completedBookings.reduce((s, b) => s + (b.total || 0), 0);
+  const platformEarnings  = completedBookings.reduce((s, b) => s + (b.platform_fee || 0), 0);
   const liveVehicles      = vehicles.filter(v => v.is_available);
 
   const statusColor = (s: string) =>
@@ -411,14 +414,15 @@ export default function AdminPage() {
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
+                  { label: 'Site Visits',     value: traffic.reduce((s,e:any)=>s+(e.visits||0),0), icon: '👁️', color: 'from-indigo-900/40 to-indigo-900/20', border: 'border-indigo-800/50' },
                   { label: 'Partners',        value: owners.length,          icon: '🏪', color: 'from-blue-900/40 to-blue-900/20',     border: 'border-blue-800/50' },
                   { label: 'Customers',       value: customers.length,       icon: '🧳', color: 'from-purple-900/40 to-purple-900/20', border: 'border-purple-800/50' },
                   { label: 'Vehicles',        value: vehicles.length,        icon: '🚗', color: 'from-slate-800/80 to-slate-800/40',   border: 'border-slate-700' },
                   { label: 'Live Now',        value: liveVehicles.length,    icon: '🟢', color: 'from-emerald-900/40 to-emerald-900/20',border: 'border-emerald-800/50' },
-                  { label: 'Total Bookings',  value: bookings.length,        icon: '📋', color: 'from-amber-900/40 to-amber-900/20',   border: 'border-amber-800/50' },
+                  { label: 'Active Bookings',  value: activeBookings.length,        icon: '📋', color: 'from-amber-900/40 to-amber-900/20',   border: 'border-amber-800/50' },
                   { label: 'Pending',         value: pendingBookings.length, icon: '⏳', color: 'from-orange-900/40 to-orange-900/20', border: 'border-orange-800/50' },
                   { label: 'Drivo Earnings',  value: `Rs. ${platformEarnings.toLocaleString()}`, icon: '💰', color: 'from-teal-900/40 to-teal-900/20', border: 'border-teal-800/50' },
-                  { label: 'Total Revenue',   value: `Rs. ${totalRevenue.toLocaleString()}`,     icon: '📈', color: 'from-green-900/40 to-green-900/20', border: 'border-green-800/50' },
+                  { label: 'Completed Revenue', value: `Rs. ${totalRevenue.toLocaleString()}`,   icon: '📈', color: 'from-green-900/40 to-green-900/20', border: 'border-green-800/50' },
                 ].map(s => (
                   <div key={s.label} className={`bg-gradient-to-br ${s.color} border ${s.border} rounded-2xl p-4`}>
                     <div className="text-2xl mb-2">{s.icon}</div>
@@ -437,7 +441,7 @@ export default function AdminPage() {
                   <div className="space-y-3">
                     {traffic.slice(-7).map((e: any) => {
                       const maxV = Math.max(...traffic.slice(-7).map((x: any) => x.visits || 0), 1);
-                      const maxB = Math.max(...traffic.slice(-7).map((x: any) => x.bookings || 0), 1);
+                      const maxB = Math.max(...traffic.slice(-7).map((x: any) => x.bookings || x.booking_count || 0), 1);
                       return (
                         <div key={e.date} className="flex items-center gap-3">
                           <span className="text-xs text-slate-400 w-20 flex-shrink-0">{e.date?.slice(5)}</span>
@@ -452,9 +456,9 @@ export default function AdminPage() {
                             <div className="flex items-center gap-2">
                               <span className="w-14 text-[10px] text-slate-500">Bookings</span>
                               <div className="flex-1 bg-slate-800 rounded-full h-2">
-                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${((e.bookings||0) / maxB) * 100}%` }}/>
+                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${((e.bookings||e.booking_count||0) / maxB) * 100}%` }}/>
                               </div>
-                              <span className="text-xs text-white w-6 text-right">{e.bookings || 0}</span>
+                              <span className="text-xs text-white w-6 text-right">{e.bookings || e.booking_count || 0}</span>
                             </div>
                           </div>
                         </div>
@@ -705,7 +709,7 @@ export default function AdminPage() {
                           <td className="px-4 py-3">
                             <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase border ${statusColor(b.status)}`}>{b.status}</span>
                           </td>
-                          <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                          <td className="px-4 py-3 text-right space-x-1" onClick={e => e.stopPropagation()}>
                             <select className="bg-slate-800 border border-slate-600 text-white text-xs font-bold rounded-lg px-2 py-1 outline-none cursor-pointer"
                               value={b.status} onChange={e => updateBookingStatus(b.id, e.target.value)}>
                               <option value="pending">Pending</option>
@@ -714,6 +718,20 @@ export default function AdminPage() {
                               <option value="cancelled">Cancelled</option>
                               <option value="declined">Declined</option>
                             </select>
+                            {(b.status === 'pending' || b.status === 'confirmed') && (
+                              <button onClick={async e => {
+                                e.stopPropagation();
+                                if (!confirm('Cancel this booking? Vehicle will become available again.')) return;
+                                await updateBookingStatus(b.id, 'cancelled');
+                                // Make vehicle available again
+                                const { createClient } = await import('@supabase/supabase-js');
+                                const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+                                await sb.from('vehicles').update({ is_available: true }).eq('id', b.vehicle_id);
+                                showToast('Booking cancelled. Vehicle available again.');
+                              }} className="text-[11px] font-black px-2.5 py-1 bg-red-900/50 hover:bg-red-600 rounded-lg transition text-red-400">
+                                Cancel
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
