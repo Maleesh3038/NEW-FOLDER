@@ -563,7 +563,7 @@ export default function Home() {
   const handleVehicleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newV.name.trim()) { showToast('Vehicle name required!','err'); return; }
-    if (photos.length < 3) { showToast('Minimum 3 photos required!','err'); return; }
+    if (photos.filter(Boolean).length < 4) { showToast('All 4 vehicle photos required! (Exterior, Dashboard, Front Seats, Back Seats)','err'); return; }
 
     const ownerId = ownerAcc?.id;
     if (!ownerId) { showToast('Please login again','err'); return; }
@@ -1781,43 +1781,128 @@ export default function Home() {
                           <input type="number" required min="500" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={newV.pricePerDay} onChange={e=>setNewV({...newV,pricePerDay:Number(e.target.value)})}/></div>
                       </div>
 
+                      {/* ── STRUCTURED 6-ANGLE PHOTO UPLOAD ── */}
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Vehicle Photos</label>
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${photos.length < 3 ? 'bg-red-50 text-red-500 border border-red-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
-                            {photos.length}/5 · min 3 required
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Vehicle Photos (6 Required)</label>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${photos.filter(Boolean).length < 6 ? 'bg-red-50 text-red-500 border-red-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
+                            {photos.filter(Boolean).length}/6
                           </span>
                         </div>
-                        {photos.length > 0 && (
-                          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
-                            {photos.map((p, i) => (
-                              <div key={i} className="relative group aspect-video rounded-xl overflow-hidden border border-slate-200">
-                                <img src={p} className="w-full h-full object-cover" alt={`Photo ${i+1}`}/>
-                                {i === 0 && <span className="absolute top-1 left-1 text-[9px] bg-slate-900 text-white font-black px-1.5 py-0.5 rounded uppercase">Cover</span>}
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1">
-                                  {i > 0 && <button type="button" onClick={()=>movePhoto(i,i-1)} className="w-6 h-6 bg-white rounded-full text-slate-700 text-xs font-black flex items-center justify-center">←</button>}
-                                  <button type="button" onClick={()=>removePhoto(i)} className="w-6 h-6 bg-red-500 rounded-full text-white text-xs font-black flex items-center justify-center">×</button>
-                                  {i < photos.length-1 && <button type="button" onClick={()=>movePhoto(i,i+1)} className="w-6 h-6 bg-white rounded-full text-slate-700 text-xs font-black flex items-center justify-center">→</button>}
+
+                        {/* Cover photo — full width, prominent */}
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[10px] font-black text-slate-700 uppercase tracking-wide">🚗 Cover Photo — Front + Side View</p>
+                            {photos[0] ? <span className="text-[9px] text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded-full">✓ Added</span> : <span className="text-[9px] text-red-500 font-black">Required</span>}
+                          </div>
+                          <label className="block cursor-pointer">
+                            <div className={`relative w-full aspect-[16/7] rounded-2xl overflow-hidden border-2 transition ${photos[0] ? 'border-emerald-400' : 'border-dashed border-red-300 hover:border-red-400 bg-slate-50'}`}>
+                              {photos[0] ? (
+                                <>
+                                  <img src={photos[0]} className="w-full h-full object-cover" alt="Cover"/>
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center">
+                                    <span className="text-white text-xs font-black bg-black/60 px-3 py-1.5 rounded-xl">Click to replace</span>
+                                  </div>
+                                  <span className="absolute top-2 left-2 text-[9px] bg-slate-900 text-white font-black px-2 py-0.5 rounded uppercase">Cover · Main Listing Photo</span>
+                                  <button type="button" onClick={e=>{e.preventDefault();removePhoto(0);}}
+                                    className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full text-sm font-black flex items-center justify-center hover:bg-red-600 transition">×</button>
+                                </>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center h-full pointer-events-none">
+                                  <p className="text-4xl mb-2">📸</p>
+                                  <p className="text-sm font-black text-slate-600">Front + side angle — main listing photo</p>
+                                  <p className="text-xs text-slate-400 mt-1">This is the first photo customers see</p>
                                 </div>
+                              )}
+                            </div>
+                            <input type="file" accept="image/*" className="hidden"
+                              onChange={e=>{ const file=e.target.files?.[0]; if(!file) return; const r=new FileReader(); r.onloadend=()=>setPhotos(prev=>{const n=[...prev];while(n.length<=0)n.push('');n[0]=r.result as string;return n;}); r.readAsDataURL(file); }}/>
+                          </label>
+                        </div>
+
+                        {/* 3 corner exterior shots */}
+                        <div className="mb-3">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-2">Exterior — 3 More Angles</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              {idx:1, label:'Front View',      hint:'Straight front'},
+                              {idx:2, label:'Side View',       hint:'Full side profile'},
+                              {idx:3, label:'Rear View',       hint:'Back of vehicle'},
+                            ].map(slot=>(
+                              <div key={slot.idx}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-[9px] font-black text-slate-600">{slot.label}</p>
+                                  {photos[slot.idx] ? <span className="text-[8px] text-emerald-600 font-black">✓</span> : <span className="text-[8px] text-red-400">req</span>}
+                                </div>
+                                <label className="block cursor-pointer">
+                                  <div className={`relative aspect-video rounded-xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50'}`}>
+                                    {photos[slot.idx] ? (
+                                      <>
+                                        <img src={photos[slot.idx]} className="w-full h-full object-cover" alt={slot.label}/>
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center">
+                                          <span className="text-white text-[9px] font-black">Replace</span>
+                                        </div>
+                                        <button type="button" onClick={e=>{e.preventDefault();removePhoto(slot.idx);}}
+                                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center">×</button>
+                                      </>
+                                    ) : (
+                                      <div className="flex flex-col items-center justify-center h-full pointer-events-none py-2">
+                                        <p className="text-lg">📷</p>
+                                        <p className="text-[9px] text-slate-400 font-bold text-center px-1">{slot.hint}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <input type="file" accept="image/*" className="hidden"
+                                    onChange={e=>{ const file=e.target.files?.[0]; if(!file) return; const r=new FileReader(); r.onloadend=()=>setPhotos(prev=>{const n=[...prev];while(n.length<=slot.idx)n.push('');n[slot.idx]=r.result as string;return n;}); r.readAsDataURL(file); }}/>
+                                </label>
                               </div>
                             ))}
                           </div>
-                        )}
-                        {photos.length < 5 && (
-                          <div
-                            onDragOver={e=>{e.preventDefault();setIsDragging(true);}}
-                            onDragLeave={()=>setIsDragging(false)}
-                            onDrop={e=>{e.preventDefault();setIsDragging(false);Array.from(e.dataTransfer.files).slice(0,5-photos.length).forEach(f=>processImg(f));}}
-                            className={`border-2 border-dashed rounded-2xl relative flex items-center justify-center transition cursor-pointer py-5 ${isDragging?'border-emerald-500 bg-emerald-50':'border-slate-200 bg-slate-50 hover:border-slate-400'}`}>
-                            <input type="file" accept="image/*" multiple className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                              onChange={e=>{if(e.target.files) Array.from(e.target.files).slice(0,5-photos.length).forEach(f=>processImg(f));}}/>
-                            <div className="text-center pointer-events-none">
-                              <p className="text-2xl mb-1">📸</p>
-                              <p className="text-sm font-black text-slate-700">Drag & drop or click to add photos</p>
-                              <p className="text-xs text-slate-400 mt-0.5">{5-photos.length} more can be added · First photo = cover</p>
-                            </div>
+                        </div>
+
+                        {/* Interior shots */}
+                        <div>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-2">Interior — 2 Photos</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            {[
+                              {idx:4, label:'🪞 Dashboard & Steering Wheel', hint:'Full dashboard view'},
+                              {idx:5, label:'💺 Seats',                      hint:'Front + rear seats'},
+                            ].map(slot=>(
+                              <div key={slot.idx}>
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <p className="text-[9px] font-black text-slate-600">{slot.label}</p>
+                                  {photos[slot.idx] ? <span className="text-[8px] text-emerald-600 font-black">✓ Added</span> : <span className="text-[8px] text-red-400">Required</span>}
+                                </div>
+                                <label className="block cursor-pointer">
+                                  <div className={`relative aspect-video rounded-xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50'}`}>
+                                    {photos[slot.idx] ? (
+                                      <>
+                                        <img src={photos[slot.idx]} className="w-full h-full object-cover" alt={slot.label}/>
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center">
+                                          <span className="text-white text-xs font-black">Click to replace</span>
+                                        </div>
+                                        <button type="button" onClick={e=>{e.preventDefault();removePhoto(slot.idx);}}
+                                          className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 text-white rounded-full text-xs font-black flex items-center justify-center">×</button>
+                                      </>
+                                    ) : (
+                                      <div className="flex flex-col items-center justify-center h-full pointer-events-none py-3">
+                                        <p className="text-2xl mb-1">📸</p>
+                                        <p className="text-[10px] font-black text-slate-500 text-center px-2">{slot.hint}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <input type="file" accept="image/*" className="hidden"
+                                    onChange={e=>{ const file=e.target.files?.[0]; if(!file) return; const r=new FileReader(); r.onloadend=()=>setPhotos(prev=>{const n=[...prev];while(n.length<=slot.idx)n.push('');n[slot.idx]=r.result as string;return n;}); r.readAsDataURL(file); }}/>
+                                </label>
+                              </div>
+                            ))}
                           </div>
-                        )}
+                        </div>
+
+                        <p className="text-[10px] text-slate-400 mt-3 text-center">
+                          6 photos required · Cover photo = main listing image · All angles help customers book with confidence
+                        </p>
                       </div>
 
                       <div>
@@ -2179,14 +2264,46 @@ export default function Home() {
                         </a>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {(selectedVehicle.images&&selectedVehicle.images.length>0?selectedVehicle.images:[selectedVehicle.image]).map((img,i)=>(
-                        <div key={i} className={`relative bg-slate-200 rounded-2xl overflow-hidden ${i===0?'col-span-2 sm:col-span-2 aspect-[16/9]':'aspect-video'}`}>
-                          <img src={img} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
-                          {i===0 && <span className="absolute top-2 left-2 text-[10px] bg-slate-900/70 text-white font-black px-2 py-0.5 rounded uppercase backdrop-blur-sm">Cover photo</span>}
+                    {/* Structured gallery — cover + 3 corners + 2 interior */}
+                    {(() => {
+                      const imgs = selectedVehicle.images && selectedVehicle.images.filter(Boolean).length > 0
+                        ? selectedVehicle.images.filter(Boolean)
+                        : [selectedVehicle.image].filter(Boolean);
+                      const labels = ['Cover', 'Front', 'Side', 'Rear', 'Dashboard', 'Seats'];
+                      return (
+                        <div className="space-y-3">
+                          {/* Cover — full width */}
+                          {imgs[0] && (
+                            <div className="relative aspect-[16/8] bg-slate-200 rounded-2xl overflow-hidden">
+                              <img src={imgs[0]} alt="Cover" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"/>
+                              <span className="absolute top-3 left-3 text-[10px] bg-slate-900/80 text-white font-black px-2.5 py-1 rounded-xl uppercase backdrop-blur-sm">Cover · Front & Side</span>
+                            </div>
+                          )}
+                          {/* 3 exterior corners */}
+                          {imgs.slice(1,4).length > 0 && (
+                            <div className="grid grid-cols-3 gap-2">
+                              {imgs.slice(1,4).map((img,i)=>(
+                                <div key={i} className="relative aspect-video bg-slate-200 rounded-xl overflow-hidden">
+                                  <img src={img} alt={labels[i+1]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
+                                  <span className="absolute bottom-1.5 left-1.5 text-[8px] bg-black/60 text-white font-black px-1.5 py-0.5 rounded uppercase backdrop-blur-sm">{labels[i+1]}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* 2 interior photos */}
+                          {imgs.slice(4,6).length > 0 && (
+                            <div className="grid grid-cols-2 gap-2">
+                              {imgs.slice(4,6).map((img,i)=>(
+                                <div key={i} className="relative aspect-[4/3] bg-slate-200 rounded-xl overflow-hidden">
+                                  <img src={img} alt={labels[i+4]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
+                                  <span className="absolute bottom-1.5 left-1.5 text-[8px] bg-black/60 text-white font-black px-1.5 py-0.5 rounded uppercase backdrop-blur-sm">{labels[i+4]}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })()}
                     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                       <div className="flex border-b border-slate-200 bg-slate-50">
                         {([['details',t.details],['docs',t.documents],['faq',t.faq]] as [string,string][]).map(([k,l])=>(
