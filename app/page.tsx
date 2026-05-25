@@ -1431,6 +1431,7 @@ export default function Home() {
                     setOwnerAcc({...ownerAcc, shop_name:ownerEditData.shopName, owner_name:ownerEditData.ownerName, phone:ownerEditData.phone, whatsapp:ownerEditData.whatsapp, city:ownerEditData.city});
                     setOwnerEditOpen(false); showToast(t.profileUpdated);
                   }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.saveProfile}</button>
+                  </div>
                 </div>
               </div>
             </div>
