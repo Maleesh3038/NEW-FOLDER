@@ -237,7 +237,8 @@ export default function Home() {
   const [mobileMenuOpen,  setMobileMenuOpen]  = useState(false);
   const [selectedBooking,      setSelectedBooking]      = useState<Booking|null>(null);
   const [ownerSelectedBooking, setOwnerSelectedBooking] = useState<Booking|null>(null);
-  const [ownerSubTab,          setOwnerSubTab]          = useState<'fleet'|'bookings'>('fleet');
+  const [ownerSubTab,          setOwnerSubTab]          = useState<'fleet'|'bookings'|'earnings'>('fleet');
+  const [earningsPeriod,       setEarningsPeriod]       = useState<'weekly'|'monthly'|'yearly'>('monthly');
 
   // ── booking
   const [days,         setDays]         = useState(1);
@@ -346,6 +347,54 @@ export default function Home() {
     const s = getSession();
     if (s) restoreSession(s.id, s.email, s.role);
   }, []);
+
+  // ── Real-time subscription for owner bookings
+  useEffect(() => {
+    if (sessionRole !== 'owner' || !ownerAcc?.id) return;
+    const channel = supabase.channel(`owner-bookings-${ownerAcc.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'bookings',
+        filter: `owner_id=eq.${ownerAcc.id}`
+      }, async (payload) => {
+        // New booking came in!
+        if (payload.eventType === 'INSERT') {
+          setOwnerBookings(prev => [payload.new as any, ...prev]);
+          showToast('🔔 New booking request!');
+        } else if (payload.eventType === 'UPDATE') {
+          setOwnerBookings(prev => prev.map(b => b.id === (payload.new as any).id ? payload.new as any : b));
+        } else if (payload.eventType === 'DELETE') {
+          setOwnerBookings(prev => prev.filter(b => b.id !== (payload.old as any).id));
+        }
+        // Also refresh vehicles
+        const vehicles = await getAvailableVehicles();
+        setAllVehicles(vehicles.map(mapVehicle));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [sessionRole, ownerAcc?.id]);
+
+  // ── Real-time subscription for customer bookings
+  useEffect(() => {
+    if (sessionRole !== 'customer' || !custAcc?.id) return;
+    const channel = supabase.channel(`cust-bookings-${custAcc.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'bookings',
+        filter: `customer_id=eq.${custAcc.id}`
+      }, (payload) => {
+        const updated = payload.new as any;
+        setCustAcc(prev => {
+          if (!prev) return prev;
+          const bookings = (prev.bookings||[]).map(b => b.id === updated.id ? updated : b);
+          return { ...prev, bookings };
+        });
+        if (updated.status === 'confirmed') showToast('✅ Your booking was confirmed!');
+        if (updated.status === 'cancelled') showToast('❌ Your booking was cancelled');
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [sessionRole, custAcc?.id]);
 
   const restoreSession = async (id: string, email: string, role: 'owner'|'customer') => {
     if (role === 'owner') {
@@ -1360,7 +1409,7 @@ export default function Home() {
               </div>
             </div>
             <div className="max-w-7xl mx-auto px-4 flex gap-0">
-              {([['fleet',t.yourFleet],['bookings',t.incomingBookings]] as [string,string][]).map(([k,l])=>(
+              {([['fleet',t.yourFleet],['bookings',t.incomingBookings],['earnings','💰 Earnings']] as [string,string][]).map(([k,l])=>(
                 <button key={k} onClick={()=>setOwnerSubTab(k as any)}
                   className={`px-5 py-3 text-xs font-black uppercase tracking-wide border-b-2 transition ${ownerSubTab===k?'border-slate-900 text-slate-900':'border-transparent text-slate-400 hover:text-slate-700'}`}>
                   {l} {k==='bookings'&&ownerBookings.filter(b=>b.status==='pending').length>0&&
@@ -1600,6 +1649,107 @@ export default function Home() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            {ownerSubTab==='earnings' && (
+              <div className="space-y-5">
+                {/* Period selector */}
+                <div className="flex items-center justify-between">
+                  <h2 className="font-black text-slate-900 text-lg">💰 Earnings Overview</h2>
+                  <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+                    {(['weekly','monthly','yearly'] as const).map(p=>(
+                      <button key={p} onClick={()=>setEarningsPeriod(p)}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase transition ${earningsPeriod===p?'bg-white text-slate-900 shadow':'text-slate-500 hover:text-slate-700'}`}>
+                        {p==='weekly'?'Week':p==='monthly'?'Month':'Year'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Earnings stats */}
+                {(() => {
+                  const now = new Date();
+                  const filtered = ownerBookings.filter(b => {
+                    if (b.status !== 'completed') return false;
+                    const d = new Date(b.booked_at || '');
+                    if (earningsPeriod === 'weekly') {
+                      const weekAgo = new Date(now); weekAgo.setDate(now.getDate()-7);
+                      return d >= weekAgo;
+                    } else if (earningsPeriod === 'monthly') {
+                      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                    } else {
+                      return d.getFullYear() === now.getFullYear();
+                    }
+                  });
+                  const gross     = filtered.reduce((s,b) => s+(b.total||0), 0);
+                  const fee       = filtered.reduce((s,b) => s+((b as any).platform_fee||Math.round((b.total||0)*0.10)), 0);
+                  const payout    = gross - fee;
+                  const pending   = ownerBookings.filter(b=>b.status==='pending').reduce((s,b)=>s+(b.total||0),0);
+                  const confirmed = ownerBookings.filter(b=>b.status==='confirmed').reduce((s,b)=>s+(b.total||0),0);
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {[
+                          {label:'Gross Revenue', value:`Rs. ${gross.toLocaleString()}`, icon:'📈', color:'bg-emerald-50 border-emerald-200', text:'text-emerald-700'},
+                          {label:'Drivo Fee (10%)', value:`Rs. ${fee.toLocaleString()}`, icon:'💳', color:'bg-blue-50 border-blue-200', text:'text-blue-700'},
+                          {label:'Your Payout', value:`Rs. ${payout.toLocaleString()}`, icon:'💰', color:'bg-slate-900 border-slate-900', text:'text-white', labelText:'text-slate-300'},
+                          {label:'Completed Rentals', value:filtered.length, icon:'✅', color:'bg-purple-50 border-purple-200', text:'text-purple-700'},
+                        ].map(s=>(
+                          <div key={s.label} className={`${s.color} border rounded-2xl p-4`}>
+                            <p className="text-xl mb-1">{s.icon}</p>
+                            <p className={`text-xl font-black ${s.text}`}>{s.value}</p>
+                            <p className={`text-xs font-semibold mt-0.5 ${(s as any).labelText||'text-slate-500'}`}>{s.label}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Upcoming earnings */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                          <p className="text-lg mb-1">⏳</p>
+                          <p className="text-lg font-black text-amber-700">Rs. {pending.toLocaleString()}</p>
+                          <p className="text-xs text-amber-600 font-semibold">Pending approval</p>
+                        </div>
+                        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+                          <p className="text-lg mb-1">🤝</p>
+                          <p className="text-lg font-black text-teal-700">Rs. {(confirmed-fee).toLocaleString()}</p>
+                          <p className="text-xs text-teal-600 font-semibold">Confirmed (incoming)</p>
+                        </div>
+                      </div>
+
+                      {/* Recent completed bookings */}
+                      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                        <div className="px-5 py-4 border-b border-slate-100">
+                          <h3 className="font-black text-slate-900 text-sm">Completed Rentals — {earningsPeriod}</h3>
+                        </div>
+                        {filtered.length === 0 ? (
+                          <div className="text-center py-12">
+                            <p className="text-3xl mb-2">📭</p>
+                            <p className="text-sm font-black text-slate-500">No completed rentals this {earningsPeriod === 'weekly' ? 'week' : earningsPeriod === 'monthly' ? 'month' : 'year'}</p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-slate-100">
+                            {filtered.map(b=>(
+                              <div key={b.id} className="flex items-center gap-4 px-5 py-3">
+                                <img src={b.vehicle_img||''} className="w-14 h-10 rounded-xl object-cover flex-shrink-0 bg-slate-100" alt=""/>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-black text-slate-900 text-sm">{b.vehicle_name}</p>
+                                  <p className="text-xs text-slate-400">{b.pickup_date} → {b.return_date} · {b.days}d</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <p className="font-black text-slate-900 text-sm">Rs. {((b as any).owner_payout || Math.round((b.total||0)*0.90)).toLocaleString()}</p>
+                                  <p className="text-[10px] text-slate-400">after 10% fee</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
 
