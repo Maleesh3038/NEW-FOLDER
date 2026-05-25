@@ -1968,7 +1968,7 @@ export default function Home() {
                       {deliveryType==='delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
                       <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Total to Shop</span><span className="text-slate-900">{fmt(total)}</span></div>
                       <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 mt-1 space-y-1">
-                        <div className="flex justify-between text-blue-700"><span>🔒 Drivo booking fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div>
+                        <div className="flex justify-between text-blue-700"><span>🔒 Booking Fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div>
                         <p className="text-[10px] text-blue-500 font-medium">Booking fee paid to Drivo · Rest goes to shop</p>
                       </div>
                     </div>
