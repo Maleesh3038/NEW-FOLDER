@@ -281,15 +281,17 @@ export default function Home() {
   // ── vehicle form
   const [showAddForm,      setShowAddForm]      = useState(false);
   const [editingId,        setEditingId]        = useState<string|null>(null);
-  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:''});
+  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive'});
   const [photos,           setPhotos]           = useState<string[]>([]);
   const [isDragging,       setIsDragging]       = useState(false);
 
   // ── profile edit modals
   const [ownerEditOpen,    setOwnerEditOpen]    = useState(false);
-  const [ownerEditData,    setOwnerEditData]    = useState({shopName:'',ownerName:'',phone:'',whatsapp:'',city:'Colombo'});
+  const [ownerEditData,    setOwnerEditData]    = useState({shopName:'',ownerName:'',phone:'',whatsapp:'',city:'Colombo',bio:''});
   const [custEditOpen,     setCustEditOpen]     = useState(false);
   const [custEditData,     setCustEditData]     = useState({firstName:'',lastName:'',phone:'',city:'Colombo'});
+  const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
+  const [filterDriver,     setFilterDriver]     = useState('all'); // all/with_driver/self_drive
 
   // ── toast
   const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null);
@@ -387,8 +389,14 @@ export default function Home() {
     if (filterPriceMax < 50000) filtered = filtered.filter(v => vPrice(v) <= filterPriceMax);
     if (filterTrans !== 'all') filtered = filtered.filter(v => v.transmission?.toLowerCase() === filterTrans.toLowerCase());
     if (filterFuel !== 'all') filtered = filtered.filter(v => v.fuel?.toLowerCase() === filterFuel.toLowerCase());
+    if (filterDriver !== 'all') filtered = filtered.filter(v => {
+      const driverOpt = (v as any).driver_option || 'self_drive';
+      if (filterDriver === 'with_driver') return driverOpt === 'with_driver' || driverOpt === 'both';
+      if (filterDriver === 'self_drive') return driverOpt === 'self_drive' || driverOpt === 'both';
+      return true;
+    });
     setDisplayed(filtered);
-  }, [allVehicles, filterCity, filterType, filterPriceMin, filterPriceMax, filterTrans, filterFuel]);
+  }, [allVehicles, filterCity, filterType, filterPriceMin, filterPriceMax, filterTrans, filterFuel, filterDriver]);
 
   // Load wishlist from Supabase on login
   useEffect(() => {
@@ -517,6 +525,7 @@ export default function Home() {
         transmission: newV.transmission, fuel: newV.fuel,
         price_per_day: Number(newV.pricePerDay),
         description: newV.description, map_link: newV.mapLink,
+        driver_option: (newV as any).driverOption || 'self_drive',
       }, photos);
       if (error) { showToast(error, 'err'); return; }
       showToast('Vehicle updated ✓');
@@ -1072,21 +1081,75 @@ export default function Home() {
 
           {custEditOpen && (
             <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center px-4">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b">
-                  <h3 className="font-black text-slate-900">{t.editProfile}</h3>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
+                  <h3 className="font-black text-slate-900">My Profile</h3>
                   <button onClick={()=>setCustEditOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl">×</button>
                 </div>
-                <div className="p-6 space-y-3">
-                  {[{l:t.firstName,k:'firstName'},{l:t.lastName,k:'lastName'},{l:t.phone,k:'phone'}].map(f=>(
-                    <div key={f.k}><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{f.l}</label>
-                      <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition"
-                        value={(custEditData as any)[f.k]} onChange={e=>setCustEditData({...custEditData,[f.k]:e.target.value})}/></div>
-                  ))}
-                  <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.city}</label>
-                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none cursor-pointer" value={custEditData.city} onChange={e=>setCustEditData({...custEditData,city:e.target.value})}>
-                      {SL_CITIES.slice(1).map(c=><option key={c}>{c}</option>)}
-                    </select></div>
+                <div className="p-6 space-y-4">
+                  {/* Profile Photo */}
+                  <div className="flex flex-col items-center gap-3 pb-4 border-b border-slate-100">
+                    <div className="relative">
+                      <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-4xl overflow-hidden border-4 border-slate-100 shadow-lg">
+                        {custAcc?.avatar_url
+                          ? <img src={custAcc.avatar_url} className="w-full h-full object-cover" alt=""/>
+                          : (custAcc?.first_name||'U').charAt(0)}
+                      </div>
+                      <label className="absolute bottom-0 right-0 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-slate-700 transition shadow-md">
+                        📷
+                        <input type="file" accept="image/*" className="hidden" onChange={async e=>{
+                          const file = e.target.files?.[0]; if (!file || !custAcc?.id) return;
+                          setProfilePhotoUploading(true);
+                          const ext = file.name.split('.').pop();
+                          const path = `avatars/customer_${custAcc.id}.${ext}`;
+                          const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+                          if (!error) {
+                            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+                            await supabase.from('customers').update({ avatar_url: urlData.publicUrl }).eq('id', custAcc.id);
+                            setCustAcc(prev => prev ? {...prev, avatar_url: urlData.publicUrl} : prev);
+                            showToast('Profile photo updated! 📷');
+                          }
+                          setProfilePhotoUploading(false);
+                        }}/>
+                      </label>
+                    </div>
+                    <p className="text-sm font-black text-slate-900">{custAcc?.first_name} {custAcc?.last_name}</p>
+                    <p className="text-xs text-slate-400">{custAcc?.email}</p>
+                    {profilePhotoUploading && <p className="text-xs text-blue-500 font-bold animate-pulse">Uploading...</p>}
+                  </div>
+
+                  {/* Profile Info */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      {[{l:t.firstName,k:'firstName'},{l:t.lastName,k:'lastName'}].map(f=>(
+                        <div key={f.k}><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{f.l}</label>
+                          <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition"
+                            value={(custEditData as any)[f.k]} onChange={e=>setCustEditData({...custEditData,[f.k]:e.target.value})}/></div>
+                      ))}
+                    </div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.phone}</label>
+                      <input type="tel" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition"
+                        value={custEditData.phone} onChange={e=>setCustEditData({...custEditData,phone:e.target.value})}/></div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.city}</label>
+                      <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none cursor-pointer" value={custEditData.city} onChange={e=>setCustEditData({...custEditData,city:e.target.value})}>
+                        {SL_CITIES.slice(1).map(c=><option key={c}>{c}</option>)}
+                      </select></div>
+                  </div>
+
+                  {/* Verified Documents */}
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Verified Documents</p>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600">NIC / Passport</span>
+                      <span className="font-black text-slate-900">{custAcc?.nic || '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-600">Driving License</span>
+                      <span className="font-black text-slate-900">{custAcc?.driving_license || '—'}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Documents verified at registration · Contact support to update</p>
+                  </div>
+
                   <button onClick={async ()=>{
                     if (!custAcc?.id) return;
                     await supabase.from('customers').update({
@@ -1309,12 +1372,44 @@ export default function Home() {
 
           {ownerEditOpen && (
             <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center px-4">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b">
-                  <h3 className="font-black text-slate-900">{t.editProfile}</h3>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
+                  <h3 className="font-black text-slate-900">Partner Profile</h3>
                   <button onClick={()=>setOwnerEditOpen(false)} className="text-slate-400 text-2xl hover:text-slate-700">×</button>
                 </div>
-                <div className="p-6 space-y-3">
+                <div className="p-6 space-y-4">
+                  {/* Shop Logo / Profile Photo */}
+                  <div className="flex flex-col items-center gap-3 pb-4 border-b border-slate-100">
+                    <div className="relative">
+                      <div className="w-24 h-24 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-4xl overflow-hidden border-4 border-slate-100 shadow-lg">
+                        {ownerAcc?.avatar_url
+                          ? <img src={ownerAcc.avatar_url} className="w-full h-full object-cover" alt=""/>
+                          : (ownerAcc?.shop_name||'S').charAt(0).toUpperCase()}
+                      </div>
+                      <label className="absolute bottom-0 right-0 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-slate-700 transition shadow-md">
+                        📷
+                        <input type="file" accept="image/*" className="hidden" onChange={async e=>{
+                          const file = e.target.files?.[0]; if (!file || !ownerAcc?.id) return;
+                          setProfilePhotoUploading(true);
+                          const ext = file.name.split('.').pop();
+                          const path = `avatars/owner_${ownerAcc.id}.${ext}`;
+                          const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+                          if (!error) {
+                            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+                            await supabase.from('owners').update({ avatar_url: urlData.publicUrl }).eq('id', ownerAcc.id);
+                            setOwnerAcc(prev => prev ? {...prev, avatar_url: urlData.publicUrl} : prev);
+                            showToast('Profile photo updated! 📷');
+                          }
+                          setProfilePhotoUploading(false);
+                        }}/>
+                      </label>
+                    </div>
+                    <p className="text-sm font-black text-slate-900">{ownerAcc?.shop_name}</p>
+                    <p className="text-xs text-slate-400">{ownerAcc?.email}</p>
+                    {profilePhotoUploading && <p className="text-xs text-blue-500 font-bold animate-pulse">Uploading...</p>}
+                  </div>
+
+                  <div className="space-y-3">
                   {[{l:t.shopName,k:'shopName'},{l:t.ownerName,k:'ownerName'},{l:t.phone,k:'phone'},{l:'WhatsApp',k:'whatsapp'}].map(f=>(
                     <div key={f.k}><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{f.l}</label>
                       <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition"
@@ -1591,6 +1686,24 @@ export default function Home() {
 
                       <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.description}</label>
                         <textarea rows={2} placeholder="AC, helmet, insurance..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition resize-none" value={newV.description} onChange={e=>setNewV({...newV,description:e.target.value})}/></div>
+
+                      {/* Driver Option */}
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">🧑‍✈️ Driver Option</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {([
+                            ['self_drive', '🚗 Self Drive', 'Customer drives'],
+                            ['with_driver', '🧑‍✈️ With Driver', 'Driver included'],
+                            ['both', '✅ Both Options', 'Customer chooses'],
+                          ] as [string,string,string][]).map(([val,label,note])=>(
+                            <button key={val} type="button" onClick={()=>setNewV({...newV,driverOption:val})}
+                              className={`py-2.5 px-2 rounded-xl border text-center transition ${(newV as any).driverOption===val?'bg-slate-900 text-white border-slate-900':'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+                              <p className="text-xs font-black">{label}</p>
+                              <p className="text-[10px] opacity-60 mt-0.5">{note}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <div className="flex gap-3">
                         <button type="button" onClick={()=>{ setShowAddForm(false); setEditingId(null); setPhotos([]); }} className="px-6 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-sm text-slate-700 transition">{t.cancel}</button>
                         <button type="submit" className="flex-1 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white py-3 rounded-xl font-black text-sm uppercase tracking-wide transition shadow-md">{editingId?t.saveChanges:t.publishLive}</button>
@@ -1729,6 +1842,15 @@ export default function Home() {
                         <option value="electric">Electric</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🧑‍✈️ Driver</label>
+                      <select value={filterDriver} onChange={e=>setFilterDriver(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition">
+                        <option value="all">Any</option>
+                        <option value="self_drive">Self Drive</option>
+                        <option value="with_driver">With Driver</option>
+                      </select>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1763,6 +1885,8 @@ export default function Home() {
                           <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                             <span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.transmission}</span>
                             <span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.fuel}</span>
+                            {(v as any).driver_option === 'with_driver' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Driver</span>}
+                            {(v as any).driver_option === 'both' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Optional</span>}
                             <span className="text-[9px] font-extrabold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase ml-auto">{v.location}</span>
                           </div>
                           <h3 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-red-500 transition-colors">{v.name}</h3>
