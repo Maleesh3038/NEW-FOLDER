@@ -1969,7 +1969,7 @@ export default function Home() {
                       <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Total to Shop</span><span className="text-slate-900">{fmt(total)}</span></div>
                       <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 mt-1 space-y-1">
                         <div className="flex justify-between text-blue-700"><span>🔒 Booking Fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div>
-                        <p className="text-[10px] text-blue-500 font-medium">Booking fee paid to Drivo · Rest goes to shop</p>
+                        <p className="text-[10px] text-blue-500 font-medium">Pay directly to shop · Booking fee included</p>
                       </div>
                     </div>
                     <button onClick={confirmBooking} className="w-full bg-red-500 hover:bg-red-600 active:scale-95 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition">Confirm Booking →</button>
