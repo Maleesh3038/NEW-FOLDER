@@ -245,6 +245,7 @@ export default function Home() {
   const [deliveryType, setDeliveryType] = useState<'pickup'|'delivery'>('pickup');
   const [bookingDone,  setBookingDone]  = useState(false);
   const [pickupTime,   setPickupTime]   = useState('09:00');
+  const [rentalPeriod, setRentalPeriod] = useState<'daily'|'weekly'|'monthly'>('daily');
 
   // ── currency
   const [currency, setCurrency] = useState('LKR');
@@ -282,7 +283,7 @@ export default function Home() {
   // ── vehicle form
   const [showAddForm,      setShowAddForm]      = useState(false);
   const [editingId,        setEditingId]        = useState<string|null>(null);
-  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both',revenueLicenceExpiry:'',insuranceExpiry:''});
+  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,weeklyPrice:0,monthlyPrice:0,kmPerDay:200,extraKmCharge:50,depositAmount:0,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both',revenueLicenceExpiry:'',insuranceExpiry:''});
   const [photos,           setPhotos]           = useState<string[]>([]);
   const [isDragging,       setIsDragging]       = useState(false);
 
@@ -590,6 +591,11 @@ export default function Home() {
         delivery_option: (newV as any).deliveryOption || 'both',
         revenue_licence_expiry: (newV as any).revenueLicenceExpiry || null,
         insurance_expiry: (newV as any).insuranceExpiry || null,
+        weekly_price: Number((newV as any).weeklyPrice) || 0,
+        monthly_price: Number((newV as any).monthlyPrice) || 0,
+        km_per_day: Number((newV as any).kmPerDay) || 200,
+        extra_km_charge: Number((newV as any).extraKmCharge) || 50,
+        deposit_amount: Number((newV as any).depositAmount) || 0,
       }, photos);
       if (error) { showToast(error, 'err'); return; }
       showToast('Vehicle updated ✓');
@@ -609,7 +615,7 @@ export default function Home() {
 
     // FIX 1: Use unified refresh that updates both states
     await refreshVehicles(ownerId);
-    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both',revenueLicenceExpiry:'',insuranceExpiry:''});
+    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,weeklyPrice:0,monthlyPrice:0,kmPerDay:200,extraKmCharge:50,depositAmount:0,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both',revenueLicenceExpiry:'',insuranceExpiry:''});
     setPhotos([]); setShowAddForm(false); setEditingId(null);
   };
 
@@ -776,11 +782,29 @@ export default function Home() {
     if (dOpt === 'delivery_only') setDeliveryType('delivery');
   }, [selectedVehicle]);
 
-  const base           = selectedVehicle ? (selectedVehicle.price_per_day || (selectedVehicle as any).pricePerDay || 0) * days : 0;
+  // Auto-set days based on rental period
+  useEffect(() => {
+    if (rentalPeriod === 'weekly'  && days < 7)  setDays(7);
+    if (rentalPeriod === 'monthly' && days < 28) setDays(28);
+    if (rentalPeriod === 'daily'   && days > 6)  setDays(1);
+  }, [rentalPeriod]);
+
+  // Price calculation based on rental period
+  const getPeriodPrice = (v: any) => {
+    if (rentalPeriod === 'weekly'  && v?.weekly_price  > 0) return { price: v.weekly_price,  unit: 'week',  mult: 7  };
+    if (rentalPeriod === 'monthly' && v?.monthly_price > 0) return { price: v.monthly_price, unit: 'month', mult: 28 };
+    return { price: v?.price_per_day || v?.pricePerDay || 0, unit: 'day', mult: 1 };
+  };
+
+  const periodInfo     = selectedVehicle ? getPeriodPrice(selectedVehicle) : { price: 0, unit: 'day', mult: 1 };
+  const periodsCount   = rentalPeriod === 'daily' ? days : rentalPeriod === 'weekly' ? Math.ceil(days/7) : Math.ceil(days/28);
+  const base           = periodInfo.price * periodsCount;
   const delFee         = deliveryType==='delivery' ? 1500 : 0;
+  const depositAmt     = selectedVehicle ? ((selectedVehicle as any).deposit_amount || 0) : 0;
   const total          = base + delFee;
-  const platformFeeAmt = Math.round(total * 0.10);   // Drivo's cut (hidden from customer)
-  const ownerPayoutAmt = total - platformFeeAmt;      // what owner receives
+  const platformFeeAmt = Math.round(total * 0.10);
+  const ownerPayoutAmt = total - platformFeeAmt;
+
 
   const confirmBooking = async () => {
     if (!selectedVehicle) return;
@@ -862,9 +886,9 @@ export default function Home() {
             <span className="hidden sm:block text-[9px] bg-slate-900 text-white font-black px-1.5 py-0.5 rounded uppercase">LK</span>
           </button>
           <div className="hidden md:flex items-center gap-5 text-sm font-semibold text-slate-500">
-            <button onClick={resetToHome} className={`py-2 hover:text-slate-900 transition ${view==='home'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.dailyRentals}</button>
-            <button className="py-2 hover:text-slate-900 transition">{t.monthly}</button>
-            <button className="py-2 hover:text-slate-900 transition">{t.longterm}</button>
+            <button onClick={()=>{ resetToHome(); setRentalPeriod('daily'); }} className={`py-2 hover:text-slate-900 transition ${view==='home'&&rentalPeriod==='daily'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.dailyRentals}</button>
+            <button onClick={()=>{ resetToHome(); setRentalPeriod('weekly'); }} className={`py-2 hover:text-slate-900 transition ${view==='home'&&rentalPeriod==='weekly'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.monthly}</button>
+            <button onClick={()=>{ resetToHome(); setRentalPeriod('monthly'); }} className={`py-2 hover:text-slate-900 transition ${view==='home'&&rentalPeriod==='monthly'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.longterm}</button>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <select value={lang} onChange={e=>setLang(e.target.value as LangKey)} className="bg-slate-100 text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer">
@@ -2009,6 +2033,54 @@ export default function Home() {
                       <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.description}</label>
                         <textarea rows={2} placeholder="AC, helmet, insurance..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition resize-none" value={newV.description} onChange={e=>setNewV({...newV,description:e.target.value})}/></div>
 
+                      {/* Weekly & Monthly Pricing */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📆 Weekly Price (Rs.)</label>
+                          <input type="number" min="0" placeholder="e.g. 28000 (leave 0 if N/A)"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
+                            value={(newV as any).weeklyPrice || ''}
+                            onChange={e=>setNewV({...newV, weeklyPrice: Number(e.target.value)} as any)}/>
+                          <p className="text-[10px] text-slate-400 mt-1">7 days flat rate · 0 = not available</p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🗓️ Monthly Price (Rs.)</label>
+                          <input type="number" min="0" placeholder="e.g. 95000 (leave 0 if N/A)"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
+                            value={(newV as any).monthlyPrice || ''}
+                            onChange={e=>setNewV({...newV, monthlyPrice: Number(e.target.value)} as any)}/>
+                          <p className="text-[10px] text-slate-400 mt-1">28 days flat rate · 0 = not available</p>
+                        </div>
+                      </div>
+
+                      {/* KM Limit + Deposit */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🛣️ KM/Day Limit</label>
+                          <input type="number" min="0"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
+                            value={(newV as any).kmPerDay || 200}
+                            onChange={e=>setNewV({...newV, kmPerDay: Number(e.target.value)} as any)}/>
+                          <p className="text-[10px] text-slate-400 mt-1">0 = unlimited</p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">⚡ Extra KM (Rs.)</label>
+                          <input type="number" min="0"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
+                            value={(newV as any).extraKmCharge || 50}
+                            onChange={e=>setNewV({...newV, extraKmCharge: Number(e.target.value)} as any)}/>
+                          <p className="text-[10px] text-slate-400 mt-1">Per extra km charge</p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🔐 Deposit (Rs.)</label>
+                          <input type="number" min="0"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
+                            value={(newV as any).depositAmount || 0}
+                            onChange={e=>setNewV({...newV, depositAmount: Number(e.target.value)} as any)}/>
+                          <p className="text-[10px] text-slate-400 mt-1">0 = no deposit</p>
+                        </div>
+                      </div>
+
                       {/* Delivery Option */}
                       <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">🚚 Delivery Option</label>
@@ -2453,7 +2525,40 @@ export default function Home() {
                         ))}
                       </div>
                       <div className="p-5">
-                        {detailTab==='details' && <div className="space-y-4"><div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">{([[t.transmission,selectedVehicle.transmission],[t.fuel,selectedVehicle.fuel],['AC','Included'],['Insurance','Full Cover']] as [string,string][]).map(([l,v])=>(<div key={l} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="text-[10px] text-slate-400 font-bold uppercase">{l}</p><p className="font-bold text-sm text-slate-800 mt-0.5">{v}</p></div>))}</div><p className="text-sm text-slate-600 leading-relaxed">{selectedVehicle.description}</p></div>}
+                        {detailTab==='details' && (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                              {([[t.transmission,selectedVehicle.transmission],[t.fuel,selectedVehicle.fuel],['KM/Day',(selectedVehicle as any).km_per_day>0?`${(selectedVehicle as any).km_per_day} km`:'Unlimited'],['Deposit',(selectedVehicle as any).deposit_amount>0?`Rs. ${(selectedVehicle as any).deposit_amount.toLocaleString()}`:'No deposit']] as [string,string][]).map(([l,v])=>(
+                                <div key={l} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="text-[10px] text-slate-400 font-bold uppercase">{l}</p><p className="font-bold text-sm text-slate-800 mt-0.5">{v}</p></div>
+                              ))}
+                            </div>
+                            {(selectedVehicle as any).extra_km_charge > 0 && (selectedVehicle as any).km_per_day > 0 && (
+                              <p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-4 py-2.5 border border-slate-200">
+                                🛣️ First <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included · Extra km charged at <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span>
+                              </p>
+                            )}
+                            {((selectedVehicle as any).weekly_price > 0 || (selectedVehicle as any).monthly_price > 0) && (
+                              <div className="grid grid-cols-2 gap-3">
+                                {(selectedVehicle as any).weekly_price > 0 && (
+                                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
+                                    <p className="text-[10px] text-blue-400 font-black uppercase">Weekly Rate</p>
+                                    <p className="font-black text-blue-700 text-lg">Rs. {(selectedVehicle as any).weekly_price.toLocaleString()}</p>
+                                    <p className="text-[10px] text-blue-400">per week (7 days)</p>
+                                  </div>
+                                )}
+                                {(selectedVehicle as any).monthly_price > 0 && (
+                                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
+                                    <p className="text-[10px] text-emerald-400 font-black uppercase">Monthly Rate</p>
+                                    <p className="font-black text-emerald-700 text-lg">Rs. {(selectedVehicle as any).monthly_price.toLocaleString()}</p>
+                                    <p className="text-[10px] text-emerald-400">per month (28 days)</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <p className="text-sm text-slate-600 leading-relaxed">{selectedVehicle.description}</p>
+                            <VehicleReviews vehicleId={selectedVehicle.id} />
+                          </div>
+                        )}
                         {detailTab==='docs' && <div className="space-y-2 text-sm"><p className="font-bold text-slate-900 mb-3">Required at pickup:</p>{['National ID (NIC)','Valid Driving License','Phone for WhatsApp'].map(i=>(<div key={i} className="flex items-center gap-2 text-slate-700"><span className="text-emerald-500 font-bold">✓</span>{i}</div>))}</div>}
                         {detailTab==='faq' && <div className="space-y-3">{[['Is fuel included?','No — return with same level.'],['Can I extend?','Yes — WhatsApp the shop.'],['Security deposit?','Most vehicles: no deposit.']].map(([q,a])=>(<div key={q} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="font-bold text-slate-900 text-sm">{q}</p><p className="text-slate-500 mt-0.5 text-xs">{a}</p></div>))}</div>}
                         {detailTab==='details' && selectedVehicle && <VehicleReviews vehicleId={selectedVehicle.id} />}
@@ -2465,6 +2570,25 @@ export default function Home() {
                       <h3 className="font-black text-lg text-slate-900">{t.bookThisRide}</h3>
                       <span className="text-sm font-black text-red-500">{fmt(vPrice(selectedVehicle))}<span className="text-xs font-semibold text-slate-400">/{t.perDay.toLowerCase()}</span></span>
                     </div>
+                    {/* Rental Period Selector */}
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Rental Period</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {([
+                          ['daily',   '📅 Daily',   `Rs. ${(vPrice(selectedVehicle)).toLocaleString()}/day`],
+                          ['weekly',  '📆 Weekly',  (selectedVehicle as any).weekly_price > 0 ? `Rs. ${((selectedVehicle as any).weekly_price).toLocaleString()}/wk` : 'N/A'],
+                          ['monthly', '🗓️ Monthly', (selectedVehicle as any).monthly_price > 0 ? `Rs. ${((selectedVehicle as any).monthly_price).toLocaleString()}/mo` : 'N/A'],
+                        ] as [string,string,string][]).map(([val,label,price])=>(
+                          <button key={val} onClick={()=>setRentalPeriod(val as any)}
+                            disabled={val==='weekly'&&!((selectedVehicle as any).weekly_price>0) || val==='monthly'&&!((selectedVehicle as any).monthly_price>0)}
+                            className={`py-2 rounded-xl border text-center transition disabled:opacity-40 disabled:cursor-not-allowed ${rentalPeriod===val?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>
+                            <p className="text-[11px] font-black">{label}</p>
+                            <p className="text-[9px] opacity-70 mt-0.5">{price}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.pickupDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterPickup} onChange={e=>setFilterPickup(e.target.value)}/></div>
                       <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.returnDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterReturn} onChange={e=>setFilterReturn(e.target.value)}/></div>
@@ -2519,13 +2643,27 @@ export default function Home() {
                       })()}
                     </div>
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
-                      <div className="flex justify-between"><span>{fmt(vPrice(selectedVehicle))} × {days}d</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
-                      {deliveryType==='delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
-                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Total to Shop</span><span className="text-slate-900">{fmt(total)}</span></div>
-                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 mt-1 space-y-1">
-                        <div className="flex justify-between text-blue-700"><span>🔒 Booking Fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div>
-                        
+                      <div className="flex justify-between">
+                        <span>{fmt(periodInfo.price)} × {periodsCount} {periodInfo.unit}{periodsCount>1?'s':''}</span>
+                        <span className="font-bold text-slate-900">{fmt(base)}</span>
                       </div>
+                      {deliveryType==='delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
+                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Rental Total</span><span className="text-slate-900">{fmt(total)}</span></div>
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 space-y-1">
+                        <div className="flex justify-between text-blue-700"><span>🔒 Booking Fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div>
+                      </div>
+                      {depositAmt > 0 && (
+                        <div className="flex justify-between text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                          <span>🔐 Security Deposit (refundable)</span>
+                          <span className="font-black">{fmt(depositAmt)}</span>
+                        </div>
+                      )}
+                      {(selectedVehicle as any).km_per_day > 0 && (
+                        <div className="text-[10px] text-slate-500 bg-slate-100 rounded-lg px-3 py-2 space-y-0.5">
+                          <p>🛣️ <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included</p>
+                          {(selectedVehicle as any).extra_km_charge > 0 && <p>Extra km: <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span></p>}
+                        </div>
+                      )}
                     </div>
                     <button onClick={confirmBooking} className="w-full bg-red-500 hover:bg-red-600 active:scale-95 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition">Confirm Booking →</button>
                     <p className="text-[10px] text-center text-slate-400">{t.noPayment}</p>
