@@ -319,7 +319,7 @@ export default function Home() {
 
   const platformFee = (amount: number) => Math.round(amount * 0.10);
   const ownerPayout = (amount: number) => Math.round(amount * 0.90);
-  const typeIcon = (tp:string) => tp==='car'?'🚙':tp==='bike'?'🏍️':'🛺';
+  const typeIcon = (tp:string) => tp==='car'?'🚙':tp==='bike'?'🏍️':tp==='van'?'🚐':'🛺';
   const statusColor = (s:string) => s==='confirmed'?'bg-emerald-50 text-emerald-700 border-emerald-200':s==='completed'?'bg-blue-50 text-blue-700 border-blue-200':s==='cancelled'?'bg-slate-50 text-slate-500 border-slate-200':'bg-amber-50 text-amber-700 border-amber-200';
   const statusLabel = (s:string) => s==='confirmed'?t.confirmed:s==='completed'?t.completed:s==='cancelled'?'Cancelled':t.pending;
 
@@ -1767,7 +1767,7 @@ export default function Home() {
                           <input required type="text" placeholder="e.g. Honda CB 150R" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition" value={newV.name} onChange={e=>setNewV({...newV,name:e.target.value})}/></div>
                         <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.vehicleType}</label>
                           <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition" value={newV.type} onChange={e=>setNewV({...newV,type:e.target.value})}>
-                            <option value="car">🚙 {t.cars}</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option>
+                            <option value="car">🚙 {t.cars}</option><option value="van">🚐 Van</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option>
                           </select></div>
                       </div>
                       {/* District selector */}
@@ -2024,7 +2024,7 @@ export default function Home() {
                   <div className="flex flex-col md:flex-row gap-2">
                     {[
                       {label:t.cityLoc, el:<select value={filterCity} onChange={e=>setFilterCity(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none">{SL_CITIES.map(c=><option key={c} value={c}>{c}</option>)}</select>},
-                      {label:t.vehicleType, el:<select value={filterType} onChange={e=>setFilterType(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none"><option value="all">{t.allTypes}</option><option value="car">🚙 {t.cars}</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option></select>},
+                      {label:t.vehicleType, el:<select value={filterType} onChange={e=>setFilterType(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none"><option value="all">{t.allTypes}</option><option value="car">🚙 {t.cars}</option><option value="van">🚐 Van</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option></select>},
                       {label:t.pickupDate, el:<input type="date" value={filterPickup} onChange={e=>setFilterPickup(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none" style={{colorScheme:'light'}}/>},
                       {label:t.returnDate, el:<input type="date" value={filterReturn} onChange={e=>setFilterReturn(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none" style={{colorScheme:'light'}}/>},
                     ].map(f=>(
@@ -2108,6 +2108,7 @@ export default function Home() {
                     {label:t.allDeals,city:'All Sri Lanka',type:'all'},
                     {label:'🚙 '+t.cars,city:'All Sri Lanka',type:'car'},
                     {label:'🏍️ '+t.bikes,city:'All Sri Lanka',type:'bike'},
+                    {label:'🚐 Vans',city:'All Sri Lanka',type:'van'},
                     {label:'🛺 '+t.tuks,city:'All Sri Lanka',type:'tuk'},
                     {label:'📍 Colombo',city:'Colombo',type:'all'},
                     {label:'📍 Galle',city:'Galle',type:'all'},
