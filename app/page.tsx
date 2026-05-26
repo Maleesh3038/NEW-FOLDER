@@ -282,7 +282,7 @@ export default function Home() {
   // ── vehicle form
   const [showAddForm,      setShowAddForm]      = useState(false);
   const [editingId,        setEditingId]        = useState<string|null>(null);
-  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:''});
+  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both'});
   const [photos,           setPhotos]           = useState<string[]>([]);
   const [isDragging,       setIsDragging]       = useState(false);
 
@@ -575,6 +575,7 @@ export default function Home() {
         price_per_day: Number(newV.pricePerDay),
         description: newV.description, map_link: newV.mapLink,
         driver_option: (newV as any).driverOption || 'self_drive',
+        delivery_option: (newV as any).deliveryOption || 'both',
       }, photos);
       if (error) { showToast(error, 'err'); return; }
       showToast('Vehicle updated ✓');
@@ -594,7 +595,7 @@ export default function Home() {
 
     // FIX 1: Use unified refresh that updates both states
     await refreshVehicles(ownerId);
-    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:''});
+    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both'});
     setPhotos([]); setShowAddForm(false); setEditingId(null);
   };
 
@@ -753,6 +754,14 @@ export default function Home() {
   };
 
   // ── confirm booking (customer)
+  // Auto-set delivery type based on vehicle's delivery_option
+  useEffect(() => {
+    if (!selectedVehicle) return;
+    const dOpt = (selectedVehicle as any).delivery_option || 'both';
+    if (dOpt === 'pickup_only')   setDeliveryType('pickup');
+    if (dOpt === 'delivery_only') setDeliveryType('delivery');
+  }, [selectedVehicle]);
+
   const base           = selectedVehicle ? (selectedVehicle.price_per_day || (selectedVehicle as any).pricePerDay || 0) * days : 0;
   const delFee         = deliveryType==='delivery' ? 1500 : 0;
   const total          = base + delFee;
@@ -1934,6 +1943,24 @@ export default function Home() {
                       <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.description}</label>
                         <textarea rows={2} placeholder="AC, helmet, insurance..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition resize-none" value={newV.description} onChange={e=>setNewV({...newV,description:e.target.value})}/></div>
 
+                      {/* Delivery Option */}
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">🚚 Delivery Option</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {([
+                            ['pickup_only',   '📍 Self Pickup Only',  'Customer comes to you'],
+                            ['delivery_only', '🚚 Delivery Only',     'You deliver to customer'],
+                            ['both',          '✅ Both Options',       'Customer chooses'],
+                          ] as [string,string,string][]).map(([val,label,note])=>(
+                            <button key={val} type="button" onClick={()=>setNewV({...newV,deliveryOption:val} as any)}
+                              className={`py-2.5 px-2 rounded-xl border text-center transition ${(newV as any).deliveryOption===val?'bg-slate-900 text-white border-slate-900':'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+                              <p className="text-xs font-black">{label}</p>
+                              <p className="text-[10px] opacity-60 mt-0.5">{note}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       {/* Driver Option */}
                       <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">🧑‍✈️ Driver Option</label>
@@ -2380,11 +2407,32 @@ export default function Home() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.pickupMethod}</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {([['pickup','📍 '+t.selfPickup,'Free'],['delivery','🚚 '+t.delivery,'+Rs.1,500']] as [string,string,string][]).map(([val,label,note])=>(
-                          <button key={val} onClick={()=>setDeliveryType(val as any)} className={`py-2.5 text-xs font-bold rounded-xl border transition ${deliveryType===val?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>{label}<br/><span className="text-[10px] font-medium opacity-70">{note}</span></button>
-                        ))}
-                      </div>
+                      {(()=>{
+                        const dOpt = (selectedVehicle as any).delivery_option || 'both';
+                        // pickup_only — only show self pickup
+                        if (dOpt === 'pickup_only') return (
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                            <p className="text-sm font-black text-slate-900">📍 {t.selfPickup}</p>
+                            <p className="text-xs text-slate-400 mt-1">This vehicle is pickup only — come to the shop</p>
+                          </div>
+                        );
+                        // delivery_only — only show delivery
+                        if (dOpt === 'delivery_only') return (
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                            <p className="text-sm font-black text-slate-900">🚚 {t.delivery}</p>
+                            <p className="text-xs text-emerald-600 font-bold mt-1">+Rs. 1,500 delivery fee</p>
+                            <p className="text-xs text-slate-400">Vehicle will be delivered to your location</p>
+                          </div>
+                        );
+                        // both — show both options
+                        return (
+                          <div className="grid grid-cols-2 gap-2">
+                            {([['pickup','📍 '+t.selfPickup,'Free'],['delivery','🚚 '+t.delivery,'+Rs.1,500']] as [string,string,string][]).map(([val,label,note])=>(
+                              <button key={val} onClick={()=>setDeliveryType(val as any)} className={`py-2.5 text-xs font-bold rounded-xl border transition ${deliveryType===val?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>{label}<br/><span className="text-[10px] font-medium opacity-70">{note}</span></button>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
                       <div className="flex justify-between"><span>{fmt(vPrice(selectedVehicle))} × {days}d</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
