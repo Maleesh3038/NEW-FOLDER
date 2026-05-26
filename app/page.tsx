@@ -439,6 +439,7 @@ export default function Home() {
     if (filterPriceMax < 50000) filtered = filtered.filter(v => vPrice(v) <= filterPriceMax);
     if (filterTrans !== 'all') filtered = filtered.filter(v => v.transmission?.toLowerCase() === filterTrans.toLowerCase());
     if (filterFuel !== 'all') filtered = filtered.filter(v => v.fuel?.toLowerCase() === filterFuel.toLowerCase());
+
     if (filterDriver !== 'all') filtered = filtered.filter(v => {
       const driverOpt = (v as any).driver_option || 'self_drive';
       if (filterDriver === 'with_driver') return driverOpt === 'with_driver' || driverOpt === 'both';
@@ -886,9 +887,9 @@ export default function Home() {
             <span className="hidden sm:block text-[9px] bg-slate-900 text-white font-black px-1.5 py-0.5 rounded uppercase">LK</span>
           </button>
           <div className="hidden md:flex items-center gap-5 text-sm font-semibold text-slate-500">
-            <button onClick={()=>{ resetToHome(); setRentalPeriod('daily'); }} className={`py-2 hover:text-slate-900 transition ${view==='home'&&rentalPeriod==='daily'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.dailyRentals}</button>
-            <button onClick={()=>{ resetToHome(); setRentalPeriod('weekly'); }} className={`py-2 hover:text-slate-900 transition ${view==='home'&&rentalPeriod==='weekly'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.monthly}</button>
-            <button onClick={()=>{ resetToHome(); setRentalPeriod('monthly'); }} className={`py-2 hover:text-slate-900 transition ${view==='home'&&rentalPeriod==='monthly'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.longterm}</button>
+            <button onClick={()=>{ resetToHome(); setRentalPeriod('daily'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod==='daily'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.dailyRentals}</button>
+            <button onClick={()=>{ resetToHome(); setRentalPeriod('weekly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod==='weekly'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.monthly}</button>
+            <button onClick={()=>{ resetToHome(); setRentalPeriod('monthly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod==='monthly'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.longterm}</button>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <select value={lang} onChange={e=>setLang(e.target.value as LangKey)} className="bg-slate-100 text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer">
