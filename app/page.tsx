@@ -282,7 +282,7 @@ export default function Home() {
   // ── vehicle form
   const [showAddForm,      setShowAddForm]      = useState(false);
   const [editingId,        setEditingId]        = useState<string|null>(null);
-  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both'});
+  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both',revenueLicenceExpiry:'',insuranceExpiry:''});
   const [photos,           setPhotos]           = useState<string[]>([]);
   const [isDragging,       setIsDragging]       = useState(false);
 
@@ -563,7 +563,19 @@ export default function Home() {
   const handleVehicleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newV.name.trim()) { showToast('Vehicle name required!','err'); return; }
-    if (photos.filter(Boolean).length < 4) { showToast('All 4 vehicle photos required! (Exterior, Dashboard, Front Seats, Back Seats)','err'); return; }
+    if (!newV.mapLink.trim()) { showToast('📍 Google Maps pickup location is required!','err'); return; }
+    if (photos.filter(Boolean).length < 6) { showToast('All 6 photos required!','err'); return; }
+
+    // Check expiry dates
+    const todayCheck = new Date(); todayCheck.setHours(0,0,0,0);
+    if ((newV as any).revenueLicenceExpiry) {
+      const revExp = new Date((newV as any).revenueLicenceExpiry);
+      if (revExp < todayCheck) { showToast('Revenue Licence is EXPIRED! Renew before listing.','err'); return; }
+    }
+    if ((newV as any).insuranceExpiry) {
+      const insExp = new Date((newV as any).insuranceExpiry);
+      if (insExp < todayCheck) { showToast('Insurance is EXPIRED! Renew before listing.','err'); return; }
+    }
 
     const ownerId = ownerAcc?.id;
     if (!ownerId) { showToast('Please login again','err'); return; }
@@ -576,6 +588,8 @@ export default function Home() {
         description: newV.description, map_link: newV.mapLink,
         driver_option: (newV as any).driverOption || 'self_drive',
         delivery_option: (newV as any).deliveryOption || 'both',
+        revenue_licence_expiry: (newV as any).revenueLicenceExpiry || null,
+        insurance_expiry: (newV as any).insuranceExpiry || null,
       }, photos);
       if (error) { showToast(error, 'err'); return; }
       showToast('Vehicle updated ✓');
@@ -595,7 +609,7 @@ export default function Home() {
 
     // FIX 1: Use unified refresh that updates both states
     await refreshVehicles(ownerId);
-    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both'});
+    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both',revenueLicenceExpiry:'',insuranceExpiry:''});
     setPhotos([]); setShowAddForm(false); setEditingId(null);
   };
 
@@ -1926,18 +1940,70 @@ export default function Home() {
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Pickup Location (Google Maps)</label>
-                        <input type="url"
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                          📍 Pickup Location (Google Maps) <span className="text-red-400">*</span>
+                        </label>
+                        <input type="url" required
                           placeholder="Paste Google Maps link — e.g. https://maps.google.com/?q=..."
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition"
+                          className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:bg-white transition ${newV.mapLink?'border-emerald-400 focus:border-emerald-500':'border-red-300 focus:border-slate-900'}`}
                           value={newV.mapLink} onChange={e=>setNewV({...newV,mapLink:e.target.value})}/>
-                        <p className="text-[10px] text-slate-400 mt-1.5">Google Maps eke "Share" → "Copy link" karala paste karanna · Optional but recommended</p>
+                        <p className="text-[10px] text-slate-400 mt-1.5">Google Maps eke "Share" → "Copy link" karala paste karanna · <span className="text-red-500 font-bold">Required</span></p>
                         {newV.mapLink && (
                           <a href={newV.mapLink} target="_blank" rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-blue-600 hover:underline">
                             📍 Preview location →
                           </a>
                         )}
+                      </div>
+
+                      {/* Revenue Licence + Insurance Expiry */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                            📄 Revenue Licence Expiry
+                          </label>
+                          <input type="date"
+                            className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white transition cursor-pointer ${
+                              (newV as any).revenueLicenceExpiry && new Date((newV as any).revenueLicenceExpiry) < new Date()
+                                ? 'border-red-400 bg-red-50 text-red-600'
+                                : (newV as any).revenueLicenceExpiry
+                                  ? 'border-emerald-400 text-slate-800'
+                                  : 'border-slate-200 text-slate-800'
+                            }`}
+                            value={(newV as any).revenueLicenceExpiry || ''}
+                            onChange={e=>setNewV({...newV, revenueLicenceExpiry: e.target.value} as any)}
+                            style={{colorScheme:'light'}}/>
+                          {(newV as any).revenueLicenceExpiry && new Date((newV as any).revenueLicenceExpiry) < new Date() && (
+                            <p className="text-[10px] text-red-500 font-black mt-1">⚠️ EXPIRED — Renew before listing!</p>
+                          )}
+                          {(newV as any).revenueLicenceExpiry && new Date((newV as any).revenueLicenceExpiry) >= new Date() && (() => {
+                            const days = Math.ceil((new Date((newV as any).revenueLicenceExpiry).getTime() - Date.now()) / 86400000);
+                            return days <= 30 ? <p className="text-[10px] text-amber-500 font-black mt-1">⚠️ Expires in {days} days</p> : null;
+                          })()}
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                            🛡️ Insurance Expiry
+                          </label>
+                          <input type="date"
+                            className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white transition cursor-pointer ${
+                              (newV as any).insuranceExpiry && new Date((newV as any).insuranceExpiry) < new Date()
+                                ? 'border-red-400 bg-red-50 text-red-600'
+                                : (newV as any).insuranceExpiry
+                                  ? 'border-emerald-400 text-slate-800'
+                                  : 'border-slate-200 text-slate-800'
+                            }`}
+                            value={(newV as any).insuranceExpiry || ''}
+                            onChange={e=>setNewV({...newV, insuranceExpiry: e.target.value} as any)}
+                            style={{colorScheme:'light'}}/>
+                          {(newV as any).insuranceExpiry && new Date((newV as any).insuranceExpiry) < new Date() && (
+                            <p className="text-[10px] text-red-500 font-black mt-1">⚠️ EXPIRED — Renew before listing!</p>
+                          )}
+                          {(newV as any).insuranceExpiry && new Date((newV as any).insuranceExpiry) >= new Date() && (() => {
+                            const days = Math.ceil((new Date((newV as any).insuranceExpiry).getTime() - Date.now()) / 86400000);
+                            return days <= 30 ? <p className="text-[10px] text-amber-500 font-black mt-1">⚠️ Expires in {days} days</p> : null;
+                          })()}
+                        </div>
                       </div>
 
                       <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.description}</label>
@@ -2012,7 +2078,25 @@ export default function Home() {
                               <p className="text-[10px] text-emerald-600 font-bold">You get Rs.{Math.round(vPrice(v)*0.90).toLocaleString()}/day</p>
                             </div>
                             </div>
-                            <p className="text-xs text-slate-400 mb-3">{v.transmission} · {v.fuel} · {v.location}</p>
+                            <p className="text-xs text-slate-400 mb-1">{v.transmission} · {v.fuel} · {v.location}</p>
+                            {(()=>{
+                              const today = new Date(); today.setHours(0,0,0,0);
+                              const revExp = (v as any).revenue_licence_expiry ? new Date((v as any).revenue_licence_expiry) : null;
+                              const insExp = (v as any).insurance_expiry ? new Date((v as any).insurance_expiry) : null;
+                              const revExpired = revExp && revExp < today;
+                              const insExpired = insExp && insExp < today;
+                              const revSoon = revExp && !revExpired && Math.ceil((revExp.getTime()-today.getTime())/86400000) <= 30;
+                              const insSoon = insExp && !insExpired && Math.ceil((insExp.getTime()-today.getTime())/86400000) <= 30;
+                              if (!revExpired && !insExpired && !revSoon && !insSoon) return null;
+                              return (
+                                <div className="flex flex-wrap gap-1 mb-2">
+                                  {revExpired && <span className="text-[9px] font-black bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded">📄 Rev. Lic EXPIRED</span>}
+                                  {insExpired && <span className="text-[9px] font-black bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded">🛡️ Insurance EXPIRED</span>}
+                                  {revSoon && <span className="text-[9px] font-black bg-amber-100 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded">📄 Rev. Lic expiring soon</span>}
+                                  {insSoon && <span className="text-[9px] font-black bg-amber-100 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded">🛡️ Insurance expiring soon</span>}
+                                </div>
+                              );
+                            })()}
                             <div className="flex gap-2 pt-3 border-t border-slate-100">
                               <button onClick={()=>toggleAvail(v.id)} className={`flex-1 py-2 rounded-xl font-black text-[11px] uppercase tracking-wide border transition ${vAvail(v)?'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600':'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>{vAvail(v)?t.hide:t.goLive}</button>
                               <button onClick={()=>{ setEditingId(v.id); setShowAddForm(false); setNewV({name:v.name,type:v.type,transmission:v.transmission,fuel:v.fuel,pricePerDay:vPrice(v),description:v.description||'',mapLink:(v as any).mapLink||''}); setPhotos(v.images&&v.images.length>0?[...v.images]:[v.image]); window.scrollTo({top:0,behavior:'smooth'}); }} className="flex-1 py-2 rounded-xl font-black text-[11px] uppercase border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition">Edit</button>
