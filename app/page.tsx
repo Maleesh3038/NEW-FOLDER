@@ -282,7 +282,7 @@ export default function Home() {
   // ── vehicle form
   const [showAddForm,      setShowAddForm]      = useState(false);
   const [editingId,        setEditingId]        = useState<string|null>(null);
-  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive'});
+  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:''});
   const [photos,           setPhotos]           = useState<string[]>([]);
   const [isDragging,       setIsDragging]       = useState(false);
 
@@ -584,7 +584,7 @@ export default function Home() {
         name: newV.name, type: newV.type as any,
         transmission: newV.transmission, fuel: newV.fuel,
         price_per_day: Number(newV.pricePerDay),
-        location: ownerAcc?.city || 'Colombo',
+        location: (newV as any).district || ownerAcc?.city || 'Colombo',
         shop_name: ownerAcc?.shop_name || '',
         description: newV.description, map_link: newV.mapLink,
       }, photos);
@@ -594,7 +594,7 @@ export default function Home() {
 
     // FIX 1: Use unified refresh that updates both states
     await refreshVehicles(ownerId);
-    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:''});
+    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:'',driverOption:'self_drive',district:''});
     setPhotos([]); setShowAddForm(false); setEditingId(null);
   };
 
@@ -1770,6 +1770,17 @@ export default function Home() {
                             <option value="car">🚙 {t.cars}</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option>
                           </select></div>
                       </div>
+                      {/* District selector */}
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📍 District <span className="text-red-400">*</span></label>
+                        <select required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition"
+                          value={(newV as any).district || ownerAcc?.city || 'Colombo'}
+                          onChange={e=>setNewV({...newV, district: e.target.value} as any)}>
+                          {SL_CITIES.slice(1).map(c=><option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <p className="text-[10px] text-slate-400 mt-1">Vehicle eka available wena district eka select karanna</p>
+                      </div>
+
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.transmission}</label>
                           <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-xs font-bold outline-none cursor-pointer" value={newV.transmission} onChange={e=>setNewV({...newV,transmission:e.target.value})}>
@@ -2093,7 +2104,26 @@ export default function Home() {
 
               <section className="max-w-7xl mx-auto px-4 pt-5 pb-3">
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  {[{label:t.allDeals,city:'All Sri Lanka',type:'all'},{label:'🚙 '+t.cars,city:'All Sri Lanka',type:'car'},{label:'🏍️ '+t.bikes,city:'All Sri Lanka',type:'bike'},{label:'🛺 '+t.tuks,city:'All Sri Lanka',type:'tuk'},{label:'📍 Colombo',city:'Colombo',type:'all'},{label:'📍 Galle',city:'Galle',type:'all'},{label:'📍 Kandy',city:'Kandy',type:'all'}].map(tag=>(
+                  {[
+                    {label:t.allDeals,city:'All Sri Lanka',type:'all'},
+                    {label:'🚙 '+t.cars,city:'All Sri Lanka',type:'car'},
+                    {label:'🏍️ '+t.bikes,city:'All Sri Lanka',type:'bike'},
+                    {label:'🛺 '+t.tuks,city:'All Sri Lanka',type:'tuk'},
+                    {label:'📍 Colombo',city:'Colombo',type:'all'},
+                    {label:'📍 Galle',city:'Galle',type:'all'},
+                    {label:'📍 Kandy',city:'Kandy',type:'all'},
+                    {label:'📍 Gampaha',city:'Gampaha',type:'all'},
+                    {label:'📍 Matara',city:'Matara',type:'all'},
+                    {label:'📍 Negombo',city:'Negombo',type:'all'},
+                    {label:'📍 Jaffna',city:'Jaffna',type:'all'},
+                    {label:'📍 Trincomalee',city:'Trincomalee',type:'all'},
+                    {label:'📍 Batticaloa',city:'Batticaloa',type:'all'},
+                    {label:'📍 Anuradhapura',city:'Anuradhapura',type:'all'},
+                    {label:'📍 Ella/Badulla',city:'Badulla',type:'all'},
+                    {label:'📍 Nuwara Eliya',city:'Nuwara Eliya',type:'all'},
+                    {label:'📍 Ratnapura',city:'Ratnapura',type:'all'},
+                    {label:'📍 Hambantota',city:'Hambantota',type:'all'},
+                  ].map(tag=>(
                     <button key={tag.label} onClick={()=>{ setFilterCity(tag.city); setFilterType(tag.type); }}
                       className={`text-xs font-bold border px-4 py-2 rounded-xl whitespace-nowrap transition ${filterCity===tag.city&&filterType===tag.type?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{tag.label}</button>
                   ))}
