@@ -349,6 +349,41 @@ export default function Home() {
     if (s) restoreSession(s.id, s.email, s.role);
   }, []);
 
+  // ── Push Notification Setup
+  const VAPID_PUBLIC_KEY = 'BKVdt525L67coH_qx5RDlKIckkmVRPDUTQL5GGNlGeJ0mQl7V7HKYMq9XlmwJfxjhjioQUE7PhFNExdi0oL7V9U';
+
+  const subscribeToPush = async (userId: string, userType: 'owner'|'customer') => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+
+      const existing = await reg.pushManager.getSubscription();
+      const sub = existing || await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: VAPID_PUBLIC_KEY,
+      });
+
+      await fetch('/api/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'subscribe', userId, userType, subscription: sub }),
+      });
+    } catch (e) {
+      console.log('Push setup failed:', e);
+    }
+  };
+
+  // Subscribe after login
+  useEffect(() => {
+    if (sessionRole === 'owner' && ownerAcc?.id) {
+      subscribeToPush(ownerAcc.id, 'owner');
+    } else if (sessionRole === 'customer' && custAcc?.id) {
+      subscribeToPush(custAcc.id, 'customer');
+    }
+  }, [sessionRole, ownerAcc?.id, custAcc?.id]);
+
   // ── Real-time subscription for owner bookings
   useEffect(() => {
     if (sessionRole !== 'owner' || !ownerAcc?.id) return;
