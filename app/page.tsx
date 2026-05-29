@@ -96,6 +96,51 @@ function VehicleReviews({ vehicleId }: { vehicleId: string }) {
   );
 }
 
+// ── Owner Contact Buttons (shown after booking confirmed)
+function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { vehicleId:string; ownerId:string; mapLink:string; vehicleName:string }) {
+  const [owner, setOwner] = useState<any>(null);
+  useEffect(() => {
+    if (!ownerId) return;
+    fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/owners?id=eq.${ownerId}&select=phone,whatsapp,shop_name`, {
+      headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }
+    }).then(r=>r.json()).then(data=>{ if(Array.isArray(data)&&data[0]) setOwner(data[0]); });
+  }, [ownerId]);
+
+  const phone   = owner?.whatsapp || owner?.phone || '';
+  const waPhone = phone.replace(/[^0-9]/g,'').replace(/^0/,'94');
+  const waMsg   = encodeURIComponent(`Hi ${owner?.shop_name||''}! I just booked your *${vehicleName}* on Drivo LK. Looking forward to it! 🚗`);
+
+  return (
+    <div className="space-y-3">
+      {phone && (
+        <a href={`https://wa.me/${waPhone}?text=${waMsg}`} target="_blank" rel="noopener noreferrer"
+          className="flex items-center justify-center gap-3 w-full py-3.5 bg-[#25D366] hover:bg-[#1fbe5a] text-white rounded-2xl font-black text-sm transition shadow-lg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/>
+            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.098.546 4.07 1.5 5.787L0 24l6.396-1.676A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.487-5.187-1.34l-.371-.22-3.8.996 1.013-3.695-.241-.381A9.938 9.938 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+          </svg>
+          Chat on WhatsApp
+        </a>
+      )}
+      {phone && (
+        <a href={`tel:${phone}`}
+          className="flex items-center justify-center gap-3 w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-sm transition shadow-md">
+          📞 Call Shop · {phone}
+        </a>
+      )}
+      {mapLink && (
+        <a href={mapLink} target="_blank" rel="noopener noreferrer"
+          className="flex items-center justify-center gap-3 w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm transition shadow-md">
+          📍 Get Directions to Pickup Location
+        </a>
+      )}
+      {!phone && !mapLink && (
+        <p className="text-xs text-slate-400 text-center py-2">Shop contact details will be shared shortly</p>
+      )}
+    </div>
+  );
+}
+
 // ── FAQ Section Component
 function FaqSection() {
   const [activeTab, setActiveTab] = useState<'general'|'booking'|'price'|'documents'>('general');
@@ -2488,12 +2533,10 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
-                  {vMap(selectedVehicle) && (
-                    <a href={vMap(selectedVehicle)} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 w-full py-3 mb-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm transition shadow-md">
-                      📍 Get Directions to Pickup Location
-                    </a>
-                  )}
+                  {/* Action buttons — revealed after booking */}
+                  <div className="space-y-3 mb-4">
+                    <OwnerContactButtons vehicleId={selectedVehicle.id} ownerId={selectedVehicle.owner_id} mapLink={vMap(selectedVehicle)} vehicleName={selectedVehicle.name} />
+                  </div>
                   {sessionRole==='customer' && <p className="text-xs text-emerald-600 font-bold mb-4">✓ Saved to your booking history</p>}
                   <div className="flex gap-3 justify-center flex-wrap">
                     {sessionRole==='customer' && <button onClick={()=>setView('custDash')} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.myBookings}</button>}
@@ -2511,12 +2554,9 @@ export default function Home() {
                       </div>
                       <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{selectedVehicle.name}</h2>
                       <p className="text-sm text-slate-500 mt-1">{vShop(selectedVehicle)} · <span className="text-blue-600 font-medium">{selectedVehicle.location}</span></p>
-                      {(selectedVehicle as any).mapLink && (
-                        <a href={(selectedVehicle as any).mapLink} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition shadow-sm">
-                          📍 Get Directions on Google Maps
-                        </a>
-                      )}
+                      <p className="text-xs text-slate-400 mt-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 inline-flex items-center gap-2">
+                        🔒 <span>Pickup location revealed after booking & payment</span>
+                      </p>
                     </div>
                     {/* Structured gallery — cover + 3 corners + 2 interior */}
                     {(() => {
