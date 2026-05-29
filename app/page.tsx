@@ -42,6 +42,7 @@ function mapVehicle(v: any): RawVehicle {
       .map((p: any) => p.storage_url) || [],
     isAvailable: v.is_available,
     mapLink: v.map_link,
+    owner_verified: v.owners?.verified || false,
   };
 }
 
@@ -373,8 +374,10 @@ export default function Home() {
   // ── FIX 1: Unified vehicle refresh — updates BOTH allVehicles and ownerFleet
   const refreshVehicles = useCallback(async (ownerId?: string) => {
     // Refresh public listing (only available vehicles)
-    const vehicles = await getAvailableVehicles();
-    setAllVehicles(vehicles.map(mapVehicle));
+    const { data: vdata } = await supabase.from('vehicles')
+      .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
+      .eq('is_available', true).order('created_at', { ascending: false });
+    if (vdata) setAllVehicles(vdata.map(mapVehicle));
 
     // If owner id provided, also refresh their full fleet (including unavailable)
     if (ownerId) {
@@ -388,9 +391,14 @@ export default function Home() {
   // ── bootstrap
   useEffect(() => {
     trackVisitInDB().catch(()=>{});
-    getAvailableVehicles().then(vehicles => {
-      setAllVehicles(vehicles.map(mapVehicle));
-    }).catch(()=>{});
+    // Fetch vehicles with owner verified status
+    supabase.from('vehicles')
+      .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
+      .eq('is_available', true)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) setAllVehicles(data.map(mapVehicle));
+      }).catch(()=>{});
     const s = getSession();
     if (s) restoreSession(s.id, s.email, s.role);
   }, []);
@@ -711,8 +719,10 @@ export default function Home() {
     const updated = ownerFleet.map(x => x.id === id ? { ...x, isAvailable: newAvail, is_available: newAvail } : x);
     setOwnerFleet(updated);
     // Also refresh public listing
-    const vehicles = await getAvailableVehicles();
-    setAllVehicles(vehicles.map(mapVehicle));
+    const { data: vdata } = await supabase.from('vehicles')
+      .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
+      .eq('is_available', true).order('created_at', { ascending: false });
+    if (vdata) setAllVehicles(vdata.map(mapVehicle));
     showToast(newAvail ? `"${v.name}" is now live!` : `"${v.name}" hidden`);
   };
 
@@ -720,8 +730,10 @@ export default function Home() {
     if (!confirm('Delete this vehicle?')) return;
     await dbDeleteVehicle(id);
     setOwnerFleet(ownerFleet.filter(v => v.id !== id));
-    const vehicles = await getAvailableVehicles();
-    setAllVehicles(vehicles.map(mapVehicle));
+    const { data: vdata } = await supabase.from('vehicles')
+      .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
+      .eq('is_available', true).order('created_at', { ascending: false });
+    if (vdata) setAllVehicles(vdata.map(mapVehicle));
     showToast('Deleted','err');
   };
 
@@ -1521,7 +1533,15 @@ export default function Home() {
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-xl">{(ownerAcc.shop_name||'S').charAt(0).toUpperCase()}</div>
                 <div>
-                  <p className="font-black text-slate-900 text-base">{ownerAcc.shop_name||''}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-black text-slate-900 text-base">{ownerAcc.shop_name||''}</p>
+                    {(ownerAcc as any).verified && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full">✅ Verified</span>
+                    )}
+                    {!(ownerAcc as any).verified && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full">⏳ Pending Verification</span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500">{ownerAcc.city||''} · {ownerAcc.phone||''}</p>
                 </div>
               </div>
@@ -2407,6 +2427,11 @@ export default function Home() {
                       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
                         <img src={v.image} alt={v.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
                         <span className="absolute top-3 left-3 bg-green-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow uppercase">{t.verified}</span>
+                        {(v as any).owner_verified && (
+                          <span className="absolute top-3 left-20 bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow flex items-center gap-1">
+                            ✅ Verified Partner
+                          </span>
+                        )}
                         <div className="absolute top-3 right-3 flex items-center gap-1.5">
                           <button onClick={e=>{ e.stopPropagation(); toggleWishlist(v.id); }}
                             className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${wishlist.includes(v.id)?'bg-red-500 text-white':'bg-white/90 text-slate-400 hover:text-red-500'}`}>
@@ -2553,7 +2578,14 @@ export default function Home() {
                         <span className="text-xs text-amber-500 font-bold">★ {selectedVehicle.rating.toFixed(1)}</span>
                       </div>
                       <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{selectedVehicle.name}</h2>
-                      <p className="text-sm text-slate-500 mt-1">{vShop(selectedVehicle)} · <span className="text-blue-600 font-medium">{selectedVehicle.location}</span></p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <p className="text-sm text-slate-500">{vShop(selectedVehicle)} · <span className="text-blue-600 font-medium">{selectedVehicle.location}</span></p>
+                        {(selectedVehicle as any).owner_verified && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-black bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full">
+                            ✅ Verified Partner
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-400 mt-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 inline-flex items-center gap-2">
                         🔒 <span>Pickup location revealed after booking & payment</span>
                       </p>

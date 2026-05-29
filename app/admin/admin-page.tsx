@@ -121,6 +121,15 @@ export default function AdminPage() {
     if(selectedPartner?.id===id) setSelectedPartner((p:any)=>({...p,blocked:!blocked}));
     showToast(!blocked?'Partner blocked':'Partner unblocked');
   };
+  const toggleVerifyOwner = async(id:string,verified:boolean)=>{
+    await supabase.from('owners').update({
+      verified:!verified,
+      verified_at: !verified ? new Date().toISOString() : null
+    }).eq('id',id);
+    setOwners(p=>p.map(o=>o.id===id?{...o,verified:!verified}:o));
+    if(selectedPartner?.id===id) setSelectedPartner((p:any)=>({...p,verified:!verified}));
+    showToast(!verified?'✅ Partner verified!':'Verification removed');
+  };
   const toggleBlockCustomer = async(id:string,blocked:boolean)=>{
     await supabase.from('customers').update({blocked:!blocked}).eq('id',id);
     setCustomers(p=>p.map(c=>c.id===id?{...c,blocked:!blocked}:c));
@@ -356,12 +365,18 @@ export default function AdminPage() {
                   {vehicles.filter(v=>v.owner_id===selectedPartner.id).length===0&&<p className="text-xs text-slate-500 text-center py-4">No vehicles listed</p>}
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={()=>toggleBlockOwner(selectedPartner.id,selectedPartner.blocked)}
-                  className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase transition ${selectedPartner.blocked?'bg-emerald-600 hover:bg-emerald-700':'bg-red-600 hover:bg-red-700'} text-white`}>
-                  {selectedPartner.blocked?'Unblock Partner':'Block Partner'}
+              <div className="space-y-2">
+                <button onClick={()=>toggleVerifyOwner(selectedPartner.id,selectedPartner.verified)}
+                  className={`w-full py-2.5 rounded-xl font-black text-xs uppercase transition ${selectedPartner.verified?'bg-slate-700 hover:bg-slate-600 text-slate-300':'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+                  {selectedPartner.verified?'Remove Verification ✅':'✅ Verify This Partner'}
                 </button>
-                <button onClick={()=>setSelectedPartner(null)} className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl font-black text-xs uppercase transition">Close</button>
+                <div className="flex gap-2">
+                  <button onClick={()=>toggleBlockOwner(selectedPartner.id,selectedPartner.blocked)}
+                    className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase transition ${selectedPartner.blocked?'bg-emerald-600 hover:bg-emerald-700':'bg-red-600 hover:bg-red-700'} text-white`}>
+                    {selectedPartner.blocked?'Unblock Partner':'Block Partner'}
+                  </button>
+                  <button onClick={()=>setSelectedPartner(null)} className="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl font-black text-xs uppercase transition">Close</button>
+                </div>
               </div>
             </div>
           </div>
@@ -575,8 +590,17 @@ export default function AdminPage() {
                             <td className="px-4 py-3 text-slate-300">{o.city||'—'}</td>
                             <td className="px-4 py-3"><span className="font-black text-white">{vehicles.filter(v=>v.owner_id===o.id).length}</span> <span className="text-slate-500">({vehicles.filter(v=>v.owner_id===o.id&&v.is_available).length} live)</span></td>
                             <td className="px-4 py-3"><p className="font-black text-white">Rs. {s.payout.toLocaleString()}</p><p className="text-[10px] text-slate-500">{s.completed} completed</p></td>
-                            <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${o.blocked?'bg-red-900/50 text-red-400':'bg-emerald-900/50 text-emerald-400'}`}>{o.blocked?'Blocked':'Active'}</span></td>
-                            <td className="px-4 py-3 text-right" onClick={e=>e.stopPropagation()}>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col gap-1">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase w-fit ${o.blocked?'bg-red-900/50 text-red-400':'bg-emerald-900/50 text-emerald-400'}`}>{o.blocked?'Blocked':'Active'}</span>
+                                {o.verified && <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-900/50 text-blue-400 w-fit">✅ Verified</span>}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right space-x-1" onClick={e=>e.stopPropagation()}>
+                              <button onClick={()=>toggleVerifyOwner(o.id,o.verified)}
+                                className={`text-[11px] font-black px-2.5 py-1 rounded-lg transition ${o.verified?'bg-blue-900/50 text-blue-400 hover:bg-slate-700':'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+                                {o.verified?'✅ Verified':'Verify'}
+                              </button>
                               <button onClick={()=>toggleBlockOwner(o.id,o.blocked)} className={`text-[11px] font-black px-2.5 py-1 rounded-lg transition ${o.blocked?'bg-emerald-900/50 hover:bg-emerald-600 text-emerald-400':'bg-red-900/50 hover:bg-red-600 text-red-400'}`}>{o.blocked?'Unblock':'Block'}</button>
                             </td>
                           </tr>
