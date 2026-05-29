@@ -326,6 +326,7 @@ export default function Home() {
   // login prompt modal
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const [bookingLoading,  setBookingLoading]  = useState(false);
+  const [lightbox, setLightbox] = useState<{imgs: string[], idx: number} | null>(null);
 
   // ── vehicle form
   const [showAddForm,      setShowAddForm]      = useState(false);
@@ -402,6 +403,18 @@ export default function Home() {
     const s = getSession();
     if (s) restoreSession(s.id, s.email, s.role);
   }, []);
+
+  // ── Keyboard navigation for lightbox
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!lightbox) return;
+      if (e.key === 'Escape') setLightbox(null);
+      if (e.key === 'ArrowRight') setLightbox(p=>p?{...p,idx:(p.idx+1)%p.imgs.length}:null);
+      if (e.key === 'ArrowLeft')  setLightbox(p=>p?{...p,idx:(p.idx-1+p.imgs.length)%p.imgs.length}:null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightbox]);
 
   // ── Push Notification Setup
   const VAPID_PUBLIC_KEY = 'BKVdt525L67coH_qx5RDlKIckkmVRPDUTQL5GGNlGeJ0mQl7V7HKYMq9XlmwJfxjhjioQUE7PhFNExdi0oL7V9U';
@@ -1044,6 +1057,51 @@ export default function Home() {
         )}
       </nav>
 
+
+      {/* ══ LIGHTBOX MODAL ══ */}
+      {lightbox && (
+        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center"
+          onClick={()=>setLightbox(null)}>
+          {/* Close */}
+          <button onClick={()=>setLightbox(null)}
+            className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-xl font-black transition z-10">
+            ×
+          </button>
+          {/* Counter */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-bold">
+            {lightbox.idx + 1} / {lightbox.imgs.length}
+          </div>
+          {/* Prev button */}
+          {lightbox.imgs.length > 1 && (
+            <button onClick={e=>{e.stopPropagation();setLightbox(p=>p?{...p,idx:(p.idx-1+p.imgs.length)%p.imgs.length}:null)}}
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center text-2xl font-black transition z-10">
+              ‹
+            </button>
+          )}
+          {/* Main image */}
+          <img src={lightbox.imgs[lightbox.idx]} alt=""
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+            onClick={e=>e.stopPropagation()}/>
+          {/* Next button */}
+          {lightbox.imgs.length > 1 && (
+            <button onClick={e=>{e.stopPropagation();setLightbox(p=>p?{...p,idx:(p.idx+1)%p.imgs.length}:null)}}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center text-2xl font-black transition z-10">
+              ›
+            </button>
+          )}
+          {/* Thumbnail strip */}
+          {lightbox.imgs.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 overflow-x-auto max-w-[90vw] pb-1">
+              {lightbox.imgs.map((img,i)=>(
+                <button key={i} onClick={e=>{e.stopPropagation();setLightbox(p=>p?{...p,idx:i}:null)}}
+                  className={`flex-shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition ${lightbox.idx===i?'border-white':'border-white/20 hover:border-white/60'}`}>
+                  <img src={img} className="w-full h-full object-cover" alt=""/>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ══ REVIEW MODAL ══ */}
       {reviewModal && (
@@ -2425,7 +2483,12 @@ export default function Home() {
                     <article key={v.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group cursor-pointer"
                       onClick={()=>{ setSelectedVehicle(v); setView('detail'); window.scrollTo({top:0,behavior:'smooth'}); }}>
                       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
-                        <img src={v.image} alt={v.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                        <img src={v.image} alt={v.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onClick={e=>{
+                            e.stopPropagation();
+                            const allImgs = (v as any).images?.filter(Boolean) || [v.image].filter(Boolean);
+                            if(allImgs.length>0) setLightbox({imgs:allImgs, idx:0});
+                          }}/>
                         {(v as any).owner_verified ? (
                           <span className="absolute top-3 left-3 bg-blue-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow flex items-center gap-1">
                             ✅ Verified Partner
@@ -2599,19 +2662,24 @@ export default function Home() {
                       const labels = ['Cover', 'Front', 'Side', 'Rear', 'Dashboard', 'Seats'];
                       return (
                         <div className="space-y-3">
-                          {/* Cover — full width */}
+                          {/* Cover — full width, clickable */}
                           {imgs[0] && (
-                            <div className="relative aspect-[16/8] bg-slate-200 rounded-2xl overflow-hidden">
-                              <img src={imgs[0]} alt="Cover" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"/>
+                            <div className="relative aspect-[16/8] bg-slate-200 rounded-2xl overflow-hidden cursor-zoom-in group"
+                              onClick={()=>setLightbox({imgs, idx:0})}>
+                              <img src={imgs[0]} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
                               <span className="absolute top-3 left-3 text-[10px] bg-slate-900/80 text-white font-black px-2.5 py-1 rounded-xl uppercase backdrop-blur-sm">Cover · Front & Side</span>
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
+                                <span className="opacity-0 group-hover:opacity-100 transition bg-black/60 text-white text-xs font-black px-3 py-1.5 rounded-xl backdrop-blur-sm">🔍 View all {imgs.length} photos</span>
+                              </div>
                             </div>
                           )}
                           {/* 3 exterior corners */}
                           {imgs.slice(1,4).length > 0 && (
                             <div className="grid grid-cols-3 gap-2">
                               {imgs.slice(1,4).map((img,i)=>(
-                                <div key={i} className="relative aspect-video bg-slate-200 rounded-xl overflow-hidden">
-                                  <img src={img} alt={labels[i+1]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
+                                <div key={i} className="relative aspect-video bg-slate-200 rounded-xl overflow-hidden cursor-zoom-in group"
+                                  onClick={()=>setLightbox({imgs, idx:i+1})}>
+                                  <img src={img} alt={labels[i+1]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
                                   <span className="absolute bottom-1.5 left-1.5 text-[8px] bg-black/60 text-white font-black px-1.5 py-0.5 rounded uppercase backdrop-blur-sm">{labels[i+1]}</span>
                                 </div>
                               ))}
@@ -2621,8 +2689,9 @@ export default function Home() {
                           {imgs.slice(4,6).length > 0 && (
                             <div className="grid grid-cols-2 gap-2">
                               {imgs.slice(4,6).map((img,i)=>(
-                                <div key={i} className="relative aspect-[4/3] bg-slate-200 rounded-xl overflow-hidden">
-                                  <img src={img} alt={labels[i+4]} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
+                                <div key={i} className="relative aspect-[4/3] bg-slate-200 rounded-xl overflow-hidden cursor-zoom-in group"
+                                  onClick={()=>setLightbox({imgs, idx:i+4})}>
+                                  <img src={img} alt={labels[i+4]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
                                   <span className="absolute bottom-1.5 left-1.5 text-[8px] bg-black/60 text-white font-black px-1.5 py-0.5 rounded uppercase backdrop-blur-sm">{labels[i+4]}</span>
                                 </div>
                               ))}
