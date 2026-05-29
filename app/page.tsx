@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { T, LangKey } from './translations';
 import { SL_CITIES } from './types';
 import {
@@ -210,7 +210,7 @@ export default function Home() {
 
   // ── vehicles & filters
   const [allVehicles, setAllVehicles] = useState<RawVehicle[]>([]);
-  const [displayed,   setDisplayed]   = useState<RawVehicle[]>([]);
+  // displayed is now computed via useMemo
   const [filterCity,  setFilterCity]  = useState('All Sri Lanka');
   const [filterType,  setFilterType]  = useState('all');
   const [filterPickup,setFilterPickup]= useState('');
@@ -279,6 +279,7 @@ export default function Home() {
 
   // login prompt modal
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
+  const [bookingLoading,  setBookingLoading]  = useState(false);
 
   // ── vehicle form
   const [showAddForm,      setShowAddForm]      = useState(false);
@@ -465,8 +466,8 @@ export default function Home() {
     }
   };
 
-  // ── FIX 1b: Filter displayed from allVehicles — only show is_available = true
-  useEffect(() => {
+  // ── Memoized filter for performance
+  const displayed = useMemo(() => {
     let filtered = allVehicles.filter(v => v.is_available === true || v.isAvailable === true);
     if (filterCity !== 'All Sri Lanka') filtered = filtered.filter(v => v.location?.toLowerCase() === filterCity.toLowerCase());
     if (filterType !== 'all') filtered = filtered.filter(v => v.type === filterType);
@@ -474,15 +475,16 @@ export default function Home() {
     if (filterPriceMax < 50000) filtered = filtered.filter(v => vPrice(v) <= filterPriceMax);
     if (filterTrans !== 'all') filtered = filtered.filter(v => v.transmission?.toLowerCase() === filterTrans.toLowerCase());
     if (filterFuel !== 'all') filtered = filtered.filter(v => v.fuel?.toLowerCase() === filterFuel.toLowerCase());
-
     if (filterDriver !== 'all') filtered = filtered.filter(v => {
       const driverOpt = (v as any).driver_option || 'self_drive';
       if (filterDriver === 'with_driver') return driverOpt === 'with_driver' || driverOpt === 'both';
       if (filterDriver === 'self_drive') return driverOpt === 'self_drive' || driverOpt === 'both';
       return true;
     });
-    setDisplayed(filtered);
+    return filtered;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allVehicles, filterCity, filterType, filterPriceMin, filterPriceMax, filterTrans, filterFuel, filterDriver]);
+
 
   // Load wishlist from Supabase on login
   useEffect(() => {
@@ -843,12 +845,12 @@ export default function Home() {
 
 
   const confirmBooking = async () => {
-    if (!selectedVehicle) return;
-    // Require login to book
+    if (!selectedVehicle || bookingLoading) return;
     if (sessionRole !== 'customer') {
       setLoginPromptOpen(true);
       return;
     }
+    setBookingLoading(true);
     const today = new Date().toISOString().split('T')[0];
 
     const bookingData = {
@@ -880,6 +882,7 @@ export default function Home() {
       showToast(res.error === 'Vehicle no longer available'
         ? 'Sorry, this vehicle was just booked by someone else!'
         : 'Booking failed. Please try again.', 'err');
+      setBookingLoading(false);
       setView('home'); setSelectedVehicle(null);
       await refreshVehicles();
       return;
@@ -897,6 +900,7 @@ export default function Home() {
     }
     await refreshVehicles();
     await trackBookingInDB().catch(()=>{});
+    setBookingLoading(false);
     setBookingDone(true);
   };
 
@@ -2356,7 +2360,7 @@ export default function Home() {
                     <article key={v.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group cursor-pointer"
                       onClick={()=>{ setSelectedVehicle(v); setView('detail'); window.scrollTo({top:0,behavior:'smooth'}); }}>
                       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
-                        <img src={v.image} alt={v.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                        <img src={v.image} alt={v.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
                         <span className="absolute top-3 left-3 bg-green-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow uppercase">{t.verified}</span>
                         <div className="absolute top-3 right-3 flex items-center gap-1.5">
                           <button onClick={e=>{ e.stopPropagation(); toggleWishlist(v.id); }}
@@ -2701,7 +2705,12 @@ export default function Home() {
                         </div>
                       )}
                     </div>
-                    <button onClick={confirmBooking} className="w-full bg-red-500 hover:bg-red-600 active:scale-95 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition">Confirm Booking →</button>
+                    <button onClick={confirmBooking} disabled={bookingLoading}
+                      className={`w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition flex items-center justify-center gap-2 ${bookingLoading?'bg-slate-400 cursor-not-allowed':'bg-red-500 hover:bg-red-600 active:scale-95'} text-white`}>
+                      {bookingLoading
+                        ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Processing...</>
+                        : 'Confirm Booking →'}
+                    </button>
                     <p className="text-[10px] text-center text-slate-400">{t.noPayment}</p>
                   </div>
                 </div>
