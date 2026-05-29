@@ -2426,11 +2426,12 @@ export default function Home() {
                       onClick={()=>{ setSelectedVehicle(v); setView('detail'); window.scrollTo({top:0,behavior:'smooth'}); }}>
                       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
                         <img src={v.image} alt={v.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
-                        <span className="absolute top-3 left-3 bg-green-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow uppercase">{t.verified}</span>
-                        {(v as any).owner_verified && (
-                          <span className="absolute top-3 left-20 bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow flex items-center gap-1">
+                        {(v as any).owner_verified ? (
+                          <span className="absolute top-3 left-3 bg-blue-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow flex items-center gap-1">
                             ✅ Verified Partner
                           </span>
+                        ) : (
+                          <span className="absolute top-3 left-3 bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow uppercase">{t.verified}</span>
                         )}
                         <div className="absolute top-3 right-3 flex items-center gap-1.5">
                           <button onClick={e=>{ e.stopPropagation(); toggleWishlist(v.id); }}
