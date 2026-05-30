@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -209,6 +209,13 @@ export async function POST(req: NextRequest) {
         await sendWhatsApp(cu.phone, `DRIVO - Rental Completed!\nThank you for renting ${b.vehicle_name}.\nWe hope you enjoyed it! Visit thedrivo.com to rent again.`);
         }
       }
+      return NextResponse.json({ success: true });
+    }
+
+    // ── WELCOME WHATSAPP
+    if (action === 'welcome_whatsapp') {
+      const { phone, message } = body;
+      if (phone && message) await sendWhatsApp(phone, message);
       return NextResponse.json({ success: true });
     }
 

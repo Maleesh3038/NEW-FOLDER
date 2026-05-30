@@ -634,6 +634,18 @@ export default function Home() {
     setSessionEmail(data.email); setSessionRole('owner');
     setOwnerAcc({...data, fleet:[], bookings:[]}); setOwnerFleet([]); setOwnerBookings([]);
     setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 🎉`);
+    // Send WhatsApp welcome to new partner
+    if (data.phone || data.whatsapp) {
+      const phone = (data.whatsapp || data.phone || '').replace(/\D/g,'').replace(/^0/,'94');
+      const welcomeMsg = `🎉 Welcome to *Drivo LK*, ${data.shop_name}!\n\nYour partner account is ready. Here's what's next:\n\n✅ Add your vehicles at thedrivo.com\n📸 Upload 6 clear photos per vehicle\n💰 You earn *90%* of every booking\n\nNeed help? Reply to this message!\n\n🌐 thedrivo.com`;
+      try {
+        await fetch('/api/booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }),
+        });
+      } catch {}
+    }
   };
 
   // ── customer login/register
@@ -664,6 +676,18 @@ export default function Home() {
     setSessionEmail(data.email); setSessionRole('customer');
     setCustAcc({...data, bookings:[]});
     setView('custDash'); showToast(`Welcome, ${data.first_name}! 🎉`);
+    // Send WhatsApp welcome to new customer
+    if (data.phone) {
+      const phone = (data.phone || '').replace(/\D/g,'').replace(/^0/,'94');
+      const welcomeMsg = `👋 Welcome to *Drivo LK*, ${data.first_name}!\n\nSri Lanka's #1 vehicle rental marketplace is ready for you.\n\n🚗 Browse cars, bikes, tuk-tuks & vans\n📍 Find vehicles across all 25 districts\n💰 Best prices, verified owners\n✅ Easy booking in 60 seconds\n\n🌐 thedrivo.com\n\nHappy travels! 🌴`;
+      try {
+        await fetch('/api/booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }),
+        });
+      } catch {}
+    }
   };
 
   const handleLogin    = () => authMode==='owner' ? handleOwnerLogin()    : handleCustLogin();
