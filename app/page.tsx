@@ -321,6 +321,8 @@ export default function Home() {
   const [regLicense,  setRegLicense]  = useState('');
   const [regIsForeign,setRegIsForeign]= useState(false);
   const [regError,    setRegError]    = useState('');
+  const [agreementAccepted,  setAgreementAccepted]  = useState(false);
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
   const [showRegPw,   setShowRegPw]   = useState(false);
 
   // login prompt modal
