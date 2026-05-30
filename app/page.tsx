@@ -620,9 +620,12 @@ export default function Home() {
     if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; }
     if (!regShop.trim()) { setRegError('Shop name required'); return; }
     if (!regPhone.trim()) { setRegError('Phone required'); return; }
+    if (!agreementAccepted) { setRegError('Please accept the Partner Agreement to continue'); return; }
     const { data, error } = await registerOwner(regEmail, regPassword, {
       shopName: regShop, ownerName: regFirst + ' ' + regLast,
       phone: regPhone, whatsapp: regPhone, city: regCity,
+      agreement_accepted: true,
+      agreement_accepted_at: new Date().toISOString(),
     });
     if (error || !data) { setRegError(error || 'Registration failed'); return; }
     saveSession({ id: data.id!, email: data.email, role: 'owner' });
@@ -1058,6 +1061,49 @@ export default function Home() {
       </nav>
 
 
+      {/* ══ AGREEMENT MODAL ══ */}
+      {showAgreementModal && (
+        <div className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-slate-900">
+              <div>
+                <h3 className="font-black text-white text-lg">Drivo LK Partner Agreement</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Please read carefully before accepting</p>
+              </div>
+              <button onClick={()=>setShowAgreementModal(false)} className="text-slate-400 hover:text-white text-2xl">×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 text-sm text-slate-700 space-y-4">
+              {[
+                ['1. Platform Relationship', 'Drivo LK operates as a marketplace connecting vehicle rental partners with customers. We do not own or operate vehicles. Partners are solely responsible for their vehicles and customer interactions.'],
+                ['2. Commission & Platform Fee', 'Drivo LK charges 10% on the total booking value. Partners receive 90% of each booking. Example: Rs. 10,000 booking = Rs. 1,000 to Drivo + Rs. 9,000 to Partner.'],
+                ['3. Vehicle Standards', 'All vehicles must have valid Revenue Licence, Insurance, and all legally required documents. Partners must keep documents updated on the platform. Vehicles must be clean and roadworthy.'],
+                ['4. Partner Responsibilities', 'Respond to bookings within 24 hours. Honor confirmed bookings. Verify customer driving licence. Provide accurate vehicle info and photos. Maintain minimum 3.5/5 rating.'],
+                ['5. Customer Protection', 'No hidden fees beyond listed prices. Pickup location shared only after booking. Disputes to be resolved in good faith.'],
+                ['6. Liability', 'Drivo LK is not liable for accidents, damages, or losses during rental. Partners must maintain adequate insurance coverage.'],
+                ['7. Termination', 'Either party may terminate with 14 days notice. Drivo may immediately suspend accounts for false information, expired documents, or repeated complaints.'],
+                ['8. Governing Law', 'This agreement is governed by the laws of Sri Lanka. Disputes are subject to Sri Lankan courts.'],
+              ].map(([title, text]) => (
+                <div key={title}>
+                  <p className="font-black text-slate-900 mb-1">{title}</p>
+                  <p className="text-slate-600 leading-relaxed">{text}</p>
+                </div>
+              ))}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4">
+                <p className="text-xs font-black text-amber-700 uppercase tracking-wide mb-1">Important</p>
+                <p className="text-sm text-amber-700">A full legally binding agreement document is available from Drivo LK for physical signing. Contact admin@drivo.lk to obtain the complete document.</p>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t bg-slate-50 flex gap-3">
+              <button onClick={()=>setShowAgreementModal(false)} className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-sm transition">Close</button>
+              <button onClick={()=>{ setAgreementAccepted(true); setShowAgreementModal(false); }}
+                className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase transition">
+                ✓ I Accept These Terms
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ══ LIGHTBOX MODAL ══ */}
       {lightbox && (
         <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center"
@@ -1310,10 +1356,14 @@ export default function Home() {
           <div className="bg-white border-b border-slate-200 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl">{(custAcc.first_name||'U').charAt(0)}</div>
+                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl overflow-hidden flex-shrink-0">
+                  {(custAcc as any).avatar_url
+                    ? <img src={(custAcc as any).avatar_url} className="w-full h-full object-cover" alt=""/>
+                    : (custAcc.first_name||'U').charAt(0)}
+                </div>
                 <div>
                   <p className="font-black text-slate-900 text-base">{custAcc.first_name||''} {custAcc.last_name||''}</p>
-                  <p className="text-xs text-slate-500">{custAcc.city||''} · {custAcc.phone||''}</p>
+                  <p className="text-xs text-slate-500">{custAcc.city||''}{custAcc.phone ? ` · ${custAcc.phone}` : ''}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
