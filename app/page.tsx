@@ -46,13 +46,257 @@ function mapVehicle(v: any): RawVehicle {
   };
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  NEW: Forgot Password Form Component
+// ══════════════════════════════════════════════════════════════════
+function ForgotPasswordForm({ onBack, onSuccess, showToast }: {
+  onBack: () => void;
+  onSuccess: (email: string) => void;
+  showToast: (msg: string, type?: 'ok'|'err') => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!email.trim()) { showToast('Email required', 'err'); return; }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.error) { showToast(data.error, 'err'); setLoading(false); return; }
+      showToast('OTP sent to your email! 📧');
+      onSuccess(email);
+    } catch {
+      showToast('Failed to send OTP. Try again.', 'err');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center pb-2">
+        <p className="text-3xl mb-2">🔑</p>
+        <p className="text-sm font-black text-slate-900">Reset Your Password</p>
+        <p className="text-xs text-slate-400 mt-1">Enter your email — we'll send a 6-digit OTP</p>
+      </div>
+      <div>
+        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Email</label>
+        <input
+          type="email"
+          placeholder="you@example.com"
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition placeholder:text-slate-300"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+        />
+      </div>
+      <button
+        onClick={handleSubmit}
+        disabled={loading}
+        className={`w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wider transition shadow-lg text-white ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800 active:scale-95'}`}>
+        {loading ? 'Sending OTP...' : 'Send OTP →'}
+      </button>
+      <button onClick={onBack} className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">
+        ← Back to Login
+      </button>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  NEW: Verify OTP + Set New Password Form Component
+// ══════════════════════════════════════════════════════════════════
+function VerifyOtpForm({ onBack, onSuccess, showToast }: {
+  onBack: () => void;
+  onSuccess: () => void;
+  showToast: (msg: string, type?: 'ok'|'err') => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('drivo_reset_email');
+    if (saved) setEmail(saved);
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!email.trim() || !otp.trim()) { showToast('Email and OTP required', 'err'); return; }
+    if (newPassword.length < 6) { showToast('Password min 6 characters', 'err'); return; }
+    if (newPassword !== confirm) { showToast('Passwords do not match', 'err'); return; }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword }),
+      });
+      const data = await res.json();
+      if (data.error) { showToast(data.error, 'err'); setLoading(false); return; }
+      localStorage.removeItem('drivo_reset_email');
+      onSuccess();
+    } catch {
+      showToast('Reset failed. Try again.', 'err');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center pb-2">
+        <p className="text-3xl mb-2">📧</p>
+        <p className="text-sm font-black text-slate-900">Enter OTP & New Password</p>
+        <p className="text-xs text-slate-400 mt-1">Check your email for the 6-digit code (valid 10 mins)</p>
+      </div>
+      <div>
+        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Email</label>
+        <input
+          type="email"
+          placeholder="you@example.com"
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">OTP Code</label>
+        <input
+          type="text"
+          placeholder="123456"
+          maxLength={6}
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-2xl font-black text-center tracking-[0.5em] outline-none focus:border-slate-900 transition placeholder:text-slate-300 placeholder:tracking-normal placeholder:text-base"
+          value={otp}
+          onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+        />
+      </div>
+      <div>
+        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">New Password</label>
+        <div className="relative">
+          <input
+            type={showPw ? 'text' : 'password'}
+            placeholder="Min 6 characters"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 pr-14 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+          />
+          <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-black px-1">
+            {showPw ? 'HIDE' : 'SHOW'}
+          </button>
+        </div>
+      </div>
+      <div>
+        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Confirm New Password</label>
+        <input
+          type="password"
+          placeholder="Repeat password"
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
+          value={confirm}
+          onChange={e => setConfirm(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+        />
+      </div>
+      <button
+        onClick={handleSubmit}
+        disabled={loading}
+        className={`w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wider transition shadow-lg text-white ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800 active:scale-95'}`}>
+        {loading ? 'Resetting...' : 'Reset Password →'}
+      </button>
+      <button onClick={onBack} className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">
+        ← Back
+      </button>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  NEW: Change Password Form Component (for dashboards)
+// ══════════════════════════════════════════════════════════════════
+function ChangePasswordForm({ userId, userType, showToast }: {
+  userId: string;
+  userType: 'owner' | 'customer';
+  showToast: (msg: string, type?: 'ok'|'err') => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [current, setCurrent] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = async () => {
+    if (!current || !newPw) { showToast('All fields required', 'err'); return; }
+    if (newPw.length < 6) { showToast('Min 6 characters', 'err'); return; }
+    if (newPw !== confirm) { showToast('Passwords do not match', 'err'); return; }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, userType, currentPassword: current, newPassword: newPw }),
+      });
+      const data = await res.json();
+      if (data.error) { showToast(data.error, 'err'); setLoading(false); return; }
+      setCurrent(''); setNewPw(''); setConfirm(''); setOpen(false);
+      showToast('Password changed successfully! 🔒');
+    } catch {
+      showToast('Failed. Try again.', 'err');
+    }
+    setLoading(false);
+  };
+
+  if (!open) return (
+    <button
+      onClick={() => setOpen(true)}
+      className="w-full py-2.5 bg-slate-50 border border-slate-200 hover:border-slate-400 text-slate-600 rounded-xl font-black text-xs uppercase tracking-wide transition">
+      🔒 Change Password
+    </button>
+  );
+
+  return (
+    <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Change Password</p>
+      {[
+        { l: 'Current Password', v: current, s: setCurrent },
+        { l: 'New Password', v: newPw, s: setNewPw },
+        { l: 'Confirm New Password', v: confirm, s: setConfirm },
+      ].map(f => (
+        <div key={f.l}>
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{f.l}</label>
+          <input
+            type="password"
+            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition"
+            value={f.v}
+            onChange={e => f.s(e.target.value)}
+          />
+        </div>
+      ))}
+      <div className="flex gap-2 pt-1">
+        <button onClick={() => { setOpen(false); setCurrent(''); setNewPw(''); setConfirm(''); }}
+          className="flex-1 py-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-xs uppercase transition hover:bg-slate-100">
+          Cancel
+        </button>
+        <button onClick={handleChange} disabled={loading}
+          className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase text-white transition ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}>
+          {loading ? 'Saving...' : 'Save'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Vehicle Reviews Component
 function VehicleReviews({ vehicleId }: { vehicleId: string }) {
   const [reviews, setReviews] = useState<any[]>([]);
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/reviews?vehicle_id=eq.${vehicleId}&select=*,customers(first_name,last_name)&order=created_at.desc`, {
       headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }
-    }).then(r=>r.json()).then(data=>{ if(Array.isArray(data)) setReviews(data); });
+    }).then(r => r.json()).then(data => { if (Array.isArray(data)) setReviews(data); });
   }, [vehicleId]);
 
   if (reviews.length === 0) return (
@@ -84,7 +328,7 @@ function VehicleReviews({ vehicleId }: { vehicleId: string }) {
               <p className="text-xs font-black text-slate-700">{r.customers?.first_name || 'Anonymous'}</p>
             </div>
             <div className="flex gap-0.5">
-              {[1,2,3,4,5].map(s => (
+              {[1, 2, 3, 4, 5].map(s => (
                 <span key={s} className={`text-sm ${s <= r.rating ? 'opacity-100' : 'opacity-20'}`}>⭐</span>
               ))}
             </div>
@@ -98,18 +342,18 @@ function VehicleReviews({ vehicleId }: { vehicleId: string }) {
 }
 
 // ── Owner Contact Buttons (shown after booking confirmed)
-function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { vehicleId:string; ownerId:string; mapLink:string; vehicleName:string }) {
+function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { vehicleId: string; ownerId: string; mapLink: string; vehicleName: string }) {
   const [owner, setOwner] = useState<any>(null);
   useEffect(() => {
     if (!ownerId) return;
     fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/owners?id=eq.${ownerId}&select=phone,whatsapp,shop_name`, {
       headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }
-    }).then(r=>r.json()).then(data=>{ if(Array.isArray(data)&&data[0]) setOwner(data[0]); });
+    }).then(r => r.json()).then(data => { if (Array.isArray(data) && data[0]) setOwner(data[0]); });
   }, [ownerId]);
 
-  const phone   = owner?.whatsapp || owner?.phone || '';
-  const waPhone = phone.replace(/[^0-9]/g,'').replace(/^0/,'94');
-  const waMsg   = encodeURIComponent(`Hi ${owner?.shop_name||''}! I just booked your *${vehicleName}* on Drivo LK. Looking forward to it! 🚗`);
+  const phone = owner?.whatsapp || owner?.phone || '';
+  const waPhone = phone.replace(/[^0-9]/g, '').replace(/^0/, '94');
+  const waMsg = encodeURIComponent(`Hi ${owner?.shop_name || ''}! I just booked your *${vehicleName}* on Drivo LK. Looking forward to it! 🚗`);
 
   return (
     <div className="space-y-3">
@@ -144,8 +388,8 @@ function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { veh
 
 // ── FAQ Section Component
 function FaqSection() {
-  const [activeTab, setActiveTab] = useState<'general'|'booking'|'price'|'documents'>('general');
-  const [openIdx, setOpenIdx] = useState<number|null>(0);
+  const [activeTab, setActiveTab] = useState<'general' | 'booking' | 'price' | 'documents'>('general');
+  const [openIdx, setOpenIdx] = useState<number | null>(0);
 
   const faqs = {
     general: [
@@ -174,10 +418,10 @@ function FaqSection() {
     ],
   };
 
-  const tabs: {key: typeof activeTab; label: string}[] = [
-    { key: 'general',   label: 'General' },
-    { key: 'booking',   label: 'Booking' },
-    { key: 'price',     label: 'Pricing' },
+  const tabs: { key: typeof activeTab; label: string }[] = [
+    { key: 'general', label: 'General' },
+    { key: 'booking', label: 'Booking' },
+    { key: 'price', label: 'Pricing' },
     { key: 'documents', label: 'Documents' },
   ];
 
@@ -188,27 +432,23 @@ function FaqSection() {
           <h2 className="text-2xl md:text-3xl font-black text-slate-900">Frequently Asked Questions</h2>
           <p className="text-slate-500 text-sm mt-2">Everything you need to know about renting with Drivo</p>
         </div>
-
-        {/* Tabs */}
         <div className="flex gap-2 justify-center flex-wrap mb-8">
-          {tabs.map(tab=>(
-            <button key={tab.key} onClick={()=>{ setActiveTab(tab.key); setOpenIdx(0); }}
-              className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-wide border transition ${activeTab===tab.key?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
+          {tabs.map(tab => (
+            <button key={tab.key} onClick={() => { setActiveTab(tab.key); setOpenIdx(0); }}
+              className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-wide border transition ${activeTab === tab.key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
               {tab.label}
             </button>
           ))}
         </div>
-
-        {/* FAQ Items */}
         <div className="space-y-2">
-          {faqs[activeTab].map((item, idx)=>(
+          {faqs[activeTab].map((item, idx) => (
             <div key={idx} className="border border-slate-200 rounded-2xl overflow-hidden">
-              <button onClick={()=>setOpenIdx(openIdx===idx?null:idx)}
+              <button onClick={() => setOpenIdx(openIdx === idx ? null : idx)}
                 className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 transition">
                 <span className="font-black text-slate-900 text-sm pr-4">{item.q}</span>
-                <span className={`text-slate-400 text-xl font-bold flex-shrink-0 transition-transform duration-200 ${openIdx===idx?'rotate-45':''}`}>+</span>
+                <span className={`text-slate-400 text-xl font-bold flex-shrink-0 transition-transform duration-200 ${openIdx === idx ? 'rotate-45' : ''}`}>+</span>
               </button>
-              {openIdx===idx && (
+              {openIdx === idx && (
                 <div className="px-5 pb-4">
                   <p className="text-sm text-slate-500 leading-relaxed">{item.a}</p>
                 </div>
@@ -234,12 +474,12 @@ function CustomerDetailCard({ customerId }: { customerId: string }) {
       <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider">Renter Details</p>
       <div className="grid grid-cols-2 gap-2 text-xs">
         {[
-          ['Name', `${cust.first_name||''} ${cust.last_name||''}`],
-          ['Phone', cust.phone||'—'],
-          ['City', cust.city||'—'],
-          ['NIC / Passport', cust.nic||'—'],
-          ['Driving License', cust.driving_license||'—'],
-        ].map(([k,v])=>(
+          ['Name', `${cust.first_name || ''} ${cust.last_name || ''}`],
+          ['Phone', cust.phone || '—'],
+          ['City', cust.city || '—'],
+          ['NIC / Passport', cust.nic || '—'],
+          ['Driving License', cust.driving_license || '—'],
+        ].map(([k, v]) => (
           <div key={k}>
             <p className="text-[9px] text-slate-400 font-bold uppercase">{k}</p>
             <p className="font-black text-slate-800">{v}</p>
@@ -250,139 +490,139 @@ function CustomerDetailCard({ customerId }: { customerId: string }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  MAIN COMPONENT
+// ══════════════════════════════════════════════════════════════════
 export default function Home() {
-  const [lang, setLang]   = useState<LangKey>('EN');
+  const [lang, setLang] = useState<LangKey>('EN');
   const t = T[lang];
 
   // ── vehicles & filters
   const [allVehicles, setAllVehicles] = useState<RawVehicle[]>([]);
-  // displayed is now computed via useMemo
-  const [filterCity,  setFilterCity]  = useState('All Sri Lanka');
-  const [filterType,  setFilterType]  = useState('all');
-  const [filterPickup,setFilterPickup]= useState('');
-  const [filterReturn,setFilterReturn]= useState('');
+  const [filterCity, setFilterCity] = useState('All Sri Lanka');
+  const [filterType, setFilterType] = useState('all');
+  const [filterPickup, setFilterPickup] = useState('');
+  const [filterReturn, setFilterReturn] = useState('');
   const [filterPriceMin, setFilterPriceMin] = useState(0);
   const [filterPriceMax, setFilterPriceMax] = useState(50000);
-  const [filterAC,       setFilterAC]       = useState(false);
-  const [filterTrans,    setFilterTrans]     = useState('all'); // all/automatic/manual
-  const [filterFuel,     setFilterFuel]      = useState('all');
-  const [showAdvFilter,  setShowAdvFilter]   = useState(false);
-  const [wishlist,       setWishlist]        = useState<string[]>([]); // vehicle IDs
-  const [reviewModal,    setReviewModal]     = useState<{vehicleId:string;bookingId:string;vehicleName:string}|null>(null);
-  const [reviewRating,   setReviewRating]    = useState(5);
-  const [reviewComment,  setReviewComment]   = useState('');
-  const [vehicleReviews, setVehicleReviews]  = useState<Record<string,any[]>>({});
+  const [filterAC, setFilterAC] = useState(false);
+  const [filterTrans, setFilterTrans] = useState('all');
+  const [filterFuel, setFilterFuel] = useState('all');
+  const [showAdvFilter, setShowAdvFilter] = useState(false);
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [reviewModal, setReviewModal] = useState<{ vehicleId: string; bookingId: string; vehicleName: string } | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [vehicleReviews, setVehicleReviews] = useState<Record<string, any[]>>({});
 
   // ── navigation
-  type ViewType = 'home'|'detail'|'auth'|'ownerDash'|'custDash';
-  const [view,            setView]            = useState<ViewType>('home');
-  const [authMode,        setAuthMode]        = useState<'owner'|'customer'>('owner');
-  const [authTab,         setAuthTab]         = useState<'login'|'register'>('login');
-  const [selectedVehicle, setSelectedVehicle] = useState<RawVehicle|null>(null);
-  const [detailTab,       setDetailTab]       = useState<'details'|'docs'|'faq'>('details');
-  const [mobileMenuOpen,  setMobileMenuOpen]  = useState(false);
-  const [selectedBooking,      setSelectedBooking]      = useState<Booking|null>(null);
-  const [ownerSelectedBooking, setOwnerSelectedBooking] = useState<Booking|null>(null);
-  const [ownerSubTab,          setOwnerSubTab]          = useState<'fleet'|'bookings'|'earnings'>('fleet');
-  const [earningsPeriod,       setEarningsPeriod]       = useState<'weekly'|'monthly'|'yearly'>('monthly');
+  type ViewType = 'home' | 'detail' | 'auth' | 'ownerDash' | 'custDash';
+  const [view, setView] = useState<ViewType>('home');
+  const [authMode, setAuthMode] = useState<'owner' | 'customer'>('owner');
+
+  // ── UPDATED: authTab now includes forgot/verify
+  const [authTab, setAuthTab] = useState<'login' | 'register' | 'forgot' | 'verify'>('login');
+
+  const [selectedVehicle, setSelectedVehicle] = useState<RawVehicle | null>(null);
+  const [detailTab, setDetailTab] = useState<'details' | 'docs' | 'faq'>('details');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [ownerSelectedBooking, setOwnerSelectedBooking] = useState<Booking | null>(null);
+  const [ownerSubTab, setOwnerSubTab] = useState<'fleet' | 'bookings' | 'earnings'>('fleet');
+  const [earningsPeriod, setEarningsPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
 
   // ── booking
-  const [days,         setDays]         = useState(1);
-  const [deliveryType, setDeliveryType] = useState<'pickup'|'delivery'>('pickup');
-  const [bookingDone,  setBookingDone]  = useState(false);
-  const [pickupTime,   setPickupTime]   = useState('09:00');
-  const [rentalPeriod, setRentalPeriod] = useState<'daily'|'weekly'|'monthly'>('daily');
+  const [days, setDays] = useState(1);
+  const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
+  const [bookingDone, setBookingDone] = useState(false);
+  const [pickupTime, setPickupTime] = useState('09:00');
+  const [rentalPeriod, setRentalPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
   // ── currency
   const [currency, setCurrency] = useState('LKR');
 
   // ── session
-  const [sessionEmail, setSessionEmail] = useState<string|null>(null);
-  const [sessionRole,  setSessionRole]  = useState<'owner'|'customer'|null>(null);
-  const [ownerAcc,     setOwnerAcc]     = useState<OwnerAccount|null>(null);
-  const [custAcc,      setCustAcc]      = useState<CustomerAccount|null>(null);
-  const [ownerFleet,   setOwnerFleet]   = useState<RawVehicle[]>([]);
-  const [ownerBookings,setOwnerBookings]= useState<Booking[]>([]);
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [sessionRole, setSessionRole] = useState<'owner' | 'customer' | null>(null);
+  const [ownerAcc, setOwnerAcc] = useState<OwnerAccount | null>(null);
+  const [custAcc, setCustAcc] = useState<CustomerAccount | null>(null);
+  const [ownerFleet, setOwnerFleet] = useState<RawVehicle[]>([]);
+  const [ownerBookings, setOwnerBookings] = useState<Booking[]>([]);
 
   // ── auth forms
-  const [loginEmail,    setLoginEmail]    = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [loginError,    setLoginError]    = useState('');
-  const [showLoginPw,   setShowLoginPw]   = useState(false);
-  const [regEmail,    setRegEmail]    = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [showLoginPw, setShowLoginPw] = useState(false);
+  const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [regConfirm,  setRegConfirm]  = useState('');
-  const [regFirst,    setRegFirst]    = useState('');
-  const [regLast,     setRegLast]     = useState('');
-  const [regShop,     setRegShop]     = useState('');
-  const [regPhone,    setRegPhone]    = useState('');
-  const [regCity,     setRegCity]     = useState('Colombo');
-  const [regNic,      setRegNic]      = useState('');
-  const [regLicense,  setRegLicense]  = useState('');
-  const [regIsForeign,setRegIsForeign]= useState(false);
-  const [regError,    setRegError]    = useState('');
-  const [agreementAccepted,  setAgreementAccepted]  = useState(false);
+  const [regConfirm, setRegConfirm] = useState('');
+  const [regFirst, setRegFirst] = useState('');
+  const [regLast, setRegLast] = useState('');
+  const [regShop, setRegShop] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regCity, setRegCity] = useState('Colombo');
+  const [regNic, setRegNic] = useState('');
+  const [regLicense, setRegLicense] = useState('');
+  const [regIsForeign, setRegIsForeign] = useState(false);
+  const [regError, setRegError] = useState('');
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [showAgreementModal, setShowAgreementModal] = useState(false);
-  const [showRegPw,   setShowRegPw]   = useState(false);
+  const [showRegPw, setShowRegPw] = useState(false);
 
   // login prompt modal
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
-  const [bookingLoading,  setBookingLoading]  = useState(false);
-  const [lightbox, setLightbox] = useState<{imgs: string[], idx: number} | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [lightbox, setLightbox] = useState<{ imgs: string[], idx: number } | null>(null);
 
   // ── vehicle form
-  const [showAddForm,      setShowAddForm]      = useState(false);
-  const [editingId,        setEditingId]        = useState<string|null>(null);
-  const [newV, setNewV] = useState({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,weeklyPrice:0,monthlyPrice:0,kmPerDay:200,extraKmCharge:50,depositAmount:0,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both',revenueLicenceExpiry:'',insuranceExpiry:''});
-  const [photos,           setPhotos]           = useState<string[]>([]);
-  const [isDragging,       setIsDragging]       = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [newV, setNewV] = useState({ name: '', type: 'car', transmission: 'Automatic', fuel: 'Petrol', pricePerDay: 5000, weeklyPrice: 0, monthlyPrice: 0, kmPerDay: 200, extraKmCharge: 50, depositAmount: 0, description: '', mapLink: '', driverOption: 'self_drive', district: '', deliveryOption: 'both', revenueLicenceExpiry: '', insuranceExpiry: '' });
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   // ── profile edit modals
-  const [ownerEditOpen,    setOwnerEditOpen]    = useState(false);
-  const [ownerEditData,    setOwnerEditData]    = useState({shopName:'',ownerName:'',phone:'',whatsapp:'',city:'Colombo',bio:''});
-  const [custEditOpen,     setCustEditOpen]     = useState(false);
-  const [custEditData,     setCustEditData]     = useState({firstName:'',lastName:'',phone:'',city:'Colombo'});
+  const [ownerEditOpen, setOwnerEditOpen] = useState(false);
+  const [ownerEditData, setOwnerEditData] = useState({ shopName: '', ownerName: '', phone: '', whatsapp: '', city: 'Colombo', bio: '' });
+  const [custEditOpen, setCustEditOpen] = useState(false);
+  const [custEditData, setCustEditData] = useState({ firstName: '', lastName: '', phone: '', city: 'Colombo' });
   const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
-  const [filterDriver,     setFilterDriver]     = useState('all'); // all/with_driver/self_drive
+  const [filterDriver, setFilterDriver] = useState('all');
 
   // ── toast
-  const [toast, setToast] = useState<{msg:string;type:'ok'|'err'}|null>(null);
-  const showToast = (msg:string, type:'ok'|'err'='ok') => { setToast({msg,type}); setTimeout(()=>setToast(null), 3200); };
+  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3200); };
 
   // ── currency helpers
-  const CURRENCIES: Record<string,{rate:number;sign:string;dec:number}> = {
-    LKR: {rate:1,      sign:'Rs.', dec:0},
-    USD: {rate:0.0033, sign:'$',   dec:2},
-    EUR: {rate:0.0030, sign:'€',   dec:2},
-    GBP: {rate:0.0026, sign:'£',   dec:2},
-    RUB: {rate:0.30,   sign:'₽',   dec:0},
-    AED: {rate:0.012,  sign:'AED', dec:2},
+  const CURRENCIES: Record<string, { rate: number; sign: string; dec: number }> = {
+    LKR: { rate: 1, sign: 'Rs.', dec: 0 },
+    USD: { rate: 0.0033, sign: '$', dec: 2 },
+    EUR: { rate: 0.0030, sign: '€', dec: 2 },
+    GBP: { rate: 0.0026, sign: '£', dec: 2 },
+    RUB: { rate: 0.30, sign: '₽', dec: 0 },
+    AED: { rate: 0.012, sign: 'AED', dec: 2 },
   };
   const curr = CURRENCIES[currency] ?? CURRENCIES['LKR'];
-  const fmt  = (p:number) => `${curr.sign} ${(p*curr.rate).toLocaleString(undefined,{minimumFractionDigits:curr.dec,maximumFractionDigits:curr.dec})}`;
+  const fmt = (p: number) => `${curr.sign} ${(p * curr.rate).toLocaleString(undefined, { minimumFractionDigits: curr.dec, maximumFractionDigits: curr.dec })}`;
 
-  // ── Normalize vehicle fields
-  const vPrice  = (v: any) => v?.price_per_day || v?.pricePerDay || 0;
-  const vShop   = (v: any) => v?.shop_name || v?.shopName || '';
-  const vAvail  = (v: any) => v?.isAvailable !== false && v?.is_available !== false;
-  const vMap    = (v: any) => v?.mapLink || v?.map_link || '';
-  const vImg    = (v: any) => v?.image || (v?.images?.[0]) || v?.vehicle_photos?.[0]?.storage_url || '';
+  const vPrice = (v: any) => v?.price_per_day || v?.pricePerDay || 0;
+  const vShop = (v: any) => v?.shop_name || v?.shopName || '';
+  const vAvail = (v: any) => v?.isAvailable !== false && v?.is_available !== false;
+  const vMap = (v: any) => v?.mapLink || v?.map_link || '';
+  const vImg = (v: any) => v?.image || (v?.images?.[0]) || v?.vehicle_photos?.[0]?.storage_url || '';
 
   const platformFee = (amount: number) => Math.round(amount * 0.10);
   const ownerPayout = (amount: number) => Math.round(amount * 0.90);
-  const typeIcon = (tp:string) => tp==='car'?'🚙':tp==='bike'?'🏍️':tp==='van'?'🚐':'🛺';
-  const statusColor = (s:string) => s==='confirmed'?'bg-emerald-50 text-emerald-700 border-emerald-200':s==='completed'?'bg-blue-50 text-blue-700 border-blue-200':s==='cancelled'?'bg-slate-50 text-slate-500 border-slate-200':'bg-amber-50 text-amber-700 border-amber-200';
-  const statusLabel = (s:string) => s==='confirmed'?t.confirmed:s==='completed'?t.completed:s==='cancelled'?'Cancelled':t.pending;
+  const typeIcon = (tp: string) => tp === 'car' ? '🚙' : tp === 'bike' ? '🏍️' : tp === 'van' ? '🚐' : '🛺';
+  const statusColor = (s: string) => s === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : s === 'completed' ? 'bg-blue-50 text-blue-700 border-blue-200' : s === 'cancelled' ? 'bg-slate-50 text-slate-500 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-200';
+  const statusLabel = (s: string) => s === 'confirmed' ? t.confirmed : s === 'completed' ? t.completed : s === 'cancelled' ? 'Cancelled' : t.pending;
 
-  // ── FIX 1: Unified vehicle refresh — updates BOTH allVehicles and ownerFleet
   const refreshVehicles = useCallback(async (ownerId?: string) => {
-    // Refresh public listing (only available vehicles)
     const { data: vdata } = await supabase.from('vehicles')
       .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
       .eq('is_available', true).order('created_at', { ascending: false });
     if (vdata) setAllVehicles(vdata.map(mapVehicle));
-
-    // If owner id provided, also refresh their full fleet (including unavailable)
     if (ownerId) {
       const ownerVehicles = await getOwnerVehicles(ownerId);
       const fleet = ownerVehicles.map(mapVehicle);
@@ -391,49 +631,43 @@ export default function Home() {
     }
   }, []);
 
-  // ── bootstrap
   useEffect(() => {
-    trackVisitInDB().catch(()=>{});
-    // Fetch vehicles with owner verified status
+    trackVisitInDB().catch(() => {});
     supabase.from('vehicles')
       .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
       .eq('is_available', true)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) setAllVehicles(data.map(mapVehicle));
-      }).catch(()=>{});
+      }).catch(() => {});
     const s = getSession();
     if (s) restoreSession(s.id, s.email, s.role);
   }, []);
 
-  // ── Keyboard navigation for lightbox
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!lightbox) return;
       if (e.key === 'Escape') setLightbox(null);
-      if (e.key === 'ArrowRight') setLightbox(p=>p?{...p,idx:(p.idx+1)%p.imgs.length}:null);
-      if (e.key === 'ArrowLeft')  setLightbox(p=>p?{...p,idx:(p.idx-1+p.imgs.length)%p.imgs.length}:null);
+      if (e.key === 'ArrowRight') setLightbox(p => p ? { ...p, idx: (p.idx + 1) % p.imgs.length } : null);
+      if (e.key === 'ArrowLeft') setLightbox(p => p ? { ...p, idx: (p.idx - 1 + p.imgs.length) % p.imgs.length } : null);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [lightbox]);
 
-  // ── Push Notification Setup
   const VAPID_PUBLIC_KEY = 'BKVdt525L67coH_qx5RDlKIckkmVRPDUTQL5GGNlGeJ0mQl7V7HKYMq9XlmwJfxjhjioQUE7PhFNExdi0oL7V9U';
 
-  const subscribeToPush = async (userId: string, userType: 'owner'|'customer') => {
+  const subscribeToPush = async (userId: string, userType: 'owner' | 'customer') => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') return;
-
       const existing = await reg.pushManager.getSubscription();
       const sub = existing || await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: VAPID_PUBLIC_KEY,
       });
-
       await fetch('/api/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -444,76 +678,47 @@ export default function Home() {
     }
   };
 
-  // Subscribe after login
   useEffect(() => {
-    if (sessionRole === 'owner' && ownerAcc?.id) {
-      subscribeToPush(ownerAcc.id, 'owner');
-    } else if (sessionRole === 'customer' && custAcc?.id) {
-      subscribeToPush(custAcc.id, 'customer');
-    }
+    if (sessionRole === 'owner' && ownerAcc?.id) subscribeToPush(ownerAcc.id, 'owner');
+    else if (sessionRole === 'customer' && custAcc?.id) subscribeToPush(custAcc.id, 'customer');
   }, [sessionRole, ownerAcc?.id, custAcc?.id]);
 
-  // ── Real-time subscription for owner bookings
   useEffect(() => {
     if (sessionRole !== 'owner' || !ownerAcc?.id) return;
     const channel = supabase.channel(`owner-bookings-${ownerAcc.id}`)
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'bookings',
-        filter: `owner_id=eq.${ownerAcc.id}`
-      }, async (payload) => {
-        // New booking came in!
-        if (payload.eventType === 'INSERT') {
-          setOwnerBookings(prev => [payload.new as any, ...prev]);
-          showToast('🔔 New booking request!');
-        } else if (payload.eventType === 'UPDATE') {
-          setOwnerBookings(prev => prev.map(b => b.id === (payload.new as any).id ? payload.new as any : b));
-        } else if (payload.eventType === 'DELETE') {
-          setOwnerBookings(prev => prev.filter(b => b.id !== (payload.old as any).id));
-        }
-        // Also refresh vehicles
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `owner_id=eq.${ownerAcc.id}` }, async (payload) => {
+        if (payload.eventType === 'INSERT') { setOwnerBookings(prev => [payload.new as any, ...prev]); showToast('🔔 New booking request!'); }
+        else if (payload.eventType === 'UPDATE') { setOwnerBookings(prev => prev.map(b => b.id === (payload.new as any).id ? payload.new as any : b)); }
+        else if (payload.eventType === 'DELETE') { setOwnerBookings(prev => prev.filter(b => b.id !== (payload.old as any).id)); }
         const vehicles = await getAvailableVehicles();
         setAllVehicles(vehicles.map(mapVehicle));
-      })
-      .subscribe();
-
+      }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [sessionRole, ownerAcc?.id]);
 
-  // ── Real-time subscription for customer bookings
   useEffect(() => {
     if (sessionRole !== 'customer' || !custAcc?.id) return;
     const channel = supabase.channel(`cust-bookings-${custAcc.id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE', schema: 'public', table: 'bookings',
-        filter: `customer_id=eq.${custAcc.id}`
-      }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `customer_id=eq.${custAcc.id}` }, (payload) => {
         const updated = payload.new as any;
         setCustAcc(prev => {
           if (!prev) return prev;
-          const bookings = (prev.bookings||[]).map(b => b.id === updated.id ? updated : b);
+          const bookings = (prev.bookings || []).map(b => b.id === updated.id ? updated : b);
           return { ...prev, bookings };
         });
         if (updated.status === 'confirmed') showToast('✅ Your booking was confirmed!');
         if (updated.status === 'cancelled') showToast('❌ Your booking was cancelled');
-      })
-      .subscribe();
-
+      }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [sessionRole, custAcc?.id]);
 
-  const restoreSession = async (id: string, email: string, role: 'owner'|'customer') => {
+  const restoreSession = async (id: string, email: string, role: 'owner' | 'customer') => {
     if (role === 'owner') {
       const { data } = await supabase.from('owners').select('*').eq('id', id).single();
       if (data) {
         const vehicles = await getOwnerVehicles(id);
         const fleet = vehicles.map(mapVehicle);
-        // FIX 2: Fetch ALL bookings for owner (not just pending) ordered newest first
-        const { data: bdata } = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('owner_id', id)
-          .not('status', 'eq', 'declined')
-          .order('booked_at', { ascending: false });
+        const { data: bdata } = await supabase.from('bookings').select('*').eq('owner_id', id).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
         setSessionEmail(email); setSessionRole('owner');
         setOwnerAcc({ ...data, fleet, bookings: bdata || [] });
         setOwnerFleet(fleet);
@@ -522,19 +727,13 @@ export default function Home() {
     } else {
       const { data } = await supabase.from('customers').select('*').eq('id', id).single();
       if (data) {
-        const { data: bdata } = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('customer_id', id)
-          .not('status', 'eq', 'declined')
-          .order('booked_at', { ascending: false });
+        const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', id).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
         setSessionEmail(email); setSessionRole('customer');
         setCustAcc({ ...data, bookings: bdata || [] });
       }
     }
   };
 
-  // ── Memoized filter for performance
   const displayed = useMemo(() => {
     let filtered = allVehicles.filter(v => v.is_available === true || v.isAvailable === true);
     if (filterCity !== 'All Sri Lanka') filtered = filtered.filter(v => v.location?.toLowerCase() === filterCity.toLowerCase());
@@ -553,8 +752,6 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allVehicles, filterCity, filterType, filterPriceMin, filterPriceMax, filterTrans, filterFuel, filterDriver]);
 
-
-  // Load wishlist from Supabase on login
   useEffect(() => {
     if (sessionRole === 'customer' && custAcc?.id) {
       supabase.from('wishlist').select('vehicle_id').eq('customer_id', custAcc.id)
@@ -564,13 +761,12 @@ export default function Home() {
 
   useEffect(() => {
     if (filterPickup && filterReturn) {
-      const d = Math.ceil((new Date(filterReturn).getTime()-new Date(filterPickup).getTime())/86400000);
+      const d = Math.ceil((new Date(filterReturn).getTime() - new Date(filterPickup).getTime()) / 86400000);
       if (d > 0) setDays(d);
-      else if (d <= 0) setFilterReturn(''); // clear invalid return date
+      else if (d <= 0) setFilterReturn('');
     }
   }, [filterPickup, filterReturn]);
 
-  // Auto-set return date when days change
   useEffect(() => {
     if (filterPickup && days > 0) {
       const pickup = new Date(filterPickup);
@@ -580,22 +776,19 @@ export default function Home() {
     }
   }, [days, filterPickup]);
 
-  // ── reset
   const resetToHome = () => {
     setView('home'); setSelectedVehicle(null); setBookingDone(false);
     setMobileMenuOpen(false); setFilterCity('All Sri Lanka'); setFilterType('all');
     setFilterPickup(''); setFilterReturn(''); setSelectedBooking(null);
   };
 
-  // ── logout
   const logout = () => {
     clearSession();
     setSessionEmail(null); setSessionRole(null); setOwnerAcc(null); setCustAcc(null);
     setOwnerFleet([]); setOwnerBookings([]); resetToHome(); showToast('Logged out');
   };
 
-  // ── open auth
-  const openAuth = (mode:'owner'|'customer', tab:'login'|'register'='login') => {
+  const openAuth = (mode: 'owner' | 'customer', tab: 'login' | 'register' = 'login') => {
     setAuthMode(mode); setAuthTab(tab);
     setLoginEmail(''); setLoginPassword(''); setLoginError('');
     setRegEmail(''); setRegPassword(''); setRegConfirm('');
@@ -604,7 +797,6 @@ export default function Home() {
     setView('auth'); setMobileMenuOpen(false);
   };
 
-  // ── owner login/register
   const handleOwnerLogin = async () => {
     setLoginError('');
     if (!loginEmail.trim() || !loginPassword.trim()) { setLoginError('Email and password required'); return; }
@@ -632,23 +824,17 @@ export default function Home() {
     if (error || !data) { setRegError(error || 'Registration failed'); return; }
     saveSession({ id: data.id!, email: data.email, role: 'owner' });
     setSessionEmail(data.email); setSessionRole('owner');
-    setOwnerAcc({...data, fleet:[], bookings:[]}); setOwnerFleet([]); setOwnerBookings([]);
+    setOwnerAcc({ ...data, fleet: [], bookings: [] }); setOwnerFleet([]); setOwnerBookings([]);
     setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 🎉`);
-    // Send WhatsApp welcome to new partner
     if (data.phone || data.whatsapp) {
-      const phone = (data.whatsapp || data.phone || '').replace(/\D/g,'').replace(/^0/,'94');
+      const phone = (data.whatsapp || data.phone || '').replace(/\D/g, '').replace(/^0/, '94');
       const welcomeMsg = `🎉 Welcome to *Drivo LK*, ${data.shop_name}!\n\nYour partner account is ready. Here's what's next:\n\n✅ Add your vehicles at thedrivo.com\n📸 Upload 6 clear photos per vehicle\n💰 You earn *90%* of every booking\n\nNeed help? Reply to this message!\n\n🌐 thedrivo.com`;
       try {
-        await fetch('/api/booking', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }),
-        });
-      } catch {}
+        await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }) });
+      } catch { }
     }
   };
 
-  // ── customer login/register
   const handleCustLogin = async () => {
     setLoginError('');
     const { data, error } = await loginCustomer(loginEmail, loginPassword);
@@ -674,52 +860,40 @@ export default function Home() {
     if (error || !data) { setRegError(error || 'Registration failed'); return; }
     saveSession({ id: data.id!, email: data.email, role: 'customer' });
     setSessionEmail(data.email); setSessionRole('customer');
-    setCustAcc({...data, bookings:[]});
+    setCustAcc({ ...data, bookings: [] });
     setView('custDash'); showToast(`Welcome, ${data.first_name}! 🎉`);
-    // Send WhatsApp welcome to new customer
     if (data.phone) {
-      const phone = (data.phone || '').replace(/\D/g,'').replace(/^0/,'94');
+      const phone = (data.phone || '').replace(/\D/g, '').replace(/^0/, '94');
       const welcomeMsg = `👋 Welcome to *Drivo LK*, ${data.first_name}!\n\nSri Lanka's #1 vehicle rental marketplace is ready for you.\n\n🚗 Browse cars, bikes, tuk-tuks & vans\n📍 Find vehicles across all 25 districts\n💰 Best prices, verified owners\n✅ Easy booking in 60 seconds\n\n🌐 thedrivo.com\n\nHappy travels! 🌴`;
       try {
-        await fetch('/api/booking', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }),
-        });
-      } catch {}
+        await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }) });
+      } catch { }
     }
   };
 
-  const handleLogin    = () => authMode==='owner' ? handleOwnerLogin()    : handleCustLogin();
-  const handleRegister = () => authMode==='owner' ? handleOwnerRegister() : handleCustRegister();
+  const handleLogin = () => authMode === 'owner' ? handleOwnerLogin() : handleCustLogin();
+  const handleRegister = () => authMode === 'owner' ? handleOwnerRegister() : handleCustRegister();
 
-  // ── vehicle submit
   const handleVehicleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newV.name.trim()) { showToast('Vehicle name required!','err'); return; }
-    if (!newV.mapLink.trim()) { showToast('📍 Google Maps pickup location is required!','err'); return; }
-    if (photos.filter(Boolean).length < 6) { showToast('All 6 photos required!','err'); return; }
-
-    // Check expiry dates
-    const todayCheck = new Date(); todayCheck.setHours(0,0,0,0);
+    if (!newV.name.trim()) { showToast('Vehicle name required!', 'err'); return; }
+    if (!newV.mapLink.trim()) { showToast('📍 Google Maps pickup location is required!', 'err'); return; }
+    if (photos.filter(Boolean).length < 6) { showToast('All 6 photos required!', 'err'); return; }
+    const todayCheck = new Date(); todayCheck.setHours(0, 0, 0, 0);
     if ((newV as any).revenueLicenceExpiry) {
       const revExp = new Date((newV as any).revenueLicenceExpiry);
-      if (revExp < todayCheck) { showToast('Revenue Licence is EXPIRED! Renew before listing.','err'); return; }
+      if (revExp < todayCheck) { showToast('Revenue Licence is EXPIRED! Renew before listing.', 'err'); return; }
     }
     if ((newV as any).insuranceExpiry) {
       const insExp = new Date((newV as any).insuranceExpiry);
-      if (insExp < todayCheck) { showToast('Insurance is EXPIRED! Renew before listing.','err'); return; }
+      if (insExp < todayCheck) { showToast('Insurance is EXPIRED! Renew before listing.', 'err'); return; }
     }
-
     const ownerId = ownerAcc?.id;
-    if (!ownerId) { showToast('Please login again','err'); return; }
-
+    if (!ownerId) { showToast('Please login again', 'err'); return; }
     if (editingId) {
       const { error } = await updateVehicle(editingId, {
-        name: newV.name, type: newV.type as any,
-        transmission: newV.transmission, fuel: newV.fuel,
-        price_per_day: Number(newV.pricePerDay),
-        description: newV.description, map_link: newV.mapLink,
+        name: newV.name, type: newV.type as any, transmission: newV.transmission, fuel: newV.fuel,
+        price_per_day: Number(newV.pricePerDay), description: newV.description, map_link: newV.mapLink,
         driver_option: (newV as any).driverOption || 'self_drive',
         delivery_option: (newV as any).deliveryOption || 'both',
         revenue_licence_expiry: (newV as any).revenueLicenceExpiry || null,
@@ -734,21 +908,16 @@ export default function Home() {
       showToast('Vehicle updated ✓');
     } else {
       const { id, error } = await addVehicle({
-        owner_id: ownerId,
-        name: newV.name, type: newV.type as any,
-        transmission: newV.transmission, fuel: newV.fuel,
-        price_per_day: Number(newV.pricePerDay),
+        owner_id: ownerId, name: newV.name, type: newV.type as any,
+        transmission: newV.transmission, fuel: newV.fuel, price_per_day: Number(newV.pricePerDay),
         location: (newV as any).district || ownerAcc?.city || 'Colombo',
-        shop_name: ownerAcc?.shop_name || '',
-        description: newV.description, map_link: newV.mapLink,
+        shop_name: ownerAcc?.shop_name || '', description: newV.description, map_link: newV.mapLink,
       }, photos);
       if (error || !id) { showToast(error || 'Failed', 'err'); return; }
       showToast('Vehicle published! 🚀');
     }
-
-    // FIX 1: Use unified refresh that updates both states
     await refreshVehicles(ownerId);
-    setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,weeklyPrice:0,monthlyPrice:0,kmPerDay:200,extraKmCharge:50,depositAmount:0,description:'',mapLink:'',driverOption:'self_drive',district:'',deliveryOption:'both',revenueLicenceExpiry:'',insuranceExpiry:''});
+    setNewV({ name: '', type: 'car', transmission: 'Automatic', fuel: 'Petrol', pricePerDay: 5000, weeklyPrice: 0, monthlyPrice: 0, kmPerDay: 200, extraKmCharge: 50, depositAmount: 0, description: '', mapLink: '', driverOption: 'self_drive', district: '', deliveryOption: 'both', revenueLicenceExpiry: '', insuranceExpiry: '' });
     setPhotos([]); setShowAddForm(false); setEditingId(null);
   };
 
@@ -757,13 +926,9 @@ export default function Home() {
     if (!v) return;
     const newAvail = !vAvail(v);
     await toggleVehicleAvailability(id, newAvail);
-    // Update ownerFleet state immediately (optimistic)
     const updated = ownerFleet.map(x => x.id === id ? { ...x, isAvailable: newAvail, is_available: newAvail } : x);
     setOwnerFleet(updated);
-    // Also refresh public listing
-    const { data: vdata } = await supabase.from('vehicles')
-      .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
-      .eq('is_available', true).order('created_at', { ascending: false });
+    const { data: vdata } = await supabase.from('vehicles').select('*, vehicle_photos(storage_url,sort_order), owners(verified)').eq('is_available', true).order('created_at', { ascending: false });
     if (vdata) setAllVehicles(vdata.map(mapVehicle));
     showToast(newAvail ? `"${v.name}" is now live!` : `"${v.name}" hidden`);
   };
@@ -772,11 +937,9 @@ export default function Home() {
     if (!confirm('Delete this vehicle?')) return;
     await dbDeleteVehicle(id);
     setOwnerFleet(ownerFleet.filter(v => v.id !== id));
-    const { data: vdata } = await supabase.from('vehicles')
-      .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
-      .eq('is_available', true).order('created_at', { ascending: false });
+    const { data: vdata } = await supabase.from('vehicles').select('*, vehicle_photos(storage_url,sort_order), owners(verified)').eq('is_available', true).order('created_at', { ascending: false });
     if (vdata) setAllVehicles(vdata.map(mapVehicle));
-    showToast('Deleted','err');
+    showToast('Deleted', 'err');
   };
 
   const processImg = (file: File) => {
@@ -786,38 +949,25 @@ export default function Home() {
     r.readAsDataURL(file);
   };
   const removePhoto = (idx: number) => setPhotos(prev => prev.filter((_, i) => i !== idx));
-  const movePhoto   = (from: number, to: number) => {
+  const movePhoto = (from: number, to: number) => {
     setPhotos(prev => { const a = [...prev]; const [item] = a.splice(from, 1); a.splice(to, 0, item); return a; });
   };
 
-  // ── Helper: call booking API
-  const bookingAPI = async (action: string, params: Record<string,any>) => {
-    const res = await fetch('/api/booking', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, ...params }),
-    });
+  const bookingAPI = async (action: string, params: Record<string, any>) => {
+    const res = await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...params }) });
     return res.json();
   };
 
-  // ── FIX 2: Owner refresh bookings from DB (source of truth)
   const refreshOwnerBookings = async (ownerId: string) => {
-    const { data } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('owner_id', ownerId)
-      .not('status', 'eq', 'declined')
-      .order('booked_at', { ascending: false });
+    const { data } = await supabase.from('bookings').select('*').eq('owner_id', ownerId).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
     setOwnerBookings(data || []);
     setOwnerAcc(prev => prev ? { ...prev, bookings: data || [] } : prev);
   };
 
-  // ── FIX 3: Owner accept booking — refresh from DB after action
-  const updateBookingStatus = async (bookingId: string, status: 'confirmed'|'completed') => {
+  const updateBookingStatus = async (bookingId: string, status: 'confirmed' | 'completed') => {
     if (status === 'confirmed') {
       const res = await bookingAPI('accept', { bookingId });
       if (res.error) { showToast(res.error, 'err'); return; }
-      // Refresh bookings from DB (declined ones will not appear due to filter)
       if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
       await refreshVehicles(ownerAcc?.id);
       showToast('Booking confirmed! Customer notified via SMS. ✓');
@@ -830,7 +980,6 @@ export default function Home() {
     }
   };
 
-  // ── FIX 3: Owner decline — refresh from DB after action
   const declineBooking = async (bookingId: string) => {
     const res = await bookingAPI('decline', { bookingId });
     if (res.error) { showToast(res.error, 'err'); return; }
@@ -839,42 +988,30 @@ export default function Home() {
     showToast('Booking declined. Vehicle is available again.');
   };
 
-  // ── FIX 4: Cancel booking — refresh customer bookings from DB after action
-  const cancelBooking = async (bookingId: string, role: 'owner'|'customer') => {
+  const cancelBooking = async (bookingId: string, role: 'owner' | 'customer') => {
     const msg = role === 'owner'
       ? 'Cancel this booking? The customer will be notified and the vehicle will become available again.'
       : 'Cancel this booking? The shop will be notified.';
     if (!confirm(msg)) return;
-
     const res = await bookingAPI('cancel', {
       bookingId,
       ownerId: role === 'owner' ? ownerAcc?.id : null,
       customerId: role === 'customer' ? custAcc?.id : null,
     });
     if (res.error) { showToast(res.error, 'err'); return; }
-
     if (role === 'owner') {
       if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
       await refreshVehicles(ownerAcc?.id);
     } else if (custAcc?.id) {
-      // FIX 4: Re-fetch from DB instead of relying on stale state
-      const { data: bdata } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('customer_id', custAcc.id)
-        .not('status', 'eq', 'declined')
-        .order('booked_at', { ascending: false });
+      const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
       setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev);
       await refreshVehicles();
     }
     showToast('Booking cancelled. Vehicle is available again.');
   };
 
-  // ── Toggle wishlist
   const toggleWishlist = async (vehicleId: string) => {
-    if (sessionRole !== 'customer' || !custAcc?.id) {
-      setLoginPromptOpen(true); return;
-    }
+    if (sessionRole !== 'customer' || !custAcc?.id) { setLoginPromptOpen(true); return; }
     const isWishlisted = wishlist.includes(vehicleId);
     if (isWishlisted) {
       await supabase.from('wishlist').delete().eq('customer_id', custAcc.id).eq('vehicle_id', vehicleId);
@@ -887,20 +1024,15 @@ export default function Home() {
     }
   };
 
-  // ── Submit review
   const submitReview = async () => {
     if (!reviewModal || !custAcc?.id) return;
     if (reviewRating < 1 || reviewRating > 5) { showToast('Select a rating', 'err'); return; }
     const { error } = await supabase.from('reviews').insert({
-      vehicle_id: reviewModal.vehicleId,
-      customer_id: custAcc.id,
-      booking_id: reviewModal.bookingId,
+      vehicle_id: reviewModal.vehicleId, customer_id: custAcc.id, booking_id: reviewModal.bookingId,
       owner_id: allVehicles.find(v => v.id === reviewModal.vehicleId)?.owner_id,
-      rating: reviewRating,
-      comment: reviewComment.trim(),
+      rating: reviewRating, comment: reviewComment.trim(),
     });
     if (error) { showToast('Review failed: ' + error.message, 'err'); return; }
-    // Update vehicle rating in DB
     const { data: reviews } = await supabase.from('reviews').select('rating').eq('vehicle_id', reviewModal.vehicleId);
     if (reviews && reviews.length > 0) {
       const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
@@ -910,99 +1042,90 @@ export default function Home() {
     showToast('Review submitted! Thank you 🌟');
   };
 
-  // ── confirm booking (customer)
-  // Auto-set delivery type based on vehicle's delivery_option
   useEffect(() => {
     if (!selectedVehicle) return;
     const dOpt = (selectedVehicle as any).delivery_option || 'both';
-    if (dOpt === 'pickup_only')   setDeliveryType('pickup');
+    if (dOpt === 'pickup_only') setDeliveryType('pickup');
     if (dOpt === 'delivery_only') setDeliveryType('delivery');
   }, [selectedVehicle]);
 
-  // Auto-set days based on rental period
   useEffect(() => {
-    if (rentalPeriod === 'weekly'  && days < 7)  setDays(7);
+    if (rentalPeriod === 'weekly' && days < 7) setDays(7);
     if (rentalPeriod === 'monthly' && days < 28) setDays(28);
-    if (rentalPeriod === 'daily'   && days > 6)  setDays(1);
+    if (rentalPeriod === 'daily' && days > 6) setDays(1);
   }, [rentalPeriod]);
 
-  // Price calculation based on rental period
   const getPeriodPrice = (v: any) => {
-    if (rentalPeriod === 'weekly'  && v?.weekly_price  > 0) return { price: v.weekly_price,  unit: 'week',  mult: 7  };
+    if (rentalPeriod === 'weekly' && v?.weekly_price > 0) return { price: v.weekly_price, unit: 'week', mult: 7 };
     if (rentalPeriod === 'monthly' && v?.monthly_price > 0) return { price: v.monthly_price, unit: 'month', mult: 28 };
     return { price: v?.price_per_day || v?.pricePerDay || 0, unit: 'day', mult: 1 };
   };
 
-  const periodInfo     = selectedVehicle ? getPeriodPrice(selectedVehicle) : { price: 0, unit: 'day', mult: 1 };
-  const periodsCount   = rentalPeriod === 'daily' ? days : rentalPeriod === 'weekly' ? Math.ceil(days/7) : Math.ceil(days/28);
-  const base           = periodInfo.price * periodsCount;
-  const delFee         = deliveryType==='delivery' ? 1500 : 0;
-  const depositAmt     = selectedVehicle ? ((selectedVehicle as any).deposit_amount || 0) : 0;
-  const total          = base + delFee;
+  const periodInfo = selectedVehicle ? getPeriodPrice(selectedVehicle) : { price: 0, unit: 'day', mult: 1 };
+  const periodsCount = rentalPeriod === 'daily' ? days : rentalPeriod === 'weekly' ? Math.ceil(days / 7) : Math.ceil(days / 28);
+  const base = periodInfo.price * periodsCount;
+  const delFee = deliveryType === 'delivery' ? 1500 : 0;
+  const depositAmt = selectedVehicle ? ((selectedVehicle as any).deposit_amount || 0) : 0;
+  const total = base + delFee;
   const platformFeeAmt = Math.round(total * 0.10);
   const ownerPayoutAmt = total - platformFeeAmt;
 
-
   const confirmBooking = async () => {
     if (!selectedVehicle || bookingLoading) return;
-    if (sessionRole !== 'customer') {
-      setLoginPromptOpen(true);
-      return;
-    }
+    if (sessionRole !== 'customer') { setLoginPromptOpen(true); return; }
     setBookingLoading(true);
     const today = new Date().toISOString().split('T')[0];
-
     const bookingData = {
-      vehicle_id: selectedVehicle.id,
-      owner_id: selectedVehicle.owner_id,
+      vehicle_id: selectedVehicle.id, owner_id: selectedVehicle.owner_id,
       customer_id: sessionRole === 'customer' ? custAcc?.id : undefined,
-      vehicle_name: selectedVehicle.name || '',
-      vehicle_img: selectedVehicle.image || '',
-      shop_name: vShop(selectedVehicle) || '',
-      location: selectedVehicle.location || '',
-      pickup_date: filterPickup || today,
-      return_date: filterReturn || today,
-      pickup_time: pickupTime,
-      days,
-      delivery_type: deliveryType,
-      price_per_day: vPrice(selectedVehicle) || 0,
-      total,
-      status: 'pending',
+      vehicle_name: selectedVehicle.name || '', vehicle_img: selectedVehicle.image || '',
+      shop_name: vShop(selectedVehicle) || '', location: selectedVehicle.location || '',
+      pickup_date: filterPickup || today, return_date: filterReturn || today,
+      pickup_time: pickupTime, days, delivery_type: deliveryType,
+      price_per_day: vPrice(selectedVehicle) || 0, total, status: 'pending',
     };
-
     const res = await bookingAPI('create', {
-      booking: bookingData,
-      vehicleId: selectedVehicle.id,
+      booking: bookingData, vehicleId: selectedVehicle.id,
       customerId: sessionRole === 'customer' ? custAcc?.id : null,
       ownerId: selectedVehicle.owner_id,
     });
-
     if (res.error) {
-      showToast(res.error === 'Vehicle no longer available'
-        ? 'Sorry, this vehicle was just booked by someone else!'
-        : 'Booking failed. Please try again.', 'err');
-      setBookingLoading(false);
-      setView('home'); setSelectedVehicle(null);
-      await refreshVehicles();
-      return;
+      showToast(res.error === 'Vehicle no longer available' ? 'Sorry, this vehicle was just booked by someone else!' : 'Booking failed. Please try again.', 'err');
+      setBookingLoading(false); setView('home'); setSelectedVehicle(null);
+      await refreshVehicles(); return;
     }
-
-    // FIX 4: Re-fetch customer bookings from DB
     if (sessionRole === 'customer' && custAcc?.id) {
-      const { data: bdata } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('customer_id', custAcc.id)
-        .not('status', 'eq', 'declined')
-        .order('booked_at', { ascending: false });
+      const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
       setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev);
     }
     await refreshVehicles();
-    await trackBookingInDB().catch(()=>{});
+    await trackBookingInDB().catch(() => {});
     setBookingLoading(false);
     setBookingDone(true);
   };
 
+  // NOTE: ══════════════════════════════════════════════════════════
+  // RENDER SECTION STARTS HERE — copy your existing RENDER section
+  // (from "return (" to end of file) and paste below this line.
+  // In the AUTH PAGE section, make these 2 changes:
+  //
+  // CHANGE 1: Add forgot/verify tabs handling in the tabs row:
+  //   Only show login/register tabs when NOT in forgot/verify mode
+  //
+  // CHANGE 2: Add forgot/verify form rendering after register block
+  //
+  // CHANGE 3: In ownerEditOpen modal, add <ChangePasswordForm> before save button
+  // CHANGE 4: In custEditOpen modal, add <ChangePasswordForm> before save button
+  //
+  // See Part 2 file for the complete updated RENDER section.
+  // ══════════════════════════════════════════════════════════════
+
+  return (
+    // PASTE YOUR EXISTING RENDER SECTION HERE
+    // Then make the 4 small changes described above
+    <div>Placeholder — paste render section from Part 2</div>
+  );
+}
   // ══════════════════════════════════════════════════════════════════
   //  RENDER
   // ══════════════════════════════════════════════════════════════════

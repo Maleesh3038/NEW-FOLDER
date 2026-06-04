@@ -30,6 +30,101 @@ const statusColor = (s:string) =>
   s==='declined'  ? 'text-red-400 bg-red-900/30 border-red-700' :
                     'text-amber-400 bg-amber-900/30 border-amber-700';
 
+// ══════════════════════════════════════════════════════════════════
+//  NEW: Admin Reset Password Modal
+// ══════════════════════════════════════════════════════════════════
+function AdminResetPasswordModal({ user, userType, onClose, showToast }: {
+  user: any;
+  userType: 'owner' | 'customer';
+  onClose: () => void;
+  showToast: (msg: string, type?: 'ok'|'err') => void;
+}) {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const userName = userType === 'owner'
+    ? (user.shop_name || user.email)
+    : `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email;
+
+  const handleReset = async () => {
+    if (!newPassword) { showToast('Password required', 'err'); return; }
+    if (newPassword.length < 6) { showToast('Min 6 characters', 'err'); return; }
+    if (newPassword !== confirm) { showToast('Passwords do not match', 'err'); return; }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/admin-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, userType, newPassword }),
+      });
+      const data = await res.json();
+      if (data.error) { showToast(data.error, 'err'); setLoading(false); return; }
+      showToast(`✅ Password reset for ${userName}!`);
+      onClose();
+    } catch {
+      showToast('Failed. Try again.', 'err');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center px-4">
+      <div className="bg-[#111118] border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+          <div>
+            <h3 className="font-black text-white">Reset Password</h3>
+            <p className="text-xs text-slate-400 mt-0.5">{userName}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl w-8 h-8 flex items-center justify-center">×</button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="bg-amber-900/20 border border-amber-800/50 rounded-xl px-4 py-3">
+            <p className="text-xs text-amber-300 font-semibold">⚠️ This will immediately change the user's password. Notify them via WhatsApp/call after resetting.</p>
+          </div>
+          <div>
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">New Password</label>
+            <div className="relative">
+              <input
+                type={showPw ? 'text' : 'password'}
+                placeholder="Min 6 characters"
+                className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 pr-14 text-sm font-semibold text-white outline-none focus:border-slate-400 placeholder:text-slate-600 transition"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+              />
+              <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 hover:text-white">
+                {showPw ? 'HIDE' : 'SHOW'}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Confirm Password</label>
+            <input
+              type="password"
+              placeholder="Repeat password"
+              className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-sm font-semibold text-white outline-none focus:border-slate-400 placeholder:text-slate-600 transition"
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleReset()}
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition">
+              Cancel
+            </button>
+            <button onClick={handleReset} disabled={loading}
+              className={`flex-1 py-3 rounded-xl font-black text-xs uppercase text-white transition ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}>
+              {loading ? 'Resetting...' : '🔑 Reset Password'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [authed,   setAuthed]   = useState(false);
   const [email,    setEmail]    = useState('');
@@ -48,9 +143,12 @@ export default function AdminPage() {
   const [traffic,   setTraffic]   = useState<any[]>([]);
 
   // Modals
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
-  const [selectedPartner, setSelectedPartner] = useState<any>(null);
-  const [selectedCustomer,setSelectedCustomer]= useState<any>(null);
+  const [selectedBooking,  setSelectedBooking]  = useState<any>(null);
+  const [selectedPartner,  setSelectedPartner]  = useState<any>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+
+  // NEW: Reset password modal state
+  const [resetModal, setResetModal] = useState<{user: any; userType: 'owner'|'customer'} | null>(null);
 
   // Filters
   const [bookingFilter, setBookingFilter] = useState('all');
@@ -79,7 +177,6 @@ export default function AdminPage() {
     setLoading(false);
   },[]);
 
-  // Real-time
   useEffect(()=>{
     if(!authed) return;
     loadData();
@@ -175,7 +272,6 @@ export default function AdminPage() {
   const liveVehicles      = vehicles.filter(v=>v.is_available);
   const totalVisits       = traffic.reduce((s,e:any)=>s+(e.visits||0),0);
 
-  // ── Partner earnings calculator
   const getPartnerStats = (ownerId:string) => {
     const pb = bookings.filter(b=>b.owner_id===ownerId);
     const completed = pb.filter(b=>b.status==='completed');
@@ -184,7 +280,6 @@ export default function AdminPage() {
     return { total:pb.length, completed:completed.length, gross, payout:gross-fee, pending:pb.filter(b=>b.status==='pending').length };
   };
 
-  // ── Filtered bookings
   const filteredBookings = bookings
     .filter(b=> bookingFilter==='all'?true:b.status===bookingFilter)
     .filter(b=> bookingSearch===''?true:
@@ -231,7 +326,17 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white antialiased font-sans">
-      {toast&&<div className={`fixed top-4 right-4 z-[200] px-5 py-3 rounded-xl text-sm font-bold shadow-2xl transition-all ${toastType==='ok'?'bg-emerald-500':'bg-red-500'} text-white`}>{toast}</div>}
+      {toast&&<div className={`fixed top-4 right-4 z-[300] px-5 py-3 rounded-xl text-sm font-bold shadow-2xl transition-all ${toastType==='ok'?'bg-emerald-500':'bg-red-500'} text-white`}>{toast}</div>}
+
+      {/* ── NEW: RESET PASSWORD MODAL ── */}
+      {resetModal && (
+        <AdminResetPasswordModal
+          user={resetModal.user}
+          userType={resetModal.userType}
+          onClose={() => setResetModal(null)}
+          showToast={showToast}
+        />
+      )}
 
       {/* ── BOOKING DETAIL MODAL ── */}
       {selectedBooking&&(
@@ -297,7 +402,6 @@ export default function AdminPage() {
               <button onClick={()=>setSelectedPartner(null)} className="text-slate-400 hover:text-white text-2xl">×</button>
             </div>
             <div className="p-6 space-y-5">
-              {/* Profile */}
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-2xl bg-slate-700 flex items-center justify-center text-white font-black text-2xl overflow-hidden flex-shrink-0">
                   {selectedPartner.avatar_url?<img src={selectedPartner.avatar_url} className="w-full h-full object-cover" alt=""/>:(selectedPartner.shop_name||'S').charAt(0).toUpperCase()}
@@ -310,7 +414,6 @@ export default function AdminPage() {
                   </span>
                 </div>
               </div>
-              {/* Info */}
               <div className="bg-slate-800/50 rounded-xl divide-y divide-slate-700/50 border border-slate-700">
                 {[
                   ['Owner Name', selectedPartner.owner_name||'—'],
@@ -324,7 +427,6 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-              {/* Earnings */}
               {(()=>{
                 const s = getPartnerStats(selectedPartner.id);
                 return (
@@ -343,7 +445,6 @@ export default function AdminPage() {
                   </div>
                 );
               })()}
-              {/* Vehicles */}
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Vehicles ({vehicles.filter(v=>v.owner_id===selectedPartner.id).length})</p>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -369,6 +470,12 @@ export default function AdminPage() {
                 <button onClick={()=>toggleVerifyOwner(selectedPartner.id,selectedPartner.verified)}
                   className={`w-full py-2.5 rounded-xl font-black text-xs uppercase transition ${selectedPartner.verified?'bg-slate-700 hover:bg-slate-600 text-slate-300':'bg-blue-600 hover:bg-blue-700 text-white'}`}>
                   {selectedPartner.verified?'Remove Verification ✅':'✅ Verify This Partner'}
+                </button>
+                {/* NEW: Reset Password button in partner modal */}
+                <button
+                  onClick={() => { setResetModal({ user: selectedPartner, userType: 'owner' }); }}
+                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-xs uppercase transition">
+                  🔑 Reset Partner Password
                 </button>
                 <div className="flex gap-2">
                   <button onClick={()=>toggleBlockOwner(selectedPartner.id,selectedPartner.blocked)}
@@ -419,7 +526,6 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-              {/* Recent bookings */}
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Recent Bookings</p>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -432,6 +538,12 @@ export default function AdminPage() {
                   {bookings.filter(b=>b.customer_id===selectedCustomer.id).length===0&&<p className="text-xs text-slate-500 text-center py-3">No bookings</p>}
                 </div>
               </div>
+              {/* NEW: Reset Password button in customer modal */}
+              <button
+                onClick={() => { setResetModal({ user: selectedCustomer, userType: 'customer' }); }}
+                className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-xs uppercase transition">
+                🔑 Reset Customer Password
+              </button>
               <div className="flex gap-2">
                 <button onClick={()=>toggleBlockCustomer(selectedCustomer.id,selectedCustomer.blocked)}
                   className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase transition ${selectedCustomer.blocked?'bg-emerald-600 hover:bg-emerald-700':'bg-red-600 hover:bg-red-700'} text-white`}>
@@ -507,7 +619,6 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-              {/* Traffic chart */}
               <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
                 <h2 className="font-black text-white text-sm mb-4">Traffic — last 14 days</h2>
                 {traffic.length===0?<p className="text-slate-500 text-sm text-center py-8">No traffic data yet</p>:(
@@ -536,7 +647,6 @@ export default function AdminPage() {
                   </div>
                 )}
               </div>
-              {/* Recent bookings */}
               <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-black text-white text-sm">Recent Bookings</h2>
@@ -601,6 +711,11 @@ export default function AdminPage() {
                                 className={`text-[11px] font-black px-2.5 py-1 rounded-lg transition ${o.verified?'bg-blue-900/50 text-blue-400 hover:bg-slate-700':'bg-blue-600 hover:bg-blue-700 text-white'}`}>
                                 {o.verified?'✅ Verified':'Verify'}
                               </button>
+                              {/* NEW: Reset PW button in table */}
+                              <button onClick={()=>setResetModal({user:o, userType:'owner'})}
+                                className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-amber-900/50 hover:bg-amber-600 text-amber-400 hover:text-white transition">
+                                🔑 PW
+                              </button>
                               <button onClick={()=>toggleBlockOwner(o.id,o.blocked)} className={`text-[11px] font-black px-2.5 py-1 rounded-lg transition ${o.blocked?'bg-emerald-900/50 hover:bg-emerald-600 text-emerald-400':'bg-red-900/50 hover:bg-red-600 text-red-400'}`}>{o.blocked?'Unblock':'Block'}</button>
                             </td>
                           </tr>
@@ -646,7 +761,12 @@ export default function AdminPage() {
                           <td className="px-4 py-3 text-slate-300">{c.driving_license||'—'}</td>
                           <td className="px-4 py-3 font-black text-white">{bookings.filter(b=>b.customer_id===c.id).length}</td>
                           <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${c.blocked?'bg-red-900/50 text-red-400':'bg-emerald-900/50 text-emerald-400'}`}>{c.blocked?'Blocked':'Active'}</span></td>
-                          <td className="px-4 py-3 text-right" onClick={e=>e.stopPropagation()}>
+                          <td className="px-4 py-3 text-right space-x-1" onClick={e=>e.stopPropagation()}>
+                            {/* NEW: Reset PW button in customers table */}
+                            <button onClick={()=>setResetModal({user:c, userType:'customer'})}
+                              className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-amber-900/50 hover:bg-amber-600 text-amber-400 hover:text-white transition">
+                              🔑 PW
+                            </button>
                             <button onClick={()=>toggleBlockCustomer(c.id,c.blocked)} className={`text-[11px] font-black px-2.5 py-1 rounded-lg transition ${c.blocked?'bg-emerald-900/50 hover:bg-emerald-600 text-emerald-400':'bg-red-900/50 hover:bg-red-600 text-red-400'}`}>{c.blocked?'Unblock':'Block'}</button>
                           </td>
                         </tr>
@@ -702,7 +822,6 @@ export default function AdminPage() {
           {tab==='bookings'&&(
             <div className="space-y-4">
               <div><h1 className="text-2xl font-black text-white">All Bookings</h1><p className="text-slate-500 text-sm">{bookings.length} total · {pendingBookings.length} pending · platform earnings: Rs. {platformEarnings.toLocaleString()}</p></div>
-              {/* Filters */}
               <div className="flex flex-wrap gap-2 items-center">
                 <div className="flex gap-1 bg-slate-800/60 rounded-xl p-1">
                   {['all','pending','confirmed','completed','cancelled','declined'].map(f=>(
