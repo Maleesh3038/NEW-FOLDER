@@ -396,9 +396,6 @@ function CustomerDetailCard({ customerId }: { customerId: string }) {
     </div>
   );
 }
-// ══════════════════════════════════════════════════════════════════
-//  MAIN COMPONENT
-// ══════════════════════════════════════════════════════════════════
 export default function Home() {
   const [lang, setLang] = useState<LangKey>('EN');
   const t = T[lang];
@@ -641,9 +638,41 @@ export default function Home() {
   const logout = () => { clearSession(); setSessionEmail(null); setSessionRole(null); setOwnerAcc(null); setCustAcc(null); setOwnerFleet([]); setOwnerBookings([]); resetToHome(); showToast('Logged out'); };
   const openAuth = (mode: 'owner'|'customer', tab: 'login'|'register' = 'login') => { setAuthMode(mode); setAuthTab(tab); setLoginEmail(''); setLoginPassword(''); setLoginError(''); setRegEmail(''); setRegPassword(''); setRegConfirm(''); setRegFirst(''); setRegLast(''); setRegShop(''); setRegPhone(''); setRegNic(''); setRegLicense(''); setRegIsForeign(false); setRegError(''); setView('auth'); setMobileMenuOpen(false); };
 
-  const handleOwnerLogin = async () => { setLoginError(''); if (!loginEmail.trim() || !loginPassword.trim()) { setLoginError('Email and password required'); return; } const { data, error } = await loginOwner(loginEmail, loginPassword); if (error || !data) { setLoginError(error || 'Login failed'); return; } saveSession({ id: data.id!, email: data.email, role: 'owner' }); await restoreSession(data.id!, data.email, 'owner'); setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 👋`); };
+  const handleOwnerLogin = async () => {
+    setLoginError('');
+    if (!loginEmail.trim() || !loginPassword.trim()) { setLoginError('Email and password required'); return; }
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword, userType: 'owner' }),
+      });
+      const result = await res.json();
+      if (result.error || !result.data) { setLoginError(result.error || 'Login failed'); return; }
+      const data = result.data;
+      saveSession({ id: data.id, email: data.email, role: 'owner' });
+      await restoreSession(data.id, data.email, 'owner');
+      setView('ownerDash');
+      showToast(`Welcome, ${data.shop_name}! 👋`);
+    } catch { setLoginError('Login failed. Please try again.'); }
+  };
   const handleOwnerRegister = async () => { setRegError(''); if (!regEmail.trim()) { setRegError('Email required'); return; } if (regPassword.length < 6) { setRegError('Password min 6 chars'); return; } if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; } if (!regShop.trim()) { setRegError('Shop name required'); return; } if (!regPhone.trim()) { setRegError('Phone required'); return; } if (!agreementAccepted) { setRegError('Please accept the Partner Agreement to continue'); return; } const { data, error } = await registerOwner(regEmail, regPassword, { shopName: regShop, ownerName: regFirst + ' ' + regLast, phone: regPhone, whatsapp: regPhone, city: regCity, agreement_accepted: true, agreement_accepted_at: new Date().toISOString() }); if (error || !data) { setRegError(error || 'Registration failed'); return; } saveSession({ id: data.id!, email: data.email, role: 'owner' }); setSessionEmail(data.email); setSessionRole('owner'); setOwnerAcc({ ...data, fleet: [], bookings: [] }); setOwnerFleet([]); setOwnerBookings([]); setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 🎉`); if (data.phone || data.whatsapp) { const phone = (data.whatsapp || data.phone || '').replace(/\D/g, '').replace(/^0/, '94'); const welcomeMsg = `🎉 Welcome to *Drivo LK*, ${data.shop_name}!\n\nYour partner account is ready.\n\n✅ Add your vehicles at thedrivo.com\n💰 You earn *90%* of every booking\n\n🌐 thedrivo.com`; try { await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }) }); } catch { } } };
-  const handleCustLogin = async () => { setLoginError(''); const { data, error } = await loginCustomer(loginEmail, loginPassword); if (error || !data) { setLoginError(error || 'Login failed'); return; } saveSession({ id: data.id!, email: data.email, role: 'customer' }); await restoreSession(data.id!, data.email, 'customer'); setView('custDash'); showToast(`Welcome back, ${data.first_name}! 👋`); };
+  const handleCustLogin = async () => {
+    setLoginError('');
+    if (!loginEmail.trim() || !loginPassword.trim()) { setLoginError('Email and password required'); return; }
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword, userType: 'customer' }),
+      });
+      const result = await res.json();
+      if (result.error || !result.data) { setLoginError(result.error || 'Login failed'); return; }
+      const data = result.data;
+      saveSession({ id: data.id, email: data.email, role: 'customer' });
+      await restoreSession(data.id, data.email, 'customer');
+      setView('custDash');
+      showToast(`Welcome back, ${data.first_name}! 👋`);
+    } catch { setLoginError('Login failed. Please try again.'); }
+  };
   const handleCustRegister = async () => { setRegError(''); if (!regEmail.trim()) { setRegError('Email required'); return; } if (regPassword.length < 6) { setRegError('Password min 6 chars'); return; } if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; } if (!regFirst.trim()) { setRegError('First name required'); return; } if (!regPhone.trim()) { setRegError('Phone required'); return; } if (!regNic.trim()) { setRegError(regIsForeign ? 'Passport number required' : 'NIC number required'); return; } if (!regLicense.trim()) { setRegError(regIsForeign ? 'International driving license required' : 'Driving license number required'); return; } const { data, error } = await registerCustomer(regEmail, regPassword, { firstName: regFirst, lastName: regLast, phone: regPhone, city: regCity, nic: regNic, drivingLicense: regLicense }); if (error || !data) { setRegError(error || 'Registration failed'); return; } saveSession({ id: data.id!, email: data.email, role: 'customer' }); setSessionEmail(data.email); setSessionRole('customer'); setCustAcc({ ...data, bookings: [] }); setView('custDash'); showToast(`Welcome, ${data.first_name}! 🎉`); if (data.phone) { const phone = (data.phone || '').replace(/\D/g, '').replace(/^0/, '94'); const welcomeMsg = `👋 Welcome to *Drivo LK*, ${data.first_name}!\n\n🚗 Browse cars, bikes, tuk-tuks & vans\n📍 Find vehicles across all 25 districts\n✅ Easy booking in 60 seconds\n\n🌐 thedrivo.com\n\nHappy travels! 🌴`; try { await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }) }); } catch { } } };
   const handleLogin = () => authMode === 'owner' ? handleOwnerLogin() : handleCustLogin();
   const handleRegister = () => authMode === 'owner' ? handleOwnerRegister() : handleCustRegister();

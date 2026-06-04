@@ -1,3 +1,4 @@
+// app/api/auth/admin-reset/route.ts  ← REPLACE existing file
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
@@ -7,12 +8,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'drivo-admin-2026';
+
 export async function POST(req: NextRequest) {
   try {
-    const { userId, userType, newPassword } = await req.json();
+    const { userId, userType, newPassword, adminSecret } = await req.json();
 
+    if (adminSecret !== ADMIN_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     if (!userId || !userType || !newPassword) {
-      return NextResponse.json({ error: 'All fields required' }, { status: 400 });
+      return NextResponse.json({ error: 'userId, userType and newPassword required' }, { status: 400 });
     }
     if (newPassword.length < 6) {
       return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
@@ -34,6 +40,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Admin reset error:', error);
-    return NextResponse.json({ error: 'Failed to reset password' }, { status: 500 });
+    return NextResponse.json({ error: 'Reset failed' }, { status: 500 });
   }
 }
