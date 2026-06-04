@@ -16,7 +16,6 @@ import {
   saveSession, getSession, clearSession,
 } from '../lib/supabase';
 
-// ── Local types for UI state
 type RawVehicle = DbVehicle & { images?: string[]; image?: string; isAvailable?: boolean; mapLink?: string; };
 type Booking = DbBooking & { vehicleImg?: string; };
 type OwnerAccount = DbOwner & { fleet?: RawVehicle[]; bookings?: Booking[]; };
@@ -32,7 +31,6 @@ function DrivoLogo({ className = 'w-9 h-9' }: { className?: string }) {
   );
 }
 
-// ── Helper: map DB vehicle to RawVehicle
 function mapVehicle(v: any): RawVehicle {
   return {
     ...v,
@@ -46,9 +44,7 @@ function mapVehicle(v: any): RawVehicle {
   };
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  NEW: Forgot Password Form Component
-// ══════════════════════════════════════════════════════════════════
+// ── Forgot Password Form
 function ForgotPasswordForm({ onBack, onSuccess, showToast }: {
   onBack: () => void;
   onSuccess: (email: string) => void;
@@ -62,17 +58,14 @@ function ForgotPasswordForm({ onBack, onSuccess, showToast }: {
     setLoading(true);
     try {
       const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
       if (data.error) { showToast(data.error, 'err'); setLoading(false); return; }
       showToast('OTP sent to your email! 📧');
       onSuccess(email);
-    } catch {
-      showToast('Failed to send OTP. Try again.', 'err');
-    }
+    } catch { showToast('Failed to send OTP. Try again.', 'err'); }
     setLoading(false);
   };
 
@@ -85,31 +78,20 @@ function ForgotPasswordForm({ onBack, onSuccess, showToast }: {
       </div>
       <div>
         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Email</label>
-        <input
-          type="email"
-          placeholder="you@example.com"
+        <input type="email" placeholder="you@example.com"
           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition placeholder:text-slate-300"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-        />
+          value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSubmit()}/>
       </div>
-      <button
-        onClick={handleSubmit}
-        disabled={loading}
+      <button onClick={handleSubmit} disabled={loading}
         className={`w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wider transition shadow-lg text-white ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800 active:scale-95'}`}>
         {loading ? 'Sending OTP...' : 'Send OTP →'}
       </button>
-      <button onClick={onBack} className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">
-        ← Back to Login
-      </button>
+      <button onClick={onBack} className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">← Back to Login</button>
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  NEW: Verify OTP + Set New Password Form Component
-// ══════════════════════════════════════════════════════════════════
+// ── Verify OTP Form
 function VerifyOtpForm({ onBack, onSuccess, showToast }: {
   onBack: () => void;
   onSuccess: () => void;
@@ -134,17 +116,14 @@ function VerifyOtpForm({ onBack, onSuccess, showToast }: {
     setLoading(true);
     try {
       const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp, newPassword }),
       });
       const data = await res.json();
       if (data.error) { showToast(data.error, 'err'); setLoading(false); return; }
       localStorage.removeItem('drivo_reset_email');
       onSuccess();
-    } catch {
-      showToast('Reset failed. Try again.', 'err');
-    }
+    } catch { showToast('Reset failed. Try again.', 'err'); }
     setLoading(false);
   };
 
@@ -157,70 +136,43 @@ function VerifyOtpForm({ onBack, onSuccess, showToast }: {
       </div>
       <div>
         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Email</label>
-        <input
-          type="email"
-          placeholder="you@example.com"
+        <input type="email" placeholder="you@example.com"
           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
+          value={email} onChange={e => setEmail(e.target.value)}/>
       </div>
       <div>
         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">OTP Code</label>
-        <input
-          type="text"
-          placeholder="123456"
-          maxLength={6}
+        <input type="text" placeholder="123456" maxLength={6}
           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-2xl font-black text-center tracking-[0.5em] outline-none focus:border-slate-900 transition placeholder:text-slate-300 placeholder:tracking-normal placeholder:text-base"
-          value={otp}
-          onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-        />
+          value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}/>
       </div>
       <div>
         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">New Password</label>
         <div className="relative">
-          <input
-            type={showPw ? 'text' : 'password'}
-            placeholder="Min 6 characters"
+          <input type={showPw ? 'text' : 'password'} placeholder="Min 6 characters"
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 pr-14 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
-            value={newPassword}
-            onChange={e => setNewPassword(e.target.value)}
-          />
-          <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-black px-1">
-            {showPw ? 'HIDE' : 'SHOW'}
-          </button>
+            value={newPassword} onChange={e => setNewPassword(e.target.value)}/>
+          <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-black px-1">{showPw ? 'HIDE' : 'SHOW'}</button>
         </div>
       </div>
       <div>
         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Confirm New Password</label>
-        <input
-          type="password"
-          placeholder="Repeat password"
+        <input type="password" placeholder="Repeat password"
           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
-          value={confirm}
-          onChange={e => setConfirm(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-        />
+          value={confirm} onChange={e => setConfirm(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSubmit()}/>
       </div>
-      <button
-        onClick={handleSubmit}
-        disabled={loading}
+      <button onClick={handleSubmit} disabled={loading}
         className={`w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wider transition shadow-lg text-white ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800 active:scale-95'}`}>
         {loading ? 'Resetting...' : 'Reset Password →'}
       </button>
-      <button onClick={onBack} className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">
-        ← Back
-      </button>
+      <button onClick={onBack} className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">← Back</button>
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════
-//  NEW: Change Password Form Component (for dashboards)
-// ══════════════════════════════════════════════════════════════════
+// ── Change Password Form
 function ChangePasswordForm({ userId, userType, showToast }: {
-  userId: string;
-  userType: 'owner' | 'customer';
+  userId: string; userType: 'owner' | 'customer';
   showToast: (msg: string, type?: 'ok'|'err') => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -236,23 +188,19 @@ function ChangePasswordForm({ userId, userType, showToast }: {
     setLoading(true);
     try {
       const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, userType, currentPassword: current, newPassword: newPw }),
       });
       const data = await res.json();
       if (data.error) { showToast(data.error, 'err'); setLoading(false); return; }
       setCurrent(''); setNewPw(''); setConfirm(''); setOpen(false);
       showToast('Password changed successfully! 🔒');
-    } catch {
-      showToast('Failed. Try again.', 'err');
-    }
+    } catch { showToast('Failed. Try again.', 'err'); }
     setLoading(false);
   };
 
   if (!open) return (
-    <button
-      onClick={() => setOpen(true)}
+    <button onClick={() => setOpen(true)}
       className="w-full py-2.5 bg-slate-50 border border-slate-200 hover:border-slate-400 text-slate-600 rounded-xl font-black text-xs uppercase tracking-wide transition">
       🔒 Change Password
     </button>
@@ -264,23 +212,16 @@ function ChangePasswordForm({ userId, userType, showToast }: {
       {[
         { l: 'Current Password', v: current, s: setCurrent },
         { l: 'New Password', v: newPw, s: setNewPw },
-        { l: 'Confirm New Password', v: confirm, s: setConfirm },
+        { l: 'Confirm New Password', v: confirm, s: setConfirm }
       ].map(f => (
         <div key={f.l}>
           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{f.l}</label>
-          <input
-            type="password"
-            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition"
-            value={f.v}
-            onChange={e => f.s(e.target.value)}
-          />
+          <input type="password" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition" value={f.v} onChange={e => f.s(e.target.value)}/>
         </div>
       ))}
       <div className="flex gap-2 pt-1">
         <button onClick={() => { setOpen(false); setCurrent(''); setNewPw(''); setConfirm(''); }}
-          className="flex-1 py-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-xs uppercase transition hover:bg-slate-100">
-          Cancel
-        </button>
+          className="flex-1 py-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-xs uppercase transition hover:bg-slate-100">Cancel</button>
         <button onClick={handleChange} disabled={loading}
           className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase text-white transition ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}>
           {loading ? 'Saving...' : 'Save'}
@@ -290,7 +231,6 @@ function ChangePasswordForm({ userId, userType, showToast }: {
   );
 }
 
-// ── Vehicle Reviews Component
 function VehicleReviews({ vehicleId }: { vehicleId: string }) {
   const [reviews, setReviews] = useState<any[]>([]);
   useEffect(() => {
@@ -298,7 +238,6 @@ function VehicleReviews({ vehicleId }: { vehicleId: string }) {
       headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }
     }).then(r => r.json()).then(data => { if (Array.isArray(data)) setReviews(data); });
   }, [vehicleId]);
-
   if (reviews.length === 0) return (
     <div className="mt-4 text-center py-8 bg-slate-50 rounded-xl border border-slate-200">
       <p className="text-3xl mb-2">⭐</p>
@@ -306,9 +245,7 @@ function VehicleReviews({ vehicleId }: { vehicleId: string }) {
       <p className="text-xs text-slate-400 mt-1">Be the first to review after your rental!</p>
     </div>
   );
-
   const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
-
   return (
     <div className="mt-4 space-y-3">
       <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
@@ -322,16 +259,10 @@ function VehicleReviews({ vehicleId }: { vehicleId: string }) {
         <div key={r.id} className="bg-slate-50 rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-slate-700 rounded-full flex items-center justify-center text-white text-xs font-black">
-                {(r.customers?.first_name || 'A').charAt(0)}
-              </div>
+              <div className="w-7 h-7 bg-slate-700 rounded-full flex items-center justify-center text-white text-xs font-black">{(r.customers?.first_name || 'A').charAt(0)}</div>
               <p className="text-xs font-black text-slate-700">{r.customers?.first_name || 'Anonymous'}</p>
             </div>
-            <div className="flex gap-0.5">
-              {[1, 2, 3, 4, 5].map(s => (
-                <span key={s} className={`text-sm ${s <= r.rating ? 'opacity-100' : 'opacity-20'}`}>⭐</span>
-              ))}
-            </div>
+            <div className="flex gap-0.5">{[1,2,3,4,5].map(s => (<span key={s} className={`text-sm ${s <= r.rating ? 'opacity-100' : 'opacity-20'}`}>⭐</span>))}</div>
           </div>
           {r.comment && <p className="text-xs text-slate-600 leading-relaxed">{r.comment}</p>}
           <p className="text-[10px] text-slate-400 mt-2">{r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</p>
@@ -341,7 +272,6 @@ function VehicleReviews({ vehicleId }: { vehicleId: string }) {
   );
 }
 
-// ── Owner Contact Buttons (shown after booking confirmed)
 function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { vehicleId: string; ownerId: string; mapLink: string; vehicleName: string }) {
   const [owner, setOwner] = useState<any>(null);
   useEffect(() => {
@@ -350,47 +280,28 @@ function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { veh
       headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}` }
     }).then(r => r.json()).then(data => { if (Array.isArray(data) && data[0]) setOwner(data[0]); });
   }, [ownerId]);
-
   const phone = owner?.whatsapp || owner?.phone || '';
   const waPhone = phone.replace(/[^0-9]/g, '').replace(/^0/, '94');
   const waMsg = encodeURIComponent(`Hi ${owner?.shop_name || ''}! I just booked your *${vehicleName}* on Drivo LK. Looking forward to it! 🚗`);
-
   return (
     <div className="space-y-3">
       {phone && (
         <a href={`https://wa.me/${waPhone}?text=${waMsg}`} target="_blank" rel="noopener noreferrer"
           className="flex items-center justify-center gap-3 w-full py-3.5 bg-[#25D366] hover:bg-[#1fbe5a] text-white rounded-2xl font-black text-sm transition shadow-lg">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/>
-            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.098.546 4.07 1.5 5.787L0 24l6.396-1.676A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.487-5.187-1.34l-.371-.22-3.8.996 1.013-3.695-.241-.381A9.938 9.938 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
-          </svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.098.546 4.07 1.5 5.787L0 24l6.396-1.676A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.487-5.187-1.34l-.371-.22-3.8.996 1.013-3.695-.241-.381A9.938 9.938 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
           Chat on WhatsApp
         </a>
       )}
-      {phone && (
-        <a href={`tel:${phone}`}
-          className="flex items-center justify-center gap-3 w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-sm transition shadow-md">
-          📞 Call Shop · {phone}
-        </a>
-      )}
-      {mapLink && (
-        <a href={mapLink} target="_blank" rel="noopener noreferrer"
-          className="flex items-center justify-center gap-3 w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm transition shadow-md">
-          📍 Get Directions to Pickup Location
-        </a>
-      )}
-      {!phone && !mapLink && (
-        <p className="text-xs text-slate-400 text-center py-2">Shop contact details will be shared shortly</p>
-      )}
+      {phone && (<a href={`tel:${phone}`} className="flex items-center justify-center gap-3 w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-sm transition shadow-md">📞 Call Shop · {phone}</a>)}
+      {mapLink && (<a href={mapLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm transition shadow-md">📍 Get Directions to Pickup Location</a>)}
+      {!phone && !mapLink && (<p className="text-xs text-slate-400 text-center py-2">Shop contact details will be shared shortly</p>)}
     </div>
   );
 }
 
-// ── FAQ Section Component
 function FaqSection() {
-  const [activeTab, setActiveTab] = useState<'general' | 'booking' | 'price' | 'documents'>('general');
-  const [openIdx, setOpenIdx] = useState<number | null>(0);
-
+  const [activeTab, setActiveTab] = useState<'general'|'booking'|'price'|'documents'>('general');
+  const [openIdx, setOpenIdx] = useState<number|null>(0);
   const faqs = {
     general: [
       { q: 'How does Drivo work?', a: 'Drivo is Sri Lanka vehicle rental marketplace. Browse verified cars, bikes & tuk-tuks from local owners. Select your dates, confirm booking, and pay directly to the shop. No middleman payments — we only charge a 10% booking fee.' },
@@ -417,14 +328,12 @@ function FaqSection() {
       { q: 'Are my documents stored securely?', a: 'Your document numbers are stored securely in our database. We do not share your personal information with third parties. Document data is only visible to Drivo admins for verification.' },
     ],
   };
-
   const tabs: { key: typeof activeTab; label: string }[] = [
     { key: 'general', label: 'General' },
     { key: 'booking', label: 'Booking' },
     { key: 'price', label: 'Pricing' },
     { key: 'documents', label: 'Documents' },
   ];
-
   return (
     <section className="bg-white py-16 px-4 border-t border-slate-100">
       <div className="max-w-3xl mx-auto">
@@ -461,12 +370,10 @@ function FaqSection() {
   );
 }
 
-// ── Customer Detail Card for Owner Booking Modal
 function CustomerDetailCard({ customerId }: { customerId: string }) {
   const [cust, setCust] = useState<any>(null);
   useEffect(() => {
-    supabase.from('customers').select('first_name,last_name,phone,nic,driving_license,city').eq('id', customerId).single()
-      .then(({ data }) => setCust(data));
+    supabase.from('customers').select('first_name,last_name,phone,nic,driving_license,city').eq('id', customerId).single().then(({ data }) => setCust(data));
   }, [customerId]);
   if (!cust) return <div className="text-xs text-slate-400 text-center py-2">Loading customer info...</div>;
   return (
@@ -489,15 +396,12 @@ function CustomerDetailCard({ customerId }: { customerId: string }) {
     </div>
   );
 }
-
 // ══════════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════════
 export default function Home() {
   const [lang, setLang] = useState<LangKey>('EN');
   const t = T[lang];
-
-  // ── vehicles & filters
   const [allVehicles, setAllVehicles] = useState<RawVehicle[]>([]);
   const [filterCity, setFilterCity] = useState('All Sri Lanka');
   const [filterType, setFilterType] = useState('all');
@@ -514,42 +418,29 @@ export default function Home() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [vehicleReviews, setVehicleReviews] = useState<Record<string, any[]>>({});
-
-  // ── navigation
-  type ViewType = 'home' | 'detail' | 'auth' | 'ownerDash' | 'custDash';
+  type ViewType = 'home'|'detail'|'auth'|'ownerDash'|'custDash';
   const [view, setView] = useState<ViewType>('home');
-  const [authMode, setAuthMode] = useState<'owner' | 'customer'>('owner');
-
-  // ── UPDATED: authTab now includes forgot/verify
-  const [authTab, setAuthTab] = useState<'login' | 'register' | 'forgot' | 'verify'>('login');
-
-  const [selectedVehicle, setSelectedVehicle] = useState<RawVehicle | null>(null);
-  const [detailTab, setDetailTab] = useState<'details' | 'docs' | 'faq'>('details');
+  const [authMode, setAuthMode] = useState<'owner'|'customer'>('owner');
+  const [authTab, setAuthTab] = useState<'login'|'register'|'forgot'|'verify'>('login');
+  const [selectedVehicle, setSelectedVehicle] = useState<RawVehicle|null>(null);
+  const [detailTab, setDetailTab] = useState<'details'|'docs'|'faq'>('details');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [ownerSelectedBooking, setOwnerSelectedBooking] = useState<Booking | null>(null);
-  const [ownerSubTab, setOwnerSubTab] = useState<'fleet' | 'bookings' | 'earnings'>('fleet');
-  const [earningsPeriod, setEarningsPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
-
-  // ── booking
+  const [selectedBooking, setSelectedBooking] = useState<Booking|null>(null);
+  const [ownerSelectedBooking, setOwnerSelectedBooking] = useState<Booking|null>(null);
+  const [ownerSubTab, setOwnerSubTab] = useState<'fleet'|'bookings'|'earnings'>('fleet');
+  const [earningsPeriod, setEarningsPeriod] = useState<'weekly'|'monthly'|'yearly'>('monthly');
   const [days, setDays] = useState(1);
-  const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryType, setDeliveryType] = useState<'pickup'|'delivery'>('pickup');
   const [bookingDone, setBookingDone] = useState(false);
   const [pickupTime, setPickupTime] = useState('09:00');
-  const [rentalPeriod, setRentalPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-
-  // ── currency
+  const [rentalPeriod, setRentalPeriod] = useState<'daily'|'weekly'|'monthly'>('daily');
   const [currency, setCurrency] = useState('LKR');
-
-  // ── session
-  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
-  const [sessionRole, setSessionRole] = useState<'owner' | 'customer' | null>(null);
-  const [ownerAcc, setOwnerAcc] = useState<OwnerAccount | null>(null);
-  const [custAcc, setCustAcc] = useState<CustomerAccount | null>(null);
+  const [sessionEmail, setSessionEmail] = useState<string|null>(null);
+  const [sessionRole, setSessionRole] = useState<'owner'|'customer'|null>(null);
+  const [ownerAcc, setOwnerAcc] = useState<OwnerAccount|null>(null);
+  const [custAcc, setCustAcc] = useState<CustomerAccount|null>(null);
   const [ownerFleet, setOwnerFleet] = useState<RawVehicle[]>([]);
   const [ownerBookings, setOwnerBookings] = useState<Booking[]>([]);
-
-  // ── auth forms
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -569,32 +460,27 @@ export default function Home() {
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [showAgreementModal, setShowAgreementModal] = useState(false);
   const [showRegPw, setShowRegPw] = useState(false);
-
-  // login prompt modal
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
-  const [lightbox, setLightbox] = useState<{ imgs: string[], idx: number } | null>(null);
-
-  // ── vehicle form
+  const [lightbox, setLightbox] = useState<{ imgs: string[], idx: number }|null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string|null>(null);
   const [newV, setNewV] = useState({ name: '', type: 'car', transmission: 'Automatic', fuel: 'Petrol', pricePerDay: 5000, weeklyPrice: 0, monthlyPrice: 0, kmPerDay: 200, extraKmCharge: 50, depositAmount: 0, description: '', mapLink: '', driverOption: 'self_drive', district: '', deliveryOption: 'both', revenueLicenceExpiry: '', insuranceExpiry: '' });
   const [photos, setPhotos] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-
-  // ── profile edit modals
   const [ownerEditOpen, setOwnerEditOpen] = useState(false);
   const [ownerEditData, setOwnerEditData] = useState({ shopName: '', ownerName: '', phone: '', whatsapp: '', city: 'Colombo', bio: '' });
   const [custEditOpen, setCustEditOpen] = useState(false);
   const [custEditData, setCustEditData] = useState({ firstName: '', lastName: '', phone: '', city: 'Colombo' });
   const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
   const [filterDriver, setFilterDriver] = useState('all');
+  const [toast, setToast] = useState<{ msg: string; type: 'ok'|'err' }|null>(null);
 
-  // ── toast
-  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
-  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3200); };
+  const showToast = (msg: string, type: 'ok'|'err' = 'ok') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3200);
+  };
 
-  // ── currency helpers
   const CURRENCIES: Record<string, { rate: number; sign: string; dec: number }> = {
     LKR: { rate: 1, sign: 'Rs.', dec: 0 },
     USD: { rate: 0.0033, sign: '$', dec: 2 },
@@ -605,13 +491,11 @@ export default function Home() {
   };
   const curr = CURRENCIES[currency] ?? CURRENCIES['LKR'];
   const fmt = (p: number) => `${curr.sign} ${(p * curr.rate).toLocaleString(undefined, { minimumFractionDigits: curr.dec, maximumFractionDigits: curr.dec })}`;
-
   const vPrice = (v: any) => v?.price_per_day || v?.pricePerDay || 0;
   const vShop = (v: any) => v?.shop_name || v?.shopName || '';
   const vAvail = (v: any) => v?.isAvailable !== false && v?.is_available !== false;
   const vMap = (v: any) => v?.mapLink || v?.map_link || '';
   const vImg = (v: any) => v?.image || (v?.images?.[0]) || v?.vehicle_photos?.[0]?.storage_url || '';
-
   const platformFee = (amount: number) => Math.round(amount * 0.10);
   const ownerPayout = (amount: number) => Math.round(amount * 0.90);
   const typeIcon = (tp: string) => tp === 'car' ? '🚙' : tp === 'bike' ? '🏍️' : tp === 'van' ? '🚐' : '🛺';
@@ -619,9 +503,7 @@ export default function Home() {
   const statusLabel = (s: string) => s === 'confirmed' ? t.confirmed : s === 'completed' ? t.completed : s === 'cancelled' ? 'Cancelled' : t.pending;
 
   const refreshVehicles = useCallback(async (ownerId?: string) => {
-    const { data: vdata } = await supabase.from('vehicles')
-      .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
-      .eq('is_available', true).order('created_at', { ascending: false });
+    const { data: vdata } = await supabase.from('vehicles').select('*, vehicle_photos(storage_url,sort_order), owners(verified)').eq('is_available', true).order('created_at', { ascending: false });
     if (vdata) setAllVehicles(vdata.map(mapVehicle));
     if (ownerId) {
       const ownerVehicles = await getOwnerVehicles(ownerId);
@@ -633,13 +515,8 @@ export default function Home() {
 
   useEffect(() => {
     trackVisitInDB().catch(() => {});
-    supabase.from('vehicles')
-      .select('*, vehicle_photos(storage_url,sort_order), owners(verified)')
-      .eq('is_available', true)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (data) setAllVehicles(data.map(mapVehicle));
-      }).catch(() => {});
+    supabase.from('vehicles').select('*, vehicle_photos(storage_url,sort_order), owners(verified)').eq('is_available', true).order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setAllVehicles(data.map(mapVehicle)); }).catch(() => {});
     const s = getSession();
     if (s) restoreSession(s.id, s.email, s.role);
   }, []);
@@ -656,26 +533,16 @@ export default function Home() {
   }, [lightbox]);
 
   const VAPID_PUBLIC_KEY = 'BKVdt525L67coH_qx5RDlKIckkmVRPDUTQL5GGNlGeJ0mQl7V7HKYMq9XlmwJfxjhjioQUE7PhFNExdi0oL7V9U';
-
-  const subscribeToPush = async (userId: string, userType: 'owner' | 'customer') => {
+  const subscribeToPush = async (userId: string, userType: 'owner'|'customer') => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') return;
       const existing = await reg.pushManager.getSubscription();
-      const sub = existing || await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: VAPID_PUBLIC_KEY,
-      });
-      await fetch('/api/push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'subscribe', userId, userType, subscription: sub }),
-      });
-    } catch (e) {
-      console.log('Push setup failed:', e);
-    }
+      const sub = existing || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: VAPID_PUBLIC_KEY });
+      await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'subscribe', userId, userType, subscription: sub }) });
+    } catch (e) { console.log('Push setup failed:', e); }
   };
 
   useEffect(() => {
@@ -701,18 +568,14 @@ export default function Home() {
     const channel = supabase.channel(`cust-bookings-${custAcc.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `customer_id=eq.${custAcc.id}` }, (payload) => {
         const updated = payload.new as any;
-        setCustAcc(prev => {
-          if (!prev) return prev;
-          const bookings = (prev.bookings || []).map(b => b.id === updated.id ? updated : b);
-          return { ...prev, bookings };
-        });
+        setCustAcc(prev => { if (!prev) return prev; const bookings = (prev.bookings || []).map(b => b.id === updated.id ? updated : b); return { ...prev, bookings }; });
         if (updated.status === 'confirmed') showToast('✅ Your booking was confirmed!');
         if (updated.status === 'cancelled') showToast('❌ Your booking was cancelled');
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [sessionRole, custAcc?.id]);
 
-  const restoreSession = async (id: string, email: string, role: 'owner' | 'customer') => {
+  const restoreSession = async (id: string, email: string, role: 'owner'|'customer') => {
     if (role === 'owner') {
       const { data } = await supabase.from('owners').select('*').eq('id', id).single();
       if (data) {
@@ -721,8 +584,7 @@ export default function Home() {
         const { data: bdata } = await supabase.from('bookings').select('*').eq('owner_id', id).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
         setSessionEmail(email); setSessionRole('owner');
         setOwnerAcc({ ...data, fleet, bookings: bdata || [] });
-        setOwnerFleet(fleet);
-        setOwnerBookings(bdata || []);
+        setOwnerFleet(fleet); setOwnerBookings(bdata || []);
       }
     } else {
       const { data } = await supabase.from('customers').select('*').eq('id', id).single();
@@ -762,8 +624,7 @@ export default function Home() {
   useEffect(() => {
     if (filterPickup && filterReturn) {
       const d = Math.ceil((new Date(filterReturn).getTime() - new Date(filterPickup).getTime()) / 86400000);
-      if (d > 0) setDays(d);
-      else if (d <= 0) setFilterReturn('');
+      if (d > 0) setDays(d); else if (d <= 0) setFilterReturn('');
     }
   }, [filterPickup, filterReturn]);
 
@@ -776,291 +637,34 @@ export default function Home() {
     }
   }, [days, filterPickup]);
 
-  const resetToHome = () => {
-    setView('home'); setSelectedVehicle(null); setBookingDone(false);
-    setMobileMenuOpen(false); setFilterCity('All Sri Lanka'); setFilterType('all');
-    setFilterPickup(''); setFilterReturn(''); setSelectedBooking(null);
-  };
+  const resetToHome = () => { setView('home'); setSelectedVehicle(null); setBookingDone(false); setMobileMenuOpen(false); setFilterCity('All Sri Lanka'); setFilterType('all'); setFilterPickup(''); setFilterReturn(''); setSelectedBooking(null); };
+  const logout = () => { clearSession(); setSessionEmail(null); setSessionRole(null); setOwnerAcc(null); setCustAcc(null); setOwnerFleet([]); setOwnerBookings([]); resetToHome(); showToast('Logged out'); };
+  const openAuth = (mode: 'owner'|'customer', tab: 'login'|'register' = 'login') => { setAuthMode(mode); setAuthTab(tab); setLoginEmail(''); setLoginPassword(''); setLoginError(''); setRegEmail(''); setRegPassword(''); setRegConfirm(''); setRegFirst(''); setRegLast(''); setRegShop(''); setRegPhone(''); setRegNic(''); setRegLicense(''); setRegIsForeign(false); setRegError(''); setView('auth'); setMobileMenuOpen(false); };
 
-  const logout = () => {
-    clearSession();
-    setSessionEmail(null); setSessionRole(null); setOwnerAcc(null); setCustAcc(null);
-    setOwnerFleet([]); setOwnerBookings([]); resetToHome(); showToast('Logged out');
-  };
-
-  const openAuth = (mode: 'owner' | 'customer', tab: 'login' | 'register' = 'login') => {
-    setAuthMode(mode); setAuthTab(tab);
-    setLoginEmail(''); setLoginPassword(''); setLoginError('');
-    setRegEmail(''); setRegPassword(''); setRegConfirm('');
-    setRegFirst(''); setRegLast(''); setRegShop(''); setRegPhone('');
-    setRegNic(''); setRegLicense(''); setRegIsForeign(false); setRegError('');
-    setView('auth'); setMobileMenuOpen(false);
-  };
-
-  const handleOwnerLogin = async () => {
-    setLoginError('');
-    if (!loginEmail.trim() || !loginPassword.trim()) { setLoginError('Email and password required'); return; }
-    const { data, error } = await loginOwner(loginEmail, loginPassword);
-    if (error || !data) { setLoginError(error || 'Login failed'); return; }
-    saveSession({ id: data.id!, email: data.email, role: 'owner' });
-    await restoreSession(data.id!, data.email, 'owner');
-    setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 👋`);
-  };
-
-  const handleOwnerRegister = async () => {
-    setRegError('');
-    if (!regEmail.trim()) { setRegError('Email required'); return; }
-    if (regPassword.length < 6) { setRegError('Password min 6 chars'); return; }
-    if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; }
-    if (!regShop.trim()) { setRegError('Shop name required'); return; }
-    if (!regPhone.trim()) { setRegError('Phone required'); return; }
-    if (!agreementAccepted) { setRegError('Please accept the Partner Agreement to continue'); return; }
-    const { data, error } = await registerOwner(regEmail, regPassword, {
-      shopName: regShop, ownerName: regFirst + ' ' + regLast,
-      phone: regPhone, whatsapp: regPhone, city: regCity,
-      agreement_accepted: true,
-      agreement_accepted_at: new Date().toISOString(),
-    });
-    if (error || !data) { setRegError(error || 'Registration failed'); return; }
-    saveSession({ id: data.id!, email: data.email, role: 'owner' });
-    setSessionEmail(data.email); setSessionRole('owner');
-    setOwnerAcc({ ...data, fleet: [], bookings: [] }); setOwnerFleet([]); setOwnerBookings([]);
-    setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 🎉`);
-    if (data.phone || data.whatsapp) {
-      const phone = (data.whatsapp || data.phone || '').replace(/\D/g, '').replace(/^0/, '94');
-      const welcomeMsg = `🎉 Welcome to *Drivo LK*, ${data.shop_name}!\n\nYour partner account is ready. Here's what's next:\n\n✅ Add your vehicles at thedrivo.com\n📸 Upload 6 clear photos per vehicle\n💰 You earn *90%* of every booking\n\nNeed help? Reply to this message!\n\n🌐 thedrivo.com`;
-      try {
-        await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }) });
-      } catch { }
-    }
-  };
-
-  const handleCustLogin = async () => {
-    setLoginError('');
-    const { data, error } = await loginCustomer(loginEmail, loginPassword);
-    if (error || !data) { setLoginError(error || 'Login failed'); return; }
-    saveSession({ id: data.id!, email: data.email, role: 'customer' });
-    await restoreSession(data.id!, data.email, 'customer');
-    setView('custDash'); showToast(`Welcome back, ${data.first_name}! 👋`);
-  };
-
-  const handleCustRegister = async () => {
-    setRegError('');
-    if (!regEmail.trim()) { setRegError('Email required'); return; }
-    if (regPassword.length < 6) { setRegError('Password min 6 chars'); return; }
-    if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; }
-    if (!regFirst.trim()) { setRegError('First name required'); return; }
-    if (!regPhone.trim()) { setRegError('Phone required'); return; }
-    if (!regNic.trim()) { setRegError(regIsForeign ? 'Passport number required' : 'NIC number required'); return; }
-    if (!regLicense.trim()) { setRegError(regIsForeign ? 'International driving license required' : 'Driving license number required'); return; }
-    const { data, error } = await registerCustomer(regEmail, regPassword, {
-      firstName: regFirst, lastName: regLast, phone: regPhone, city: regCity,
-      nic: regNic, drivingLicense: regLicense,
-    });
-    if (error || !data) { setRegError(error || 'Registration failed'); return; }
-    saveSession({ id: data.id!, email: data.email, role: 'customer' });
-    setSessionEmail(data.email); setSessionRole('customer');
-    setCustAcc({ ...data, bookings: [] });
-    setView('custDash'); showToast(`Welcome, ${data.first_name}! 🎉`);
-    if (data.phone) {
-      const phone = (data.phone || '').replace(/\D/g, '').replace(/^0/, '94');
-      const welcomeMsg = `👋 Welcome to *Drivo LK*, ${data.first_name}!\n\nSri Lanka's #1 vehicle rental marketplace is ready for you.\n\n🚗 Browse cars, bikes, tuk-tuks & vans\n📍 Find vehicles across all 25 districts\n💰 Best prices, verified owners\n✅ Easy booking in 60 seconds\n\n🌐 thedrivo.com\n\nHappy travels! 🌴`;
-      try {
-        await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }) });
-      } catch { }
-    }
-  };
-
+  const handleOwnerLogin = async () => { setLoginError(''); if (!loginEmail.trim() || !loginPassword.trim()) { setLoginError('Email and password required'); return; } const { data, error } = await loginOwner(loginEmail, loginPassword); if (error || !data) { setLoginError(error || 'Login failed'); return; } saveSession({ id: data.id!, email: data.email, role: 'owner' }); await restoreSession(data.id!, data.email, 'owner'); setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 👋`); };
+  const handleOwnerRegister = async () => { setRegError(''); if (!regEmail.trim()) { setRegError('Email required'); return; } if (regPassword.length < 6) { setRegError('Password min 6 chars'); return; } if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; } if (!regShop.trim()) { setRegError('Shop name required'); return; } if (!regPhone.trim()) { setRegError('Phone required'); return; } if (!agreementAccepted) { setRegError('Please accept the Partner Agreement to continue'); return; } const { data, error } = await registerOwner(regEmail, regPassword, { shopName: regShop, ownerName: regFirst + ' ' + regLast, phone: regPhone, whatsapp: regPhone, city: regCity, agreement_accepted: true, agreement_accepted_at: new Date().toISOString() }); if (error || !data) { setRegError(error || 'Registration failed'); return; } saveSession({ id: data.id!, email: data.email, role: 'owner' }); setSessionEmail(data.email); setSessionRole('owner'); setOwnerAcc({ ...data, fleet: [], bookings: [] }); setOwnerFleet([]); setOwnerBookings([]); setView('ownerDash'); showToast(`Welcome, ${data.shop_name}! 🎉`); if (data.phone || data.whatsapp) { const phone = (data.whatsapp || data.phone || '').replace(/\D/g, '').replace(/^0/, '94'); const welcomeMsg = `🎉 Welcome to *Drivo LK*, ${data.shop_name}!\n\nYour partner account is ready.\n\n✅ Add your vehicles at thedrivo.com\n💰 You earn *90%* of every booking\n\n🌐 thedrivo.com`; try { await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }) }); } catch { } } };
+  const handleCustLogin = async () => { setLoginError(''); const { data, error } = await loginCustomer(loginEmail, loginPassword); if (error || !data) { setLoginError(error || 'Login failed'); return; } saveSession({ id: data.id!, email: data.email, role: 'customer' }); await restoreSession(data.id!, data.email, 'customer'); setView('custDash'); showToast(`Welcome back, ${data.first_name}! 👋`); };
+  const handleCustRegister = async () => { setRegError(''); if (!regEmail.trim()) { setRegError('Email required'); return; } if (regPassword.length < 6) { setRegError('Password min 6 chars'); return; } if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; } if (!regFirst.trim()) { setRegError('First name required'); return; } if (!regPhone.trim()) { setRegError('Phone required'); return; } if (!regNic.trim()) { setRegError(regIsForeign ? 'Passport number required' : 'NIC number required'); return; } if (!regLicense.trim()) { setRegError(regIsForeign ? 'International driving license required' : 'Driving license number required'); return; } const { data, error } = await registerCustomer(regEmail, regPassword, { firstName: regFirst, lastName: regLast, phone: regPhone, city: regCity, nic: regNic, drivingLicense: regLicense }); if (error || !data) { setRegError(error || 'Registration failed'); return; } saveSession({ id: data.id!, email: data.email, role: 'customer' }); setSessionEmail(data.email); setSessionRole('customer'); setCustAcc({ ...data, bookings: [] }); setView('custDash'); showToast(`Welcome, ${data.first_name}! 🎉`); if (data.phone) { const phone = (data.phone || '').replace(/\D/g, '').replace(/^0/, '94'); const welcomeMsg = `👋 Welcome to *Drivo LK*, ${data.first_name}!\n\n🚗 Browse cars, bikes, tuk-tuks & vans\n📍 Find vehicles across all 25 districts\n✅ Easy booking in 60 seconds\n\n🌐 thedrivo.com\n\nHappy travels! 🌴`; try { await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'welcome_whatsapp', phone: `+${phone}`, message: welcomeMsg }) }); } catch { } } };
   const handleLogin = () => authMode === 'owner' ? handleOwnerLogin() : handleCustLogin();
   const handleRegister = () => authMode === 'owner' ? handleOwnerRegister() : handleCustRegister();
 
-  const handleVehicleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newV.name.trim()) { showToast('Vehicle name required!', 'err'); return; }
-    if (!newV.mapLink.trim()) { showToast('📍 Google Maps pickup location is required!', 'err'); return; }
-    if (photos.filter(Boolean).length < 6) { showToast('All 6 photos required!', 'err'); return; }
-    const todayCheck = new Date(); todayCheck.setHours(0, 0, 0, 0);
-    if ((newV as any).revenueLicenceExpiry) {
-      const revExp = new Date((newV as any).revenueLicenceExpiry);
-      if (revExp < todayCheck) { showToast('Revenue Licence is EXPIRED! Renew before listing.', 'err'); return; }
-    }
-    if ((newV as any).insuranceExpiry) {
-      const insExp = new Date((newV as any).insuranceExpiry);
-      if (insExp < todayCheck) { showToast('Insurance is EXPIRED! Renew before listing.', 'err'); return; }
-    }
-    const ownerId = ownerAcc?.id;
-    if (!ownerId) { showToast('Please login again', 'err'); return; }
-    if (editingId) {
-      const { error } = await updateVehicle(editingId, {
-        name: newV.name, type: newV.type as any, transmission: newV.transmission, fuel: newV.fuel,
-        price_per_day: Number(newV.pricePerDay), description: newV.description, map_link: newV.mapLink,
-        driver_option: (newV as any).driverOption || 'self_drive',
-        delivery_option: (newV as any).deliveryOption || 'both',
-        revenue_licence_expiry: (newV as any).revenueLicenceExpiry || null,
-        insurance_expiry: (newV as any).insuranceExpiry || null,
-        weekly_price: Number((newV as any).weeklyPrice) || 0,
-        monthly_price: Number((newV as any).monthlyPrice) || 0,
-        km_per_day: Number((newV as any).kmPerDay) || 200,
-        extra_km_charge: Number((newV as any).extraKmCharge) || 50,
-        deposit_amount: Number((newV as any).depositAmount) || 0,
-      }, photos);
-      if (error) { showToast(error, 'err'); return; }
-      showToast('Vehicle updated ✓');
-    } else {
-      const { id, error } = await addVehicle({
-        owner_id: ownerId, name: newV.name, type: newV.type as any,
-        transmission: newV.transmission, fuel: newV.fuel, price_per_day: Number(newV.pricePerDay),
-        location: (newV as any).district || ownerAcc?.city || 'Colombo',
-        shop_name: ownerAcc?.shop_name || '', description: newV.description, map_link: newV.mapLink,
-      }, photos);
-      if (error || !id) { showToast(error || 'Failed', 'err'); return; }
-      showToast('Vehicle published! 🚀');
-    }
-    await refreshVehicles(ownerId);
-    setNewV({ name: '', type: 'car', transmission: 'Automatic', fuel: 'Petrol', pricePerDay: 5000, weeklyPrice: 0, monthlyPrice: 0, kmPerDay: 200, extraKmCharge: 50, depositAmount: 0, description: '', mapLink: '', driverOption: 'self_drive', district: '', deliveryOption: 'both', revenueLicenceExpiry: '', insuranceExpiry: '' });
-    setPhotos([]); setShowAddForm(false); setEditingId(null);
-  };
+  const handleVehicleSubmit = async (e: React.FormEvent) => { e.preventDefault(); if (!newV.name.trim()) { showToast('Vehicle name required!', 'err'); return; } if (!newV.mapLink.trim()) { showToast('📍 Google Maps pickup location is required!', 'err'); return; } if (photos.filter(Boolean).length < 6) { showToast('All 6 photos required!', 'err'); return; } const todayCheck = new Date(); todayCheck.setHours(0, 0, 0, 0); if ((newV as any).revenueLicenceExpiry) { const revExp = new Date((newV as any).revenueLicenceExpiry); if (revExp < todayCheck) { showToast('Revenue Licence is EXPIRED! Renew before listing.', 'err'); return; } } if ((newV as any).insuranceExpiry) { const insExp = new Date((newV as any).insuranceExpiry); if (insExp < todayCheck) { showToast('Insurance is EXPIRED! Renew before listing.', 'err'); return; } } const ownerId = ownerAcc?.id; if (!ownerId) { showToast('Please login again', 'err'); return; } if (editingId) { const { error } = await updateVehicle(editingId, { name: newV.name, type: newV.type as any, transmission: newV.transmission, fuel: newV.fuel, price_per_day: Number(newV.pricePerDay), description: newV.description, map_link: newV.mapLink, driver_option: (newV as any).driverOption || 'self_drive', delivery_option: (newV as any).deliveryOption || 'both', revenue_licence_expiry: (newV as any).revenueLicenceExpiry || null, insurance_expiry: (newV as any).insuranceExpiry || null, weekly_price: Number((newV as any).weeklyPrice) || 0, monthly_price: Number((newV as any).monthlyPrice) || 0, km_per_day: Number((newV as any).kmPerDay) || 200, extra_km_charge: Number((newV as any).extraKmCharge) || 50, deposit_amount: Number((newV as any).depositAmount) || 0 }, photos); if (error) { showToast(error, 'err'); return; } showToast('Vehicle updated ✓'); } else { const { id, error } = await addVehicle({ owner_id: ownerId, name: newV.name, type: newV.type as any, transmission: newV.transmission, fuel: newV.fuel, price_per_day: Number(newV.pricePerDay), location: (newV as any).district || ownerAcc?.city || 'Colombo', shop_name: ownerAcc?.shop_name || '', description: newV.description, map_link: newV.mapLink }, photos); if (error || !id) { showToast(error || 'Failed', 'err'); return; } showToast('Vehicle published! 🚀'); } await refreshVehicles(ownerId); setNewV({ name: '', type: 'car', transmission: 'Automatic', fuel: 'Petrol', pricePerDay: 5000, weeklyPrice: 0, monthlyPrice: 0, kmPerDay: 200, extraKmCharge: 50, depositAmount: 0, description: '', mapLink: '', driverOption: 'self_drive', district: '', deliveryOption: 'both', revenueLicenceExpiry: '', insuranceExpiry: '' }); setPhotos([]); setShowAddForm(false); setEditingId(null); };
 
-  const toggleAvail = async (id: string) => {
-    const v = ownerFleet.find(v => v.id === id);
-    if (!v) return;
-    const newAvail = !vAvail(v);
-    await toggleVehicleAvailability(id, newAvail);
-    const updated = ownerFleet.map(x => x.id === id ? { ...x, isAvailable: newAvail, is_available: newAvail } : x);
-    setOwnerFleet(updated);
-    const { data: vdata } = await supabase.from('vehicles').select('*, vehicle_photos(storage_url,sort_order), owners(verified)').eq('is_available', true).order('created_at', { ascending: false });
-    if (vdata) setAllVehicles(vdata.map(mapVehicle));
-    showToast(newAvail ? `"${v.name}" is now live!` : `"${v.name}" hidden`);
-  };
-
-  const deleteVehicle = async (id: string) => {
-    if (!confirm('Delete this vehicle?')) return;
-    await dbDeleteVehicle(id);
-    setOwnerFleet(ownerFleet.filter(v => v.id !== id));
-    const { data: vdata } = await supabase.from('vehicles').select('*, vehicle_photos(storage_url,sort_order), owners(verified)').eq('is_available', true).order('created_at', { ascending: false });
-    if (vdata) setAllVehicles(vdata.map(mapVehicle));
-    showToast('Deleted', 'err');
-  };
-
-  const processImg = (file: File) => {
-    if (photos.length >= 5) { showToast('Maximum 5 photos allowed', 'err'); return; }
-    const r = new FileReader();
-    r.onloadend = () => setPhotos(prev => [...prev, r.result as string]);
-    r.readAsDataURL(file);
-  };
+  const toggleAvail = async (id: string) => { const v = ownerFleet.find(v => v.id === id); if (!v) return; const newAvail = !vAvail(v); await toggleVehicleAvailability(id, newAvail); const updated = ownerFleet.map(x => x.id === id ? { ...x, isAvailable: newAvail, is_available: newAvail } : x); setOwnerFleet(updated); const { data: vdata } = await supabase.from('vehicles').select('*, vehicle_photos(storage_url,sort_order), owners(verified)').eq('is_available', true).order('created_at', { ascending: false }); if (vdata) setAllVehicles(vdata.map(mapVehicle)); showToast(newAvail ? `"${v.name}" is now live!` : `"${v.name}" hidden`); };
+  const deleteVehicle = async (id: string) => { if (!confirm('Delete this vehicle?')) return; await dbDeleteVehicle(id); setOwnerFleet(ownerFleet.filter(v => v.id !== id)); const { data: vdata } = await supabase.from('vehicles').select('*, vehicle_photos(storage_url,sort_order), owners(verified)').eq('is_available', true).order('created_at', { ascending: false }); if (vdata) setAllVehicles(vdata.map(mapVehicle)); showToast('Deleted', 'err'); };
   const removePhoto = (idx: number) => setPhotos(prev => prev.filter((_, i) => i !== idx));
-  const movePhoto = (from: number, to: number) => {
-    setPhotos(prev => { const a = [...prev]; const [item] = a.splice(from, 1); a.splice(to, 0, item); return a; });
-  };
+  const bookingAPI = async (action: string, params: Record<string, any>) => { const res = await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...params }) }); return res.json(); };
+  const refreshOwnerBookings = async (ownerId: string) => { const { data } = await supabase.from('bookings').select('*').eq('owner_id', ownerId).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setOwnerBookings(data || []); setOwnerAcc(prev => prev ? { ...prev, bookings: data || [] } : prev); };
+  const updateBookingStatus = async (bookingId: string, status: 'confirmed'|'completed') => { if (status === 'confirmed') { const res = await bookingAPI('accept', { bookingId }); if (res.error) { showToast(res.error, 'err'); return; } if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); await refreshVehicles(ownerAcc?.id); showToast('Booking confirmed! Customer notified via SMS. ✓'); } else { const res = await bookingAPI('complete', { bookingId }); if (res.error) { showToast(res.error, 'err'); return; } if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); await refreshVehicles(ownerAcc?.id); showToast('Rental completed! Vehicle is available again. ✓'); } };
+  const declineBooking = async (bookingId: string) => { const res = await bookingAPI('decline', { bookingId }); if (res.error) { showToast(res.error, 'err'); return; } if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); await refreshVehicles(ownerAcc?.id); showToast('Booking declined. Vehicle is available again.'); };
+  const cancelBooking = async (bookingId: string, role: 'owner'|'customer') => { const msg = role === 'owner' ? 'Cancel this booking? The customer will be notified and the vehicle will become available again.' : 'Cancel this booking? The shop will be notified.'; if (!confirm(msg)) return; const res = await bookingAPI('cancel', { bookingId, ownerId: role === 'owner' ? ownerAcc?.id : null, customerId: role === 'customer' ? custAcc?.id : null }); if (res.error) { showToast(res.error, 'err'); return; } if (role === 'owner') { if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); await refreshVehicles(ownerAcc?.id); } else if (custAcc?.id) { const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev); await refreshVehicles(); } showToast('Booking cancelled. Vehicle is available again.'); };
+  const toggleWishlist = async (vehicleId: string) => { if (sessionRole !== 'customer' || !custAcc?.id) { setLoginPromptOpen(true); return; } const isWishlisted = wishlist.includes(vehicleId); if (isWishlisted) { await supabase.from('wishlist').delete().eq('customer_id', custAcc.id).eq('vehicle_id', vehicleId); setWishlist(prev => prev.filter(id => id !== vehicleId)); showToast('Removed from favourites'); } else { await supabase.from('wishlist').insert({ customer_id: custAcc.id, vehicle_id: vehicleId }); setWishlist(prev => [...prev, vehicleId]); showToast('Saved to favourites ❤️'); } };
+  const submitReview = async () => { if (!reviewModal || !custAcc?.id) return; if (reviewRating < 1 || reviewRating > 5) { showToast('Select a rating', 'err'); return; } const { error } = await supabase.from('reviews').insert({ vehicle_id: reviewModal.vehicleId, customer_id: custAcc.id, booking_id: reviewModal.bookingId, owner_id: allVehicles.find(v => v.id === reviewModal.vehicleId)?.owner_id, rating: reviewRating, comment: reviewComment.trim() }); if (error) { showToast('Review failed: ' + error.message, 'err'); return; } const { data: reviews } = await supabase.from('reviews').select('rating').eq('vehicle_id', reviewModal.vehicleId); if (reviews && reviews.length > 0) { const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length; await supabase.from('vehicles').update({ rating: Math.round(avg * 10) / 10 }).eq('id', reviewModal.vehicleId); } setReviewModal(null); setReviewRating(5); setReviewComment(''); showToast('Review submitted! Thank you 🌟'); };
 
-  const bookingAPI = async (action: string, params: Record<string, any>) => {
-    const res = await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...params }) });
-    return res.json();
-  };
+  useEffect(() => { if (!selectedVehicle) return; const dOpt = (selectedVehicle as any).delivery_option || 'both'; if (dOpt === 'pickup_only') setDeliveryType('pickup'); if (dOpt === 'delivery_only') setDeliveryType('delivery'); }, [selectedVehicle]);
+  useEffect(() => { if (rentalPeriod === 'weekly' && days < 7) setDays(7); if (rentalPeriod === 'monthly' && days < 28) setDays(28); if (rentalPeriod === 'daily' && days > 6) setDays(1); }, [rentalPeriod]);
 
-  const refreshOwnerBookings = async (ownerId: string) => {
-    const { data } = await supabase.from('bookings').select('*').eq('owner_id', ownerId).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
-    setOwnerBookings(data || []);
-    setOwnerAcc(prev => prev ? { ...prev, bookings: data || [] } : prev);
-  };
-
-  const updateBookingStatus = async (bookingId: string, status: 'confirmed' | 'completed') => {
-    if (status === 'confirmed') {
-      const res = await bookingAPI('accept', { bookingId });
-      if (res.error) { showToast(res.error, 'err'); return; }
-      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
-      await refreshVehicles(ownerAcc?.id);
-      showToast('Booking confirmed! Customer notified via SMS. ✓');
-    } else {
-      const res = await bookingAPI('complete', { bookingId });
-      if (res.error) { showToast(res.error, 'err'); return; }
-      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
-      await refreshVehicles(ownerAcc?.id);
-      showToast('Rental completed! Vehicle is available again. ✓');
-    }
-  };
-
-  const declineBooking = async (bookingId: string) => {
-    const res = await bookingAPI('decline', { bookingId });
-    if (res.error) { showToast(res.error, 'err'); return; }
-    if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
-    await refreshVehicles(ownerAcc?.id);
-    showToast('Booking declined. Vehicle is available again.');
-  };
-
-  const cancelBooking = async (bookingId: string, role: 'owner' | 'customer') => {
-    const msg = role === 'owner'
-      ? 'Cancel this booking? The customer will be notified and the vehicle will become available again.'
-      : 'Cancel this booking? The shop will be notified.';
-    if (!confirm(msg)) return;
-    const res = await bookingAPI('cancel', {
-      bookingId,
-      ownerId: role === 'owner' ? ownerAcc?.id : null,
-      customerId: role === 'customer' ? custAcc?.id : null,
-    });
-    if (res.error) { showToast(res.error, 'err'); return; }
-    if (role === 'owner') {
-      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
-      await refreshVehicles(ownerAcc?.id);
-    } else if (custAcc?.id) {
-      const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
-      setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev);
-      await refreshVehicles();
-    }
-    showToast('Booking cancelled. Vehicle is available again.');
-  };
-
-  const toggleWishlist = async (vehicleId: string) => {
-    if (sessionRole !== 'customer' || !custAcc?.id) { setLoginPromptOpen(true); return; }
-    const isWishlisted = wishlist.includes(vehicleId);
-    if (isWishlisted) {
-      await supabase.from('wishlist').delete().eq('customer_id', custAcc.id).eq('vehicle_id', vehicleId);
-      setWishlist(prev => prev.filter(id => id !== vehicleId));
-      showToast('Removed from favourites');
-    } else {
-      await supabase.from('wishlist').insert({ customer_id: custAcc.id, vehicle_id: vehicleId });
-      setWishlist(prev => [...prev, vehicleId]);
-      showToast('Saved to favourites ❤️');
-    }
-  };
-
-  const submitReview = async () => {
-    if (!reviewModal || !custAcc?.id) return;
-    if (reviewRating < 1 || reviewRating > 5) { showToast('Select a rating', 'err'); return; }
-    const { error } = await supabase.from('reviews').insert({
-      vehicle_id: reviewModal.vehicleId, customer_id: custAcc.id, booking_id: reviewModal.bookingId,
-      owner_id: allVehicles.find(v => v.id === reviewModal.vehicleId)?.owner_id,
-      rating: reviewRating, comment: reviewComment.trim(),
-    });
-    if (error) { showToast('Review failed: ' + error.message, 'err'); return; }
-    const { data: reviews } = await supabase.from('reviews').select('rating').eq('vehicle_id', reviewModal.vehicleId);
-    if (reviews && reviews.length > 0) {
-      const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
-      await supabase.from('vehicles').update({ rating: Math.round(avg * 10) / 10 }).eq('id', reviewModal.vehicleId);
-    }
-    setReviewModal(null); setReviewRating(5); setReviewComment('');
-    showToast('Review submitted! Thank you 🌟');
-  };
-
-  useEffect(() => {
-    if (!selectedVehicle) return;
-    const dOpt = (selectedVehicle as any).delivery_option || 'both';
-    if (dOpt === 'pickup_only') setDeliveryType('pickup');
-    if (dOpt === 'delivery_only') setDeliveryType('delivery');
-  }, [selectedVehicle]);
-
-  useEffect(() => {
-    if (rentalPeriod === 'weekly' && days < 7) setDays(7);
-    if (rentalPeriod === 'monthly' && days < 28) setDays(28);
-    if (rentalPeriod === 'daily' && days > 6) setDays(1);
-  }, [rentalPeriod]);
-
-  const getPeriodPrice = (v: any) => {
-    if (rentalPeriod === 'weekly' && v?.weekly_price > 0) return { price: v.weekly_price, unit: 'week', mult: 7 };
-    if (rentalPeriod === 'monthly' && v?.monthly_price > 0) return { price: v.monthly_price, unit: 'month', mult: 28 };
-    return { price: v?.price_per_day || v?.pricePerDay || 0, unit: 'day', mult: 1 };
-  };
-
+  const getPeriodPrice = (v: any) => { if (rentalPeriod === 'weekly' && v?.weekly_price > 0) return { price: v.weekly_price, unit: 'week', mult: 7 }; if (rentalPeriod === 'monthly' && v?.monthly_price > 0) return { price: v.monthly_price, unit: 'month', mult: 28 }; return { price: v?.price_per_day || v?.pricePerDay || 0, unit: 'day', mult: 1 }; };
   const periodInfo = selectedVehicle ? getPeriodPrice(selectedVehicle) : { price: 0, unit: 'day', mult: 1 };
   const periodsCount = rentalPeriod === 'daily' ? days : rentalPeriod === 'weekly' ? Math.ceil(days / 7) : Math.ceil(days / 28);
   const base = periodInfo.price * periodsCount;
@@ -1070,76 +674,13 @@ export default function Home() {
   const platformFeeAmt = Math.round(total * 0.10);
   const ownerPayoutAmt = total - platformFeeAmt;
 
-  const confirmBooking = async () => {
-    if (!selectedVehicle || bookingLoading) return;
-    if (sessionRole !== 'customer') { setLoginPromptOpen(true); return; }
-    setBookingLoading(true);
-    const today = new Date().toISOString().split('T')[0];
-    const bookingData = {
-      vehicle_id: selectedVehicle.id, owner_id: selectedVehicle.owner_id,
-      customer_id: sessionRole === 'customer' ? custAcc?.id : undefined,
-      vehicle_name: selectedVehicle.name || '', vehicle_img: selectedVehicle.image || '',
-      shop_name: vShop(selectedVehicle) || '', location: selectedVehicle.location || '',
-      pickup_date: filterPickup || today, return_date: filterReturn || today,
-      pickup_time: pickupTime, days, delivery_type: deliveryType,
-      price_per_day: vPrice(selectedVehicle) || 0, total, status: 'pending',
-    };
-    const res = await bookingAPI('create', {
-      booking: bookingData, vehicleId: selectedVehicle.id,
-      customerId: sessionRole === 'customer' ? custAcc?.id : null,
-      ownerId: selectedVehicle.owner_id,
-    });
-    if (res.error) {
-      showToast(res.error === 'Vehicle no longer available' ? 'Sorry, this vehicle was just booked by someone else!' : 'Booking failed. Please try again.', 'err');
-      setBookingLoading(false); setView('home'); setSelectedVehicle(null);
-      await refreshVehicles(); return;
-    }
-    if (sessionRole === 'customer' && custAcc?.id) {
-      const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
-      setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev);
-    }
-    await refreshVehicles();
-    await trackBookingInDB().catch(() => {});
-    setBookingLoading(false);
-    setBookingDone(true);
-  };
-
-  // NOTE: ══════════════════════════════════════════════════════════
-  // RENDER SECTION STARTS HERE — copy your existing RENDER section
-  // (from "return (" to end of file) and paste below this line.
-  // In the AUTH PAGE section, make these 2 changes:
-  //
-  // CHANGE 1: Add forgot/verify tabs handling in the tabs row:
-  //   Only show login/register tabs when NOT in forgot/verify mode
-  //
-  // CHANGE 2: Add forgot/verify form rendering after register block
-  //
-  // CHANGE 3: In ownerEditOpen modal, add <ChangePasswordForm> before save button
-  // CHANGE 4: In custEditOpen modal, add <ChangePasswordForm> before save button
-  //
-  // See Part 2 file for the complete updated RENDER section.
-  // ══════════════════════════════════════════════════════════════
+  const confirmBooking = async () => { if (!selectedVehicle || bookingLoading) return; if (sessionRole !== 'customer') { setLoginPromptOpen(true); return; } setBookingLoading(true); const today = new Date().toISOString().split('T')[0]; const bookingData = { vehicle_id: selectedVehicle.id, owner_id: selectedVehicle.owner_id, customer_id: sessionRole === 'customer' ? custAcc?.id : undefined, vehicle_name: selectedVehicle.name || '', vehicle_img: selectedVehicle.image || '', shop_name: vShop(selectedVehicle) || '', location: selectedVehicle.location || '', pickup_date: filterPickup || today, return_date: filterReturn || today, pickup_time: pickupTime, days, delivery_type: deliveryType, price_per_day: vPrice(selectedVehicle) || 0, total, status: 'pending' }; const res = await bookingAPI('create', { booking: bookingData, vehicleId: selectedVehicle.id, customerId: sessionRole === 'customer' ? custAcc?.id : null, ownerId: selectedVehicle.owner_id }); if (res.error) { showToast(res.error === 'Vehicle no longer available' ? 'Sorry, this vehicle was just booked by someone else!' : 'Booking failed. Please try again.', 'err'); setBookingLoading(false); setView('home'); setSelectedVehicle(null); await refreshVehicles(); return; } if (sessionRole === 'customer' && custAcc?.id) { const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev); } await refreshVehicles(); await trackBookingInDB().catch(() => {}); setBookingLoading(false); setBookingDone(true); };
 
   return (
-    // PASTE YOUR EXISTING RENDER SECTION HERE
-    // Then make the 4 small changes described above
-    <div>Placeholder — paste render section from Part 2</div>
-  );
-}
-  // ══════════════════════════════════════════════════════════════════
-  //  RENDER
-  // ══════════════════════════════════════════════════════════════════
-  return (
-    <main dir={t.dir} className={`min-h-screen bg-slate-50 text-slate-800 antialiased font-sans ${t.dir==='rtl'?'text-right':''}`}>
+    <main dir={t.dir} className={`min-h-screen bg-slate-50 text-slate-800 antialiased font-sans ${t.dir === 'rtl' ? 'text-right' : ''}`}>
+      {toast && (<div className={`fixed top-4 right-4 z-[200] px-5 py-3 rounded-xl text-sm font-bold shadow-2xl ${toast.type === 'ok' ? 'bg-slate-900 text-white' : 'bg-red-500 text-white'}`}>{toast.msg}</div>)}
 
-      {/* TOAST */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-[200] px-5 py-3 rounded-xl text-sm font-bold shadow-2xl ${toast.type==='ok'?'bg-slate-900 text-white':'bg-red-500 text-white'}`}>
-          {toast.msg}
-        </div>
-      )}
-
-      {/* ══ NAV ══ */}
+      {/* NAV */}
       <nav className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
           <button onClick={resetToHome} className="flex items-center gap-2 focus:outline-none flex-shrink-0">
@@ -1148,46 +689,27 @@ export default function Home() {
             <span className="hidden sm:block text-[9px] bg-slate-900 text-white font-black px-1.5 py-0.5 rounded uppercase">LK</span>
           </button>
           <div className="hidden md:flex items-center gap-5 text-sm font-semibold text-slate-500">
-            <button onClick={()=>{ resetToHome(); setRentalPeriod('daily'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod==='daily'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.dailyRentals}</button>
-            <button onClick={()=>{ resetToHome(); setRentalPeriod('weekly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod==='weekly'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.monthly}</button>
-            <button onClick={()=>{ resetToHome(); setRentalPeriod('monthly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod==='monthly'?'text-slate-900 border-b-2 border-slate-900':''}`}>{t.longterm}</button>
+            <button onClick={() => { resetToHome(); setRentalPeriod('daily'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod === 'daily' ? 'text-slate-900 border-b-2 border-slate-900' : ''}`}>{t.dailyRentals}</button>
+            <button onClick={() => { resetToHome(); setRentalPeriod('weekly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod === 'weekly' ? 'text-slate-900 border-b-2 border-slate-900' : ''}`}>{t.monthly}</button>
+            <button onClick={() => { resetToHome(); setRentalPeriod('monthly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod === 'monthly' ? 'text-slate-900 border-b-2 border-slate-900' : ''}`}>{t.longterm}</button>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <select value={lang} onChange={e=>setLang(e.target.value as LangKey)} className="bg-slate-100 text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer">
-              <option value="EN">🇬🇧 EN</option>
-              <option value="SI">🇱🇰 සිං</option>
-              <option value="RU">🇷🇺 RU</option>
-              <option value="DE">🇩🇪 DE</option>
-              <option value="FR">🇫🇷 FR</option>
-              <option value="AR">🇦🇪 AR</option>
+            <select value={lang} onChange={e => setLang(e.target.value as LangKey)} className="bg-slate-100 text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer">
+              <option value="EN">🇬🇧 EN</option><option value="SI">🇱🇰 සිං</option><option value="RU">🇷🇺 RU</option><option value="DE">🇩🇪 DE</option><option value="FR">🇫🇷 FR</option><option value="AR">🇦🇪 AR</option>
             </select>
-            <select value={currency} onChange={e=>setCurrency(e.target.value)} className="bg-slate-100 text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer">
-              <option value="LKR">🇱🇰 LKR</option>
-              <option value="USD">🇺🇸 USD</option>
-              <option value="EUR">🇪🇺 EUR</option>
-              <option value="GBP">🇬🇧 GBP</option>
-              <option value="RUB">🇷🇺 RUB</option>
-              <option value="AED">🇦🇪 AED</option>
+            <select value={currency} onChange={e => setCurrency(e.target.value)} className="bg-slate-100 text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer">
+              <option value="LKR">🇱🇰 LKR</option><option value="USD">🇺🇸 USD</option><option value="EUR">🇪🇺 EUR</option><option value="GBP">🇬🇧 GBP</option><option value="RUB">🇷🇺 RUB</option><option value="AED">🇦🇪 AED</option>
             </select>
-            <button className="md:hidden p-2 rounded-lg hover:bg-slate-100" onClick={()=>setMobileMenuOpen(!mobileMenuOpen)}>
+            <button className="md:hidden p-2 rounded-lg hover:bg-slate-100" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
               <span className="block w-5 h-0.5 bg-slate-700 mb-1"/><span className="block w-5 h-0.5 bg-slate-700 mb-1"/><span className="block w-5 h-0.5 bg-slate-700"/>
             </button>
             <div className="hidden md:flex items-center gap-2">
-              {sessionRole==='owner' ? (
-                <>
-                  <button onClick={()=>setView('ownerDash')} className={`text-xs font-black px-3 py-2 rounded-xl border transition ${view==='ownerDash'?'bg-slate-900 text-white border-slate-900':'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{t.ownerDashboard}</button>
-                  <button onClick={logout} className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-red-500 transition">{t.logOut}</button>
-                </>
-              ) : sessionRole==='customer' ? (
-                <>
-                  <button onClick={()=>setView('custDash')} className={`text-xs font-black px-3 py-2 rounded-xl border transition ${view==='custDash'?'bg-slate-900 text-white border-slate-900':'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{t.myDashboard}</button>
-                  <button onClick={logout} className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-red-500 transition">{t.logOut}</button>
-                </>
+              {sessionRole === 'owner' ? (
+                <><button onClick={() => setView('ownerDash')} className={`text-xs font-black px-3 py-2 rounded-xl border transition ${view === 'ownerDash' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{t.ownerDashboard}</button><button onClick={logout} className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-red-500 transition">{t.logOut}</button></>
+              ) : sessionRole === 'customer' ? (
+                <><button onClick={() => setView('custDash')} className={`text-xs font-black px-3 py-2 rounded-xl border transition ${view === 'custDash' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{t.myDashboard}</button><button onClick={logout} className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-red-500 transition">{t.logOut}</button></>
               ) : (
-                <>
-                  <button onClick={()=>openAuth('customer')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition">🚗 Rent a Vehicle</button>
-                  <button onClick={()=>openAuth('owner')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 transition">{t.partnerLogin}</button>
-                </>
+                <><button onClick={() => openAuth('customer')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition">🚗 Rent a Vehicle</button><button onClick={() => openAuth('owner')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 transition">{t.partnerLogin}</button></>
               )}
             </div>
           </div>
@@ -1195,303 +717,206 @@ export default function Home() {
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-t border-slate-100 px-4 py-3 space-y-2 shadow-md">
             {sessionRole ? (
-              <>
-                <button onClick={()=>{ setView(sessionRole==='owner'?'ownerDash':'custDash'); setMobileMenuOpen(false); }} className="w-full py-2.5 text-sm font-black bg-slate-900 text-white rounded-xl">{t.myDashboard}</button>
-                <button onClick={logout} className="w-full py-2 text-sm font-bold text-red-500">{t.logOut}</button>
-              </>
+              <><button onClick={() => { setView(sessionRole === 'owner' ? 'ownerDash' : 'custDash'); setMobileMenuOpen(false); }} className="w-full py-2.5 text-sm font-black bg-slate-900 text-white rounded-xl">{t.myDashboard}</button><button onClick={logout} className="w-full py-2 text-sm font-bold text-red-500">{t.logOut}</button></>
             ) : (
-              <>
-                <button onClick={()=>openAuth('customer')} className="w-full py-2.5 text-sm font-bold bg-slate-100 rounded-xl">🚗 Rent a Vehicle</button>
-                <button onClick={()=>openAuth('owner')} className="w-full py-2.5 text-sm font-black bg-slate-900 text-white rounded-xl">{t.partnerLogin}</button>
-              </>
+              <><button onClick={() => openAuth('customer')} className="w-full py-2.5 text-sm font-bold bg-slate-100 rounded-xl">🚗 Rent a Vehicle</button><button onClick={() => openAuth('owner')} className="w-full py-2.5 text-sm font-black bg-slate-900 text-white rounded-xl">{t.partnerLogin}</button></>
             )}
           </div>
         )}
       </nav>
 
-
-      {/* ══ AGREEMENT MODAL ══ */}
+      {/* AGREEMENT MODAL */}
       {showAgreementModal && (
         <div className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center px-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b bg-slate-900">
-              <div>
-                <h3 className="font-black text-white text-lg">Drivo LK Partner Agreement</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Please read carefully before accepting</p>
-              </div>
-              <button onClick={()=>setShowAgreementModal(false)} className="text-slate-400 hover:text-white text-2xl">×</button>
+              <div><h3 className="font-black text-white text-lg">Drivo LK Partner Agreement</h3><p className="text-xs text-slate-400 mt-0.5">Please read carefully before accepting</p></div>
+              <button onClick={() => setShowAgreementModal(false)} className="text-slate-400 hover:text-white text-2xl">×</button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 text-sm text-slate-700 space-y-4">
               {[
-                ['1. Platform Relationship', 'Drivo LK operates as a marketplace connecting vehicle rental partners with customers. We do not own or operate vehicles. Partners are solely responsible for their vehicles and customer interactions.'],
-                ['2. Commission & Platform Fee', 'Drivo LK charges 10% on the total booking value. Partners receive 90% of each booking. Example: Rs. 10,000 booking = Rs. 1,000 to Drivo + Rs. 9,000 to Partner.'],
-                ['3. Vehicle Standards', 'All vehicles must have valid Revenue Licence, Insurance, and all legally required documents. Partners must keep documents updated on the platform. Vehicles must be clean and roadworthy.'],
-                ['4. Partner Responsibilities', 'Respond to bookings within 24 hours. Honor confirmed bookings. Verify customer driving licence. Provide accurate vehicle info and photos. Maintain minimum 3.5/5 rating.'],
-                ['5. Customer Protection', 'No hidden fees beyond listed prices. Pickup location shared only after booking. Disputes to be resolved in good faith.'],
-                ['6. Liability', 'Drivo LK is not liable for accidents, damages, or losses during rental. Partners must maintain adequate insurance coverage.'],
-                ['7. Termination', 'Either party may terminate with 14 days notice. Drivo may immediately suspend accounts for false information, expired documents, or repeated complaints.'],
-                ['8. Governing Law', 'This agreement is governed by the laws of Sri Lanka. Disputes are subject to Sri Lankan courts.'],
+                ['1. Platform Relationship','Drivo LK operates as a marketplace connecting vehicle rental partners with customers. We do not own or operate vehicles. Partners are solely responsible for their vehicles and customer interactions.'],
+                ['2. Commission & Platform Fee','Drivo LK charges 10% on the total booking value. Partners receive 90% of each booking. Example: Rs. 10,000 booking = Rs. 1,000 to Drivo + Rs. 9,000 to Partner.'],
+                ['3. Vehicle Standards','All vehicles must have valid Revenue Licence, Insurance, and all legally required documents. Partners must keep documents updated on the platform. Vehicles must be clean and roadworthy.'],
+                ['4. Partner Responsibilities','Respond to bookings within 24 hours. Honor confirmed bookings. Verify customer driving licence. Provide accurate vehicle info and photos. Maintain minimum 3.5/5 rating.'],
+                ['5. Customer Protection','No hidden fees beyond listed prices. Pickup location shared only after booking. Disputes to be resolved in good faith.'],
+                ['6. Liability','Drivo LK is not liable for accidents, damages, or losses during rental. Partners must maintain adequate insurance coverage.'],
+                ['7. Termination','Either party may terminate with 14 days notice. Drivo may immediately suspend accounts for false information, expired documents, or repeated complaints.'],
+                ['8. Governing Law','This agreement is governed by the laws of Sri Lanka. Disputes are subject to Sri Lankan courts.'],
               ].map(([title, text]) => (
-                <div key={title}>
-                  <p className="font-black text-slate-900 mb-1">{title}</p>
-                  <p className="text-slate-600 leading-relaxed">{text}</p>
-                </div>
+                <div key={title}><p className="font-black text-slate-900 mb-1">{title}</p><p className="text-slate-600 leading-relaxed">{text}</p></div>
               ))}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4">
-                <p className="text-xs font-black text-amber-700 uppercase tracking-wide mb-1">Important</p>
-                <p className="text-sm text-amber-700">A full legally binding agreement document is available from Drivo LK for physical signing. Contact admin@drivo.lk to obtain the complete document.</p>
-              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4"><p className="text-xs font-black text-amber-700 uppercase tracking-wide mb-1">Important</p><p className="text-sm text-amber-700">A full legally binding agreement document is available from Drivo LK for physical signing. Contact admin@drivo.lk to obtain the complete document.</p></div>
             </div>
             <div className="px-6 py-4 border-t bg-slate-50 flex gap-3">
-              <button onClick={()=>setShowAgreementModal(false)} className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-sm transition">Close</button>
-              <button onClick={()=>{ setAgreementAccepted(true); setShowAgreementModal(false); }}
-                className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase transition">
-                ✓ I Accept These Terms
-              </button>
+              <button onClick={() => setShowAgreementModal(false)} className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-black text-sm transition">Close</button>
+              <button onClick={() => { setAgreementAccepted(true); setShowAgreementModal(false); }} className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase transition">✓ I Accept These Terms</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ LIGHTBOX MODAL ══ */}
+      {/* LIGHTBOX */}
       {lightbox && (
-        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center"
-          onClick={()=>setLightbox(null)}>
-          {/* Close */}
-          <button onClick={()=>setLightbox(null)}
-            className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-xl font-black transition z-10">
-            ×
-          </button>
-          {/* Counter */}
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-bold">
-            {lightbox.idx + 1} / {lightbox.imgs.length}
-          </div>
-          {/* Prev button */}
-          {lightbox.imgs.length > 1 && (
-            <button onClick={e=>{e.stopPropagation();setLightbox(p=>p?{...p,idx:(p.idx-1+p.imgs.length)%p.imgs.length}:null)}}
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center text-2xl font-black transition z-10">
-              ‹
-            </button>
-          )}
-          {/* Main image */}
-          <img src={lightbox.imgs[lightbox.idx]} alt=""
-            className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl"
-            onClick={e=>e.stopPropagation()}/>
-          {/* Next button */}
-          {lightbox.imgs.length > 1 && (
-            <button onClick={e=>{e.stopPropagation();setLightbox(p=>p?{...p,idx:(p.idx+1)%p.imgs.length}:null)}}
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center text-2xl font-black transition z-10">
-              ›
-            </button>
-          )}
-          {/* Thumbnail strip */}
-          {lightbox.imgs.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 overflow-x-auto max-w-[90vw] pb-1">
-              {lightbox.imgs.map((img,i)=>(
-                <button key={i} onClick={e=>{e.stopPropagation();setLightbox(p=>p?{...p,idx:i}:null)}}
-                  className={`flex-shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition ${lightbox.idx===i?'border-white':'border-white/20 hover:border-white/60'}`}>
-                  <img src={img} className="w-full h-full object-cover" alt=""/>
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center" onClick={() => setLightbox(null)}>
+          <button onClick={() => setLightbox(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-xl font-black transition z-10">×</button>
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-bold">{lightbox.idx + 1} / {lightbox.imgs.length}</div>
+          {lightbox.imgs.length > 1 && (<button onClick={e => { e.stopPropagation(); setLightbox(p => p ? { ...p, idx: (p.idx - 1 + p.imgs.length) % p.imgs.length } : null); }} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center text-2xl font-black transition z-10">‹</button>)}
+          <img src={lightbox.imgs[lightbox.idx]} alt="" className="max-w-[90vw] max-h-[85vh] object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()}/>
+          {lightbox.imgs.length > 1 && (<button onClick={e => { e.stopPropagation(); setLightbox(p => p ? { ...p, idx: (p.idx + 1) % p.imgs.length } : null); }} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center text-2xl font-black transition z-10">›</button>)}
+          {lightbox.imgs.length > 1 && (<div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 overflow-x-auto max-w-[90vw] pb-1">{lightbox.imgs.map((img, i) => (<button key={i} onClick={e => { e.stopPropagation(); setLightbox(p => p ? { ...p, idx: i } : null); }} className={`flex-shrink-0 w-14 h-10 rounded-lg overflow-hidden border-2 transition ${lightbox.idx === i ? 'border-white' : 'border-white/20 hover:border-white/60'}`}><img src={img} className="w-full h-full object-cover" alt=""/></button>))}</div>)}
         </div>
       )}
 
-      {/* ══ REVIEW MODAL ══ */}
+      {/* REVIEW MODAL */}
       {reviewModal && (
         <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center px-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="bg-slate-900 px-6 py-5 text-center">
-              <p className="text-2xl mb-1">⭐</p>
-              <h2 className="text-white text-lg font-black">Rate Your Ride</h2>
-              <p className="text-slate-400 text-xs mt-1">{reviewModal.vehicleName}</p>
-            </div>
+            <div className="bg-slate-900 px-6 py-5 text-center"><p className="text-2xl mb-1">⭐</p><h2 className="text-white text-lg font-black">Rate Your Ride</h2><p className="text-slate-400 text-xs mt-1">{reviewModal.vehicleName}</p></div>
             <div className="p-6 space-y-4">
-              <div>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 text-center">Your Rating</p>
-                <div className="flex justify-center gap-2">
-                  {[1,2,3,4,5].map(star=>(
-                    <button key={star} onClick={()=>setReviewRating(star)}
-                      className={`text-3xl transition-transform hover:scale-110 ${star <= reviewRating ? '' : 'opacity-30'}`}>
-                      ⭐
-                    </button>
-                  ))}
-                </div>
-                <p className="text-center text-xs font-bold text-slate-500 mt-2">
-                  {reviewRating === 1 ? 'Poor' : reviewRating === 2 ? 'Fair' : reviewRating === 3 ? 'Good' : reviewRating === 4 ? 'Very Good' : 'Excellent!'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">Comment (optional)</label>
-                <textarea rows={3} placeholder="Tell others about your experience..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition resize-none"
-                  value={reviewComment} onChange={e=>setReviewComment(e.target.value)}/>
-              </div>
-              <button onClick={submitReview}
-                className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase tracking-wide transition">
-                Submit Review 🌟
-              </button>
-              <button onClick={()=>setReviewModal(null)}
-                className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">
-                Cancel
-              </button>
+              <div><p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 text-center">Your Rating</p><div className="flex justify-center gap-2">{[1,2,3,4,5].map(star => (<button key={star} onClick={() => setReviewRating(star)} className={`text-3xl transition-transform hover:scale-110 ${star <= reviewRating ? '' : 'opacity-30'}`}>⭐</button>))}</div><p className="text-center text-xs font-bold text-slate-500 mt-2">{reviewRating === 1 ? 'Poor' : reviewRating === 2 ? 'Fair' : reviewRating === 3 ? 'Good' : reviewRating === 4 ? 'Very Good' : 'Excellent!'}</p></div>
+              <div><label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">Comment (optional)</label><textarea rows={3} placeholder="Tell others about your experience..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition resize-none" value={reviewComment} onChange={e => setReviewComment(e.target.value)}/></div>
+              <button onClick={submitReview} className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase tracking-wide transition">Submit Review 🌟</button>
+              <button onClick={() => setReviewModal(null)} className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ LOGIN PROMPT MODAL (shown when guest tries to book) ══ */}
+      {/* LOGIN PROMPT MODAL */}
       {loginPromptOpen && (
         <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center px-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="bg-slate-900 px-6 py-6 text-center">
-              <DrivoLogo className="w-10 h-10 mx-auto mb-2"/>
-              <h2 className="text-white text-xl font-black">Login Required</h2>
-              <p className="text-slate-400 text-xs mt-1">You need an account to book a vehicle</p>
-            </div>
+            <div className="bg-slate-900 px-6 py-6 text-center"><DrivoLogo className="w-10 h-10 mx-auto mb-2"/><h2 className="text-white text-xl font-black">Login Required</h2><p className="text-slate-400 text-xs mt-1">You need an account to book a vehicle</p></div>
             <div className="p-6 space-y-3">
-              <button onClick={()=>{ setLoginPromptOpen(false); openAuth('customer','login'); }}
-                className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase tracking-wide transition shadow-md">
-                🔑 Sign In to My Account
-              </button>
-              <button onClick={()=>{ setLoginPromptOpen(false); openAuth('customer','register'); }}
-                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm uppercase tracking-wide transition">
-                ✨ Create New Account
-              </button>
-              <p className="text-center text-[11px] text-slate-400 pt-1">
-                Free account · Takes 1 minute · NIC &amp; license required
-              </p>
-              <button onClick={()=>setLoginPromptOpen(false)}
-                className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">
-                Cancel
-              </button>
+              <button onClick={() => { setLoginPromptOpen(false); openAuth('customer', 'login'); }} className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase tracking-wide transition shadow-md">🔑 Sign In to My Account</button>
+              <button onClick={() => { setLoginPromptOpen(false); openAuth('customer', 'register'); }} className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm uppercase tracking-wide transition">✨ Create New Account</button>
+              <p className="text-center text-[11px] text-slate-400 pt-1">Free account · Takes 1 minute · NIC &amp; license required</p>
+              <button onClick={() => setLoginPromptOpen(false)} className="w-full py-2.5 text-slate-400 hover:text-slate-700 text-sm font-semibold transition">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ══ AUTH PAGE ══ */}
-      {view==='auth' && (
+      {/* AUTH PAGE */}
+      {view === 'auth' && (
         <div className="min-h-[calc(100vh-64px)] bg-slate-100 flex items-center justify-center px-4 py-12">
           <div className="w-full max-w-[460px]">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
               <div className="bg-slate-900 px-8 py-8 text-center">
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  <DrivoLogo className="w-9 h-9"/>
-                  <span className="text-white font-black text-xl">drivo</span>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ml-1 ${authMode==='owner'?'bg-emerald-500 text-slate-900':'bg-blue-400 text-white'}`}>{authMode==='owner'?'Partner':'Customer'}</span>
-                </div>
-                <h2 className="text-white text-2xl font-black">{authTab==='login'?t.welcomeBack:(authMode==='owner'?t.createShop:t.register)}</h2>
-                <p className="text-slate-400 text-sm mt-1">{authTab==='login'?(authMode==='owner'?t.manageFleet:t.myBookings):t.startListing}</p>
-                <div className="flex gap-2 mt-4 justify-center">
-                  {(['customer','owner'] as const).map(role=>(
-                    <button key={role} onClick={()=>setAuthMode(role)} className={`text-xs font-black px-4 py-1.5 rounded-full transition border ${authMode===role?'bg-white text-slate-900 border-white':'border-white/30 text-white/70 hover:border-white/60'}`}>
-                      {role==='owner'?'🔑 '+t.partnerLogin:'👤 '+t.customerLogin}
+                <div className="flex items-center justify-center gap-2 mb-3"><DrivoLogo className="w-9 h-9"/><span className="text-white font-black text-xl">drivo</span><span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ml-1 ${authMode === 'owner' ? 'bg-emerald-500 text-slate-900' : 'bg-blue-400 text-white'}`}>{authMode === 'owner' ? 'Partner' : 'Customer'}</span></div>
+                <h2 className="text-white text-2xl font-black">{authTab === 'login' ? t.welcomeBack : authTab === 'forgot' ? 'Reset Password' : authTab === 'verify' ? 'Enter OTP' : (authMode === 'owner' ? t.createShop : t.register)}</h2>
+                <p className="text-slate-400 text-sm mt-1">{authTab === 'login' ? (authMode === 'owner' ? t.manageFleet : t.myBookings) : t.startListing}</p>
+                {authTab !== 'forgot' && authTab !== 'verify' && (
+                  <div className="flex gap-2 mt-4 justify-center">
+                    {(['customer', 'owner'] as const).map(role => (
+                      <button key={role} onClick={() => setAuthMode(role)} className={`text-xs font-black px-4 py-1.5 rounded-full transition border ${authMode === role ? 'bg-white text-slate-900 border-white' : 'border-white/30 text-white/70 hover:border-white/60'}`}>
+                        {role === 'owner' ? '🔑 ' + t.partnerLogin : '👤 ' + t.customerLogin}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Tabs — only show for login/register */}
+              {authTab !== 'forgot' && authTab !== 'verify' && (
+                <div className="flex border-b border-slate-200">
+                  {(['login', 'register'] as const).map(tab => (
+                    <button key={tab} onClick={() => { setAuthTab(tab); setLoginError(''); setRegError(''); }}
+                      className={`flex-1 py-3.5 text-sm font-black uppercase tracking-wide transition ${authTab === tab ? 'text-slate-900 border-b-2 border-slate-900 bg-white' : 'text-slate-400 bg-slate-50 hover:text-slate-700'}`}>
+                      {tab === 'login' ? t.signIn : t.register}
                     </button>
                   ))}
                 </div>
-              </div>
-              <div className="flex border-b border-slate-200">
-                {(['login','register'] as const).map(tab=>(
-                  <button key={tab} onClick={()=>{ setAuthTab(tab); setLoginError(''); setRegError(''); }} className={`flex-1 py-3.5 text-sm font-black uppercase tracking-wide transition ${authTab===tab?'text-slate-900 border-b-2 border-slate-900 bg-white':'text-slate-400 bg-slate-50 hover:text-slate-700'}`}>{tab==='login'?t.signIn:t.register}</button>
-                ))}
-              </div>
+              )}
+
               <div className="px-8 py-7">
-                {authTab==='login' && (
+                {/* LOGIN */}
+                {authTab === 'login' && (
                   <div className="space-y-4">
-                    {[{l:t.email,v:loginEmail,s:setLoginEmail,t:'email'},{l:t.password,v:loginPassword,s:setLoginPassword,t:'pw'}].map((f,i)=>(
+                    {[
+                      { l: t.email, v: loginEmail, s: setLoginEmail, t: 'email' },
+                      { l: t.password, v: loginPassword, s: setLoginPassword, t: 'pw' },
+                    ].map((f, i) => (
                       <div key={i}>
                         <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{f.l}</label>
                         <div className="relative">
-                          <input type={f.t==='pw'?(showLoginPw?'text':'password'):'email'} placeholder={f.t==='pw'?'••••••••':'you@example.com'}
+                          <input type={f.t === 'pw' ? (showLoginPw ? 'text' : 'password') : 'email'} placeholder={f.t === 'pw' ? '••••••••' : 'you@example.com'}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 pr-14 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition placeholder:text-slate-300"
-                            value={f.v} onChange={e=>f.s(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleLogin()}/>
-                          {f.t==='pw' && <button type="button" onClick={()=>setShowLoginPw(!showLoginPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-black px-1">{showLoginPw?'HIDE':'SHOW'}</button>}
+                            value={f.v} onChange={e => f.s(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()}/>
+                          {f.t === 'pw' && <button type="button" onClick={() => setShowLoginPw(!showLoginPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-black px-1">{showLoginPw ? 'HIDE' : 'SHOW'}</button>}
                         </div>
                       </div>
                     ))}
                     {loginError && <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl">⚠️ {loginError}</div>}
+                    {/* FORGOT PASSWORD LINK */}
+                    <div className="text-right -mt-2">
+                      <button onClick={() => setAuthTab('forgot')} className="text-xs text-slate-400 hover:text-slate-700 font-semibold transition">Forgot password?</button>
+                    </div>
                     <button onClick={handleLogin} className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white rounded-xl font-black text-sm uppercase tracking-wider transition shadow-lg">{t.signIn} →</button>
-                    <p className="text-center text-xs text-slate-400">{t.noAccount} <button onClick={()=>setAuthTab('register')} className="text-slate-700 font-black hover:underline">{t.registerHere}</button></p>
+                    <p className="text-center text-xs text-slate-400">{t.noAccount} <button onClick={() => setAuthTab('register')} className="text-slate-700 font-black hover:underline">{t.registerHere}</button></p>
                   </div>
                 )}
-                {authTab==='register' && (
+
+                {/* REGISTER */}
+                {authTab === 'register' && (
                   <div className="space-y-3">
-                    <div>
-                      <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.email} <span className="text-red-400">*</span></label>
-                      <input type="email" placeholder="you@example.com" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition placeholder:text-slate-300" value={regEmail} onChange={e=>setRegEmail(e.target.value)}/>
-                    </div>
+                    <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.email} <span className="text-red-400">*</span></label><input type="email" placeholder="you@example.com" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition placeholder:text-slate-300" value={regEmail} onChange={e => setRegEmail(e.target.value)}/></div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.password} <span className="text-red-400">*</span></label>
-                        <div className="relative">
-                          <input type={showRegPw?'text':'password'} placeholder="Min 6" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regPassword} onChange={e=>setRegPassword(e.target.value)}/>
-                          <button type="button" onClick={()=>setShowRegPw(!showRegPw)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-black">{showRegPw?'HIDE':'SHOW'}</button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.confirmPw} <span className="text-red-400">*</span></label>
-                        <input type="password" placeholder="Repeat" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regConfirm} onChange={e=>setRegConfirm(e.target.value)}/>
-                      </div>
+                      <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.password} <span className="text-red-400">*</span></label><div className="relative"><input type={showRegPw ? 'text' : 'password'} placeholder="Min 6" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 pr-10 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regPassword} onChange={e => setRegPassword(e.target.value)}/><button type="button" onClick={() => setShowRegPw(!showRegPw)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-black">{showRegPw ? 'HIDE' : 'SHOW'}</button></div></div>
+                      <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.confirmPw} <span className="text-red-400">*</span></label><input type="password" placeholder="Repeat" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regConfirm} onChange={e => setRegConfirm(e.target.value)}/></div>
                     </div>
                     <div className="pt-1 border-t border-slate-100 space-y-3">
-                      {authMode==='owner' ? (
+                      {authMode === 'owner' ? (
                         <>
-                          <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.shopName} <span className="text-red-400">*</span></label><input type="text" placeholder="e.g. Galle Road Rentals" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regShop} onChange={e=>setRegShop(e.target.value)}/></div>
+                          <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.shopName} <span className="text-red-400">*</span></label><input type="text" placeholder="e.g. Galle Road Rentals" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regShop} onChange={e => setRegShop(e.target.value)}/></div>
                           <div className="grid grid-cols-2 gap-3">
-                            <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.ownerName}</label><input type="text" placeholder="Your name" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regFirst} onChange={e=>setRegFirst(e.target.value)}/></div>
-                            <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.phone} <span className="text-red-400">*</span></label><input type="tel" placeholder="077XXXXXXX" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regPhone} onChange={e=>setRegPhone(e.target.value)}/></div>
+                            <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.ownerName}</label><input type="text" placeholder="Your name" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regFirst} onChange={e => setRegFirst(e.target.value)}/></div>
+                            <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.phone} <span className="text-red-400">*</span></label><input type="tel" placeholder="077XXXXXXX" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regPhone} onChange={e => setRegPhone(e.target.value)}/></div>
+                          </div>
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                            <div className="flex items-start gap-3">
+                              <input type="checkbox" id="agreeCheck" checked={agreementAccepted} onChange={e => setAgreementAccepted(e.target.checked)} className="mt-0.5 w-4 h-4 accent-slate-900 cursor-pointer flex-shrink-0"/>
+                              <label htmlFor="agreeCheck" className="text-xs text-slate-600 cursor-pointer leading-relaxed">I have read and agree to the <button type="button" onClick={() => setShowAgreementModal(true)} className="text-slate-900 font-black underline">Drivo LK Partner Agreement</button></label>
+                            </div>
                           </div>
                         </>
                       ) : (
                         <>
                           <div className="grid grid-cols-2 gap-3">
-                            <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.firstName} <span className="text-red-400">*</span></label><input type="text" placeholder="Kavinda" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regFirst} onChange={e=>setRegFirst(e.target.value)}/></div>
-                            <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.lastName}</label><input type="text" placeholder="Perera" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regLast} onChange={e=>setRegLast(e.target.value)}/></div>
+                            <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.firstName} <span className="text-red-400">*</span></label><input type="text" placeholder="Kavinda" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regFirst} onChange={e => setRegFirst(e.target.value)}/></div>
+                            <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.lastName}</label><input type="text" placeholder="Perera" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regLast} onChange={e => setRegLast(e.target.value)}/></div>
                           </div>
-                          <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.phone} <span className="text-red-400">*</span></label><input type="tel" placeholder="077XXXXXXX" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regPhone} onChange={e=>setRegPhone(e.target.value)}/></div>
-
-                          {/* Foreigner toggle */}
-                          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-                            <input type="checkbox" id="isForeign" checked={regIsForeign} onChange={e=>setRegIsForeign(e.target.checked)} className="w-4 h-4 accent-slate-900 cursor-pointer"/>
-                            <label htmlFor="isForeign" className="text-xs font-black text-slate-700 cursor-pointer">I am a foreign national (tourist/expat)</label>
-                          </div>
-
-                          {/* ID Document */}
-                          <div>
-                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
-                              {regIsForeign ? 'Passport Number' : 'NIC Number'} <span className="text-red-400">*</span>
-                            </label>
-                            <input type="text"
-                              placeholder={regIsForeign ? 'e.g. A12345678' : 'e.g. 200012345678 or 991234567V'}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
-                              value={regNic} onChange={e=>setRegNic(e.target.value)}/>
-                          </div>
-
-                          {/* Driving License */}
-                          <div>
-                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
-                              {regIsForeign ? 'International Driving License No.' : 'Driving License No.'} <span className="text-red-400">*</span>
-                            </label>
-                            <input type="text"
-                              placeholder={regIsForeign ? 'International license number' : 'e.g. B1234567'}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300"
-                              value={regLicense} onChange={e=>setRegLicense(e.target.value)}/>
-                            <p className="text-[10px] text-slate-400 mt-1">⚠️ Your name on ID &amp; license must match. Required for verification.</p>
-                          </div>
+                          <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.phone} <span className="text-red-400">*</span></label><input type="tel" placeholder="077XXXXXXX" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regPhone} onChange={e => setRegPhone(e.target.value)}/></div>
+                          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3"><input type="checkbox" id="isForeign" checked={regIsForeign} onChange={e => setRegIsForeign(e.target.checked)} className="w-4 h-4 accent-slate-900 cursor-pointer"/><label htmlFor="isForeign" className="text-xs font-black text-slate-700 cursor-pointer">I am a foreign national (tourist/expat)</label></div>
+                          <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{regIsForeign ? 'Passport Number' : 'NIC Number'} <span className="text-red-400">*</span></label><input type="text" placeholder={regIsForeign ? 'e.g. A12345678' : 'e.g. 200012345678 or 991234567V'} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regNic} onChange={e => setRegNic(e.target.value)}/></div>
+                          <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{regIsForeign ? 'International Driving License No.' : 'Driving License No.'} <span className="text-red-400">*</span></label><input type="text" placeholder={regIsForeign ? 'International license number' : 'e.g. B1234567'} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition placeholder:text-slate-300" value={regLicense} onChange={e => setRegLicense(e.target.value)}/><p className="text-[10px] text-slate-400 mt-1">⚠️ Your name on ID &amp; license must match. Required for verification.</p></div>
                         </>
                       )}
-                      <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.city}</label>
-                        <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition" value={regCity} onChange={e=>setRegCity(e.target.value)}>
-                          {SL_CITIES.slice(1).map(c=><option key={c}>{c}</option>)}
-                        </select>
-                      </div>
+                      <div><label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.city}</label><select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition" value={regCity} onChange={e => setRegCity(e.target.value)}>{SL_CITIES.slice(1).map(c => <option key={c}>{c}</option>)}</select></div>
                     </div>
                     {regError && <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl">⚠️ {regError}</div>}
                     <button onClick={handleRegister} className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white rounded-xl font-black text-sm uppercase tracking-wider transition shadow-lg">{t.createAccount} →</button>
-                    <p className="text-center text-xs text-slate-400">{t.alreadyReg} <button onClick={()=>setAuthTab('login')} className="text-slate-700 font-black hover:underline">{t.signIn}</button></p>
+                    <p className="text-center text-xs text-slate-400">{t.alreadyReg} <button onClick={() => setAuthTab('login')} className="text-slate-700 font-black hover:underline">{t.signIn}</button></p>
                   </div>
+                )}
+
+                {/* FORGOT PASSWORD */}
+                {authTab === 'forgot' && (
+                  <ForgotPasswordForm
+                    onBack={() => setAuthTab('login')}
+                    onSuccess={(email) => { localStorage.setItem('drivo_reset_email', email); setAuthTab('verify'); }}
+                    showToast={showToast}
+                  />
+                )}
+
+                {/* VERIFY OTP */}
+                {authTab === 'verify' && (
+                  <VerifyOtpForm
+                    onBack={() => setAuthTab('forgot')}
+                    onSuccess={() => { setAuthTab('login'); showToast('Password reset! Please login. ✓'); }}
+                    showToast={showToast}
+                  />
                 )}
               </div>
             </div>
@@ -1499,118 +924,46 @@ export default function Home() {
         </div>
       )}
 
-      {/* ══ CUSTOMER DASHBOARD ══ */}
-      {view==='custDash' && custAcc && (
+      {/* CUSTOMER DASHBOARD */}
+      {view === 'custDash' && custAcc && (
         <div className="bg-slate-100 min-h-[calc(100vh-64px)]">
           <div className="bg-white border-b border-slate-200 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl overflow-hidden flex-shrink-0">
-                  {(custAcc as any).avatar_url
-                    ? <img src={(custAcc as any).avatar_url} className="w-full h-full object-cover" alt=""/>
-                    : (custAcc.first_name||'U').charAt(0)}
-                </div>
-                <div>
-                  <p className="font-black text-slate-900 text-base">{custAcc.first_name||''} {custAcc.last_name||''}</p>
-                  <p className="text-xs text-slate-500">{custAcc.city||''}{custAcc.phone ? ` · ${custAcc.phone}` : ''}</p>
-                </div>
+                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl overflow-hidden flex-shrink-0">{(custAcc as any).avatar_url ? <img src={(custAcc as any).avatar_url} className="w-full h-full object-cover" alt=""/> : (custAcc.first_name || 'U').charAt(0)}</div>
+                <div><p className="font-black text-slate-900 text-base">{custAcc.first_name || ''} {custAcc.last_name || ''}</p><p className="text-xs text-slate-500">{custAcc.city || ''}{custAcc.phone ? ` · ${custAcc.phone}` : ''}</p></div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="hidden sm:flex items-center gap-3 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
-                  <span>{(custAcc.bookings||[]).length} {t.myBookings}</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-emerald-600">{(custAcc.bookings||[]).filter(b=>b.status==='confirmed').length} {t.confirmed}</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-amber-500">{(custAcc.bookings||[]).filter(b=>b.status==='pending').length} {t.pending}</span>
-                </div>
-                <button onClick={()=>{ setCustEditData({firstName:custAcc.first_name||'',lastName:custAcc.last_name||'',phone:custAcc.phone||'',city:custAcc.city||'Colombo'}); setCustEditOpen(true); }} className="text-xs font-bold px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition">{t.editProfile}</button>
+                <div className="hidden sm:flex items-center gap-3 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-4 py-2"><span>{(custAcc.bookings || []).length} {t.myBookings}</span><span className="text-slate-300">|</span><span className="text-emerald-600">{(custAcc.bookings || []).filter(b => b.status === 'confirmed').length} {t.confirmed}</span><span className="text-slate-300">|</span><span className="text-amber-500">{(custAcc.bookings || []).filter(b => b.status === 'pending').length} {t.pending}</span></div>
+                <button onClick={() => { setCustEditData({ firstName: custAcc.first_name || '', lastName: custAcc.last_name || '', phone: custAcc.phone || '', city: custAcc.city || 'Colombo' }); setCustEditOpen(true); }} className="text-xs font-bold px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition">{t.editProfile}</button>
                 <button onClick={resetToHome} className="text-xs font-black px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition">{t.browseVehicles}</button>
               </div>
             </div>
           </div>
 
+          {/* Customer Edit Modal */}
           {custEditOpen && (
             <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center px-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
-                  <h3 className="font-black text-slate-900">My Profile</h3>
-                  <button onClick={()=>setCustEditOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl">×</button>
-                </div>
+                <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10"><h3 className="font-black text-slate-900">My Profile</h3><button onClick={() => setCustEditOpen(false)} className="text-slate-400 hover:text-slate-700 text-2xl">×</button></div>
                 <div className="p-6 space-y-4">
-                  {/* Profile Photo */}
                   <div className="flex flex-col items-center gap-3 pb-4 border-b border-slate-100">
                     <div className="relative">
-                      <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-4xl overflow-hidden border-4 border-slate-100 shadow-lg">
-                        {custAcc?.avatar_url
-                          ? <img src={custAcc.avatar_url} className="w-full h-full object-cover" alt=""/>
-                          : (custAcc?.first_name||'U').charAt(0)}
-                      </div>
-                      <label className="absolute bottom-0 right-0 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-slate-700 transition shadow-md">
-                        📷
-                        <input type="file" accept="image/*" className="hidden" onChange={async e=>{
-                          const file = e.target.files?.[0]; if (!file || !custAcc?.id) return;
-                          setProfilePhotoUploading(true);
-                          const ext = file.name.split('.').pop();
-                          const path = `avatars/customer_${custAcc.id}.${ext}`;
-                          const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-                          if (!error) {
-                            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-                            await supabase.from('customers').update({ avatar_url: urlData.publicUrl }).eq('id', custAcc.id);
-                            setCustAcc(prev => prev ? {...prev, avatar_url: urlData.publicUrl} : prev);
-                            showToast('Profile photo updated! 📷');
-                          }
-                          setProfilePhotoUploading(false);
-                        }}/>
-                      </label>
+                      <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-4xl overflow-hidden border-4 border-slate-100 shadow-lg">{custAcc?.avatar_url ? <img src={custAcc.avatar_url} className="w-full h-full object-cover" alt=""/> : (custAcc?.first_name || 'U').charAt(0)}</div>
+                      <label className="absolute bottom-0 right-0 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-slate-700 transition shadow-md">📷<input type="file" accept="image/*" className="hidden" onChange={async e => { const file = e.target.files?.[0]; if (!file || !custAcc?.id) return; setProfilePhotoUploading(true); const ext = file.name.split('.').pop(); const path = `avatars/customer_${custAcc.id}.${ext}`; const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true }); if (!error) { const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path); await supabase.from('customers').update({ avatar_url: urlData.publicUrl }).eq('id', custAcc.id); setCustAcc(prev => prev ? { ...prev, avatar_url: urlData.publicUrl } : prev); showToast('Profile photo updated! 📷'); } setProfilePhotoUploading(false); }}/></label>
                     </div>
                     <p className="text-sm font-black text-slate-900">{custAcc?.first_name} {custAcc?.last_name}</p>
                     <p className="text-xs text-slate-400">{custAcc?.email}</p>
                     {profilePhotoUploading && <p className="text-xs text-blue-500 font-bold animate-pulse">Uploading...</p>}
                   </div>
-
-                  {/* Profile Info */}
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      {[{l:t.firstName,k:'firstName'},{l:t.lastName,k:'lastName'}].map(f=>(
-                        <div key={f.k}><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{f.l}</label>
-                          <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition"
-                            value={(custEditData as any)[f.k]} onChange={e=>setCustEditData({...custEditData,[f.k]:e.target.value})}/></div>
-                      ))}
-                    </div>
-                    <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.phone}</label>
-                      <input type="tel" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition"
-                        value={custEditData.phone} onChange={e=>setCustEditData({...custEditData,phone:e.target.value})}/></div>
-                    <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.city}</label>
-                      <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none cursor-pointer" value={custEditData.city} onChange={e=>setCustEditData({...custEditData,city:e.target.value})}>
-                        {SL_CITIES.slice(1).map(c=><option key={c}>{c}</option>)}
-                      </select></div>
+                    <div className="grid grid-cols-2 gap-3">{[{ l: t.firstName, k: 'firstName' }, { l: t.lastName, k: 'lastName' }].map(f => (<div key={f.k}><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{f.l}</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition" value={(custEditData as any)[f.k]} onChange={e => setCustEditData({ ...custEditData, [f.k]: e.target.value })}/></div>))}</div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.phone}</label><input type="tel" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition" value={custEditData.phone} onChange={e => setCustEditData({ ...custEditData, phone: e.target.value })}/></div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.city}</label><select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none cursor-pointer" value={custEditData.city} onChange={e => setCustEditData({ ...custEditData, city: e.target.value })}>{SL_CITIES.slice(1).map(c => <option key={c}>{c}</option>)}</select></div>
                   </div>
-
-                  {/* Verified Documents */}
-                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Verified Documents</p>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-600">NIC / Passport</span>
-                      <span className="font-black text-slate-900">{custAcc?.nic || '—'}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-600">Driving License</span>
-                      <span className="font-black text-slate-900">{custAcc?.driving_license || '—'}</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-1">Documents verified at registration · Contact support to update</p>
-                  </div>
-
-                  <button onClick={async ()=>{
-                    if (!custAcc?.id) return;
-                    await supabase.from('customers').update({
-                      first_name: custEditData.firstName,
-                      last_name: custEditData.lastName,
-                      phone: custEditData.phone,
-                      city: custEditData.city,
-                    }).eq('id', custAcc.id);
-                    setCustAcc(prev => prev ? {...prev, first_name:custEditData.firstName, last_name:custEditData.lastName, phone:custEditData.phone, city:custEditData.city} : prev);
-                    setCustEditOpen(false); showToast(t.profileUpdated);
-                  }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.saveProfile}</button>
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2"><p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Verified Documents</p><div className="flex items-center justify-between text-xs"><span className="text-slate-600">NIC / Passport</span><span className="font-black text-slate-900">{custAcc?.nic || '—'}</span></div><div className="flex items-center justify-between text-xs"><span className="text-slate-600">Driving License</span><span className="font-black text-slate-900">{custAcc?.driving_license || '—'}</span></div><p className="text-[10px] text-slate-400 mt-1">Documents verified at registration · Contact support to update</p></div>
+                  <ChangePasswordForm userId={custAcc?.id || ''} userType="customer" showToast={showToast} />
+                  <button onClick={async () => { if (!custAcc?.id) return; await supabase.from('customers').update({ first_name: custEditData.firstName, last_name: custEditData.lastName, phone: custEditData.phone, city: custEditData.city }).eq('id', custAcc.id); setCustAcc(prev => prev ? { ...prev, first_name: custEditData.firstName, last_name: custEditData.lastName, phone: custEditData.phone, city: custEditData.city } : prev); setCustEditOpen(false); showToast(t.profileUpdated); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.saveProfile}</button>
                 </div>
               </div>
             </div>
@@ -1619,70 +972,13 @@ export default function Home() {
           {selectedBooking && (
             <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center px-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b">
-                  <h3 className="font-black text-slate-900">{t.bookingDetails}</h3>
-                  <button onClick={()=>setSelectedBooking(null)} className="text-slate-400 text-2xl hover:text-slate-700">×</button>
-                </div>
+                <div className="flex items-center justify-between px-6 py-4 border-b"><h3 className="font-black text-slate-900">{t.bookingDetails}</h3><button onClick={() => setSelectedBooking(null)} className="text-slate-400 text-2xl hover:text-slate-700">×</button></div>
                 <div className="p-6 space-y-4">
-                  <div className="flex gap-4">
-                    <img src={selectedBooking.vehicle_img||''} className="w-28 h-20 rounded-xl object-cover flex-shrink-0" alt=""/>
-                    <div>
-                      <p className="font-black text-slate-900">{selectedBooking.vehicle_name||''}</p>
-                      <p className="text-xs text-slate-500 mt-1">{selectedBooking.shop_name||''} · {selectedBooking.location}</p>
-                      <span className={`inline-block mt-2 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${statusColor(selectedBooking.status)}`}>{statusLabel(selectedBooking.status)}</span>
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100">
-                    {([
-                      [t.rentalPeriod, `${selectedBooking.pickup_date||''} → ${selectedBooking.return_date||''}`],
-                      ['Pickup Time', (selectedBooking as any).pickup_time || '—'],
-                      ['Days', `${selectedBooking.days} day${selectedBooking.days>1?'s':''}`],
-                      [t.pickupType, (selectedBooking.delivery_type||'pickup')==='delivery'?t.delivery:t.selfPickup],
-                      [t.vehicleRented, `Rs. ${(selectedBooking.price_per_day||0).toLocaleString()} /day`],
-                      ...((selectedBooking.delivery_type||'pickup')==='delivery' ? [[t.deliveryFee,'Rs. 1,500']] : []),
-                      [t.totalPaid, `Rs. ${(selectedBooking.total||0).toLocaleString()}`],
-                      [t.status, statusLabel(selectedBooking.status)],
-                      [t.bookedOn, selectedBooking.booked_at ? new Date(selectedBooking.booked_at).toLocaleDateString() : ''],
-                    ] as [string,string][]).map(([k,v])=>(
-                      <div key={k} className="flex justify-between px-4 py-2.5 text-xs">
-                        <span className="text-slate-500 font-semibold">{k}</span>
-                        <span className="font-black text-slate-900">{v}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Cancel button inside modal — only for active bookings */}
-                  {(selectedBooking.status === 'pending' || selectedBooking.status === 'confirmed') && (
-                    <button
-                      onClick={async () => {
-                        await cancelBooking(selectedBooking.id, 'customer');
-                        setSelectedBooking(null);
-                      }}
-                      className="w-full py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-sm uppercase tracking-wide transition flex items-center justify-center gap-2">
-                      ✕ Cancel This Booking
-                    </button>
-                  )}
-                  {(selectedBooking.status === 'completed' || selectedBooking.status === 'cancelled') && (
-                    <button onClick={async ()=>{
-                      if (!confirm('Remove this booking from your history?')) return;
-                      await supabase.from('bookings').update({ customer_id: null }).eq('id', selectedBooking.id);
-                      const { data: bdata } = await supabase
-                        .from('bookings').select('*')
-                        .eq('customer_id', custAcc.id)
-                        .not('status','eq','declined')
-                        .order('booked_at',{ascending:false});
-                      setCustAcc(prev => prev ? {...prev, bookings: bdata||[]} : prev);
-                      setSelectedBooking(null);
-                      showToast('Removed from history');
-                    }} className="w-full py-3 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl font-black text-xs uppercase transition">
-                      🗑 Remove from History
-                    </button>
-                  )}
-                  <button
-                    onClick={()=>setSelectedBooking(null)}
-                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition">
-                    Close
-                  </button>
+                  <div className="flex gap-4"><img src={selectedBooking.vehicle_img || ''} className="w-28 h-20 rounded-xl object-cover flex-shrink-0" alt=""/><div><p className="font-black text-slate-900">{selectedBooking.vehicle_name || ''}</p><p className="text-xs text-slate-500 mt-1">{selectedBooking.shop_name || ''} · {selectedBooking.location}</p><span className={`inline-block mt-2 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${statusColor(selectedBooking.status)}`}>{statusLabel(selectedBooking.status)}</span></div></div>
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100">{([['Rental Period', `${selectedBooking.pickup_date || ''} → ${selectedBooking.return_date || ''}`], ['Pickup Time', (selectedBooking as any).pickup_time || '—'], ['Days', `${selectedBooking.days} day${selectedBooking.days > 1 ? 's' : ''}`], ['Pickup Type', (selectedBooking.delivery_type || 'pickup') === 'delivery' ? t.delivery : t.selfPickup], ['Vehicle Rate', `Rs. ${(selectedBooking.price_per_day || 0).toLocaleString()} /day`], ...((selectedBooking.delivery_type || 'pickup') === 'delivery' ? [['Delivery Fee', 'Rs. 1,500']] : []), ['Total Paid', `Rs. ${(selectedBooking.total || 0).toLocaleString()}`], ['Status', statusLabel(selectedBooking.status)], ['Booked On', selectedBooking.booked_at ? new Date(selectedBooking.booked_at).toLocaleDateString() : '']] as [string, string][]).map(([k, v]) => (<div key={k} className="flex justify-between px-4 py-2.5 text-xs"><span className="text-slate-500 font-semibold">{k}</span><span className="font-black text-slate-900">{v}</span></div>))}</div>
+                  {(selectedBooking.status === 'pending' || selectedBooking.status === 'confirmed') && (<button onClick={async () => { await cancelBooking(selectedBooking.id, 'customer'); setSelectedBooking(null); }} className="w-full py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-sm uppercase tracking-wide transition">✕ Cancel This Booking</button>)}
+                  {(selectedBooking.status === 'completed' || selectedBooking.status === 'cancelled') && (<button onClick={async () => { if (!confirm('Remove this booking from your history?')) return; await supabase.from('bookings').update({ customer_id: null }).eq('id', selectedBooking.id); const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev); setSelectedBooking(null); showToast('Removed from history'); }} className="w-full py-3 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl font-black text-xs uppercase transition">🗑 Remove from History</button>)}
+                  <button onClick={() => setSelectedBooking(null)} className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition">Close</button>
                 </div>
               </div>
             </div>
@@ -1690,90 +986,18 @@ export default function Home() {
 
           <div className="max-w-7xl mx-auto px-4 py-6">
             <div className="flex gap-2 mb-5 flex-wrap">
-              {(['all','upcoming','past','favourites'] as const).map(tab=>(
-                <button key={tab} onClick={()=>setOwnerSubTab(tab as any)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition ${ownerSubTab===tab?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
-                  {tab==='all'?t.myBookings:tab==='upcoming'?t.upcomingRentals:tab==='past'?t.pastRentals:'❤️ Favourites'}
-                </button>
-              ))}
+              {(['all', 'upcoming', 'past', 'favourites'] as const).map(tab => (<button key={tab} onClick={() => setOwnerSubTab(tab as any)} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition ${ownerSubTab === tab ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>{tab === 'all' ? t.myBookings : tab === 'upcoming' ? t.upcomingRentals : tab === 'past' ? t.pastRentals : '❤️ Favourites'}</button>))}
             </div>
             {ownerSubTab === 'favourites' ? (
-              <div>
-                {wishlist.length === 0 ? (
-                  <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20">
-                    <p className="text-5xl mb-3">🤍</p>
-                    <p className="font-black text-slate-700">No favourites yet</p>
-                    <button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">Browse Vehicles</button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {allVehicles.filter(v => wishlist.includes(v.id)).map(v => (
-                      <div key={v.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
-                        onClick={()=>{ setSelectedVehicle(v); setView('detail'); }}>
-                        <div className="relative aspect-video bg-slate-100 overflow-hidden">
-                          <img src={v.image} alt={v.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/>
-                          <button onClick={e=>{ e.stopPropagation(); toggleWishlist(v.id); }}
-                            className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition">
-                            ❤️
-                          </button>
-                        </div>
-                        <div className="p-3">
-                          <p className="font-black text-slate-900 text-sm">{v.name}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">{vShop(v)} · {v.location}</p>
-                          <p className="font-black text-slate-900 text-sm mt-2">Rs. {vPrice(v).toLocaleString()} <span className="text-xs font-normal text-slate-400">/day</span></p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (custAcc.bookings||[]).length === 0 ? (
-              <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20">
-                <p className="text-5xl mb-3">🗓️</p>
-                <p className="font-black text-slate-700">{t.noBookings}</p>
-                <button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.browseVehicles}</button>
-              </div>
+              <div>{wishlist.length === 0 ? (<div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20"><p className="text-5xl mb-3">🤍</p><p className="font-black text-slate-700">No favourites yet</p><button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">Browse Vehicles</button></div>) : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{allVehicles.filter(v => wishlist.includes(v.id)).map(v => (<div key={v.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer" onClick={() => { setSelectedVehicle(v); setView('detail'); }}><div className="relative aspect-video bg-slate-100 overflow-hidden"><img src={v.image} alt={v.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/><button onClick={e => { e.stopPropagation(); toggleWishlist(v.id); }} className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition">❤️</button></div><div className="p-3"><p className="font-black text-slate-900 text-sm">{v.name}</p><p className="text-xs text-slate-400 mt-0.5">{vShop(v)} · {v.location}</p><p className="font-black text-slate-900 text-sm mt-2">Rs. {vPrice(v).toLocaleString()} <span className="text-xs font-normal text-slate-400">/day</span></p></div></div>))}</div>)}</div>
+            ) : (custAcc.bookings || []).length === 0 ? (
+              <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20"><p className="text-5xl mb-3">🗓️</p><p className="font-black text-slate-700">{t.noBookings}</p><button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.browseVehicles}</button></div>
             ) : (
               <div className="space-y-3">
-                {(custAcc.bookings||[])
-                  .filter(b=> ownerSubTab==='all'?true:ownerSubTab==='upcoming'?b.status!=='completed'&&b.status!=='cancelled':b.status==='completed'||b.status==='cancelled')
-                  .map(b=>(
+                {(custAcc.bookings || []).filter(b => ownerSubTab === 'all' ? true : ownerSubTab === 'upcoming' ? b.status !== 'completed' && b.status !== 'cancelled' : b.status === 'completed' || b.status === 'cancelled').map(b => (
                   <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden">
-                    <div className="flex gap-4 p-4">
-                      <img src={b.vehicle_img||''} className="w-24 h-16 rounded-xl object-cover flex-shrink-0" alt=""/>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-black text-slate-900 text-sm">{b.vehicle_name||''}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">{b.shop_name||''} · {b.location}</p>
-                          </div>
-                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span>
-                        </div>
-                        <div className="flex items-center gap-4 mt-1.5 flex-wrap">
-                          <span className="text-xs text-slate-500">📅 {b.pickup_date||''} → {b.return_date||''}</span>
-                          <span className="text-xs font-black text-slate-900">Rs. {b.total.toLocaleString()}</span>
-                          <span className="text-xs text-slate-400">{b.days}d · {b.delivery_type||'pickup'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="border-t border-slate-100 px-4 py-2.5 flex justify-between items-center gap-2">
-                      <span className="text-[10px] text-slate-400">{t.bookedOn}: {b.booked_at ? new Date(b.booked_at).toLocaleDateString() : ''}</span>
-                      <div className="flex items-center gap-2">
-                        {(b.status === 'pending' || b.status === 'confirmed') && (
-                          <button onClick={()=>cancelBooking(b.id, 'customer')}
-                            className="text-xs font-black text-red-500 hover:text-red-700 transition border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg">
-                            Cancel
-                          </button>
-                        )}
-                        {b.status === 'completed' && (
-                          <button onClick={()=>{ setReviewModal({ vehicleId: b.vehicle_id, bookingId: b.id, vehicleName: b.vehicle_name||'' }); setReviewRating(5); setReviewComment(''); }}
-                            className="text-xs font-black text-amber-600 hover:text-amber-700 transition border border-amber-200 bg-amber-50 hover:bg-amber-100 px-3 py-1 rounded-lg">
-                            ⭐ Review
-                          </button>
-                        )}
-                        <button onClick={()=>setSelectedBooking(b)} className="text-xs font-black text-slate-600 hover:text-slate-900 transition">{t.bookingDetails} →</button>
-                      </div>
-                    </div>
+                    <div className="flex gap-4 p-4"><img src={b.vehicle_img || ''} className="w-24 h-16 rounded-xl object-cover flex-shrink-0" alt=""/><div className="flex-1 min-w-0"><div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-900 text-sm">{b.vehicle_name || ''}</p><p className="text-xs text-slate-400 mt-0.5">{b.shop_name || ''} · {b.location}</p></div><span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span></div><div className="flex items-center gap-4 mt-1.5 flex-wrap"><span className="text-xs text-slate-500">📅 {b.pickup_date || ''} → {b.return_date || ''}</span><span className="text-xs font-black text-slate-900">Rs. {b.total.toLocaleString()}</span><span className="text-xs text-slate-400">{b.days}d · {b.delivery_type || 'pickup'}</span></div></div></div>
+                    <div className="border-t border-slate-100 px-4 py-2.5 flex justify-between items-center gap-2"><span className="text-[10px] text-slate-400">{t.bookedOn}: {b.booked_at ? new Date(b.booked_at).toLocaleDateString() : ''}</span><div className="flex items-center gap-2">{(b.status === 'pending' || b.status === 'confirmed') && (<button onClick={() => cancelBooking(b.id, 'customer')} className="text-xs font-black text-red-500 hover:text-red-700 transition border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg">Cancel</button>)}{b.status === 'completed' && (<button onClick={() => { setReviewModal({ vehicleId: b.vehicle_id, bookingId: b.id, vehicleName: b.vehicle_name || '' }); setReviewRating(5); setReviewComment(''); }} className="text-xs font-black text-amber-600 hover:text-amber-700 transition border border-amber-200 bg-amber-50 hover:bg-amber-100 px-3 py-1 rounded-lg">⭐ Review</button>)}<button onClick={() => setSelectedBooking(b)} className="text-xs font-black text-slate-600 hover:text-slate-900 transition">{t.bookingDetails} →</button></div></div>
                   </div>
                 ))}
               </div>
@@ -1782,764 +1006,183 @@ export default function Home() {
         </div>
       )}
 
-      {/* ══ OWNER DASHBOARD ══ */}
-      {view==='ownerDash' && ownerAcc && (
+      {/* OWNER DASHBOARD */}
+      {view === 'ownerDash' && ownerAcc && (
         <div className="bg-slate-100 min-h-[calc(100vh-64px)]">
           <div className="bg-white border-b border-slate-200 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-xl">{(ownerAcc.shop_name||'S').charAt(0).toUpperCase()}</div>
+                <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-xl">{(ownerAcc.shop_name || 'S').charAt(0).toUpperCase()}</div>
                 <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-black text-slate-900 text-base">{ownerAcc.shop_name||''}</p>
-                    {(ownerAcc as any).verified && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full">✅ Verified</span>
-                    )}
-                    {!(ownerAcc as any).verified && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full">⏳ Pending Verification</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500">{ownerAcc.city||''} · {ownerAcc.phone||''}</p>
+                  <div className="flex items-center gap-2 flex-wrap"><p className="font-black text-slate-900 text-base">{ownerAcc.shop_name || ''}</p>{(ownerAcc as any).verified && (<span className="inline-flex items-center gap-1 text-[10px] font-black bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full">✅ Verified</span>)}{!(ownerAcc as any).verified && (<span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full">⏳ Pending Verification</span>)}</div>
+                  <p className="text-xs text-slate-500">{ownerAcc.city || ''} · {ownerAcc.phone || ''}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="hidden sm:flex items-center gap-3 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-4 py-2">
-                  <span>{ownerFleet.length} {t.total}</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-emerald-600">{ownerFleet.filter(v=>vAvail(v)).length} {t.live}</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-amber-500">{ownerBookings.filter(b=>b.status==='pending').length} {t.pending}</span>
-                </div>
-                <button onClick={()=>{ setOwnerEditData({shopName:ownerAcc.shop_name||'',ownerName:ownerAcc.owner_name||'',phone:ownerAcc.phone||'',whatsapp:ownerAcc.whatsapp||'',city:ownerAcc.city||'Colombo'}); setOwnerEditOpen(true); }} className="text-xs font-bold px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition">{t.editProfile}</button>
-                <button onClick={()=>{ setShowAddForm(true); setEditingId(null); setNewV({name:'',type:'car',transmission:'Automatic',fuel:'Petrol',pricePerDay:5000,description:'',mapLink:''}); setPhotos([]); }}
-                  className="text-xs font-black px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition flex items-center gap-1.5 shadow-sm">
-                  <span className="text-lg leading-none">+</span> {t.addVehicle}
-                </button>
+                <div className="hidden sm:flex items-center gap-3 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-4 py-2"><span>{ownerFleet.length} {t.total}</span><span className="text-slate-300">|</span><span className="text-emerald-600">{ownerFleet.filter(v => vAvail(v)).length} {t.live}</span><span className="text-slate-300">|</span><span className="text-amber-500">{ownerBookings.filter(b => b.status === 'pending').length} {t.pending}</span></div>
+                <button onClick={() => { setOwnerEditData({ shopName: ownerAcc.shop_name || '', ownerName: ownerAcc.owner_name || '', phone: ownerAcc.phone || '', whatsapp: ownerAcc.whatsapp || '', city: ownerAcc.city || 'Colombo', bio: '' }); setOwnerEditOpen(true); }} className="text-xs font-bold px-3 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition">{t.editProfile}</button>
+                <button onClick={() => { setShowAddForm(true); setEditingId(null); setNewV({ name: '', type: 'car', transmission: 'Automatic', fuel: 'Petrol', pricePerDay: 5000, weeklyPrice: 0, monthlyPrice: 0, kmPerDay: 200, extraKmCharge: 50, depositAmount: 0, description: '', mapLink: '', driverOption: 'self_drive', district: '', deliveryOption: 'both', revenueLicenceExpiry: '', insuranceExpiry: '' }); setPhotos([]); }} className="text-xs font-black px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition flex items-center gap-1.5 shadow-sm"><span className="text-lg leading-none">+</span> {t.addVehicle}</button>
               </div>
             </div>
             <div className="max-w-7xl mx-auto px-4 flex gap-0">
-              {([['fleet',t.yourFleet],['bookings',t.incomingBookings],['earnings','💰 Earnings']] as [string,string][]).map(([k,l])=>(
-                <button key={k} onClick={()=>setOwnerSubTab(k as any)}
-                  className={`px-5 py-3 text-xs font-black uppercase tracking-wide border-b-2 transition ${ownerSubTab===k?'border-slate-900 text-slate-900':'border-transparent text-slate-400 hover:text-slate-700'}`}>
-                  {l} {k==='bookings'&&ownerBookings.filter(b=>b.status==='pending').length>0&&
-                    <span className="ml-1.5 bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">{ownerBookings.filter(b=>b.status==='pending').length}</span>}
+              {([['fleet', t.yourFleet], ['bookings', t.incomingBookings], ['earnings', '💰 Earnings']] as [string, string][]).map(([k, l]) => (
+                <button key={k} onClick={() => setOwnerSubTab(k as any)} className={`px-5 py-3 text-xs font-black uppercase tracking-wide border-b-2 transition ${ownerSubTab === k ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-700'}`}>
+                  {l} {k === 'bookings' && ownerBookings.filter(b => b.status === 'pending').length > 0 && <span className="ml-1.5 bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full">{ownerBookings.filter(b => b.status === 'pending').length}</span>}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Owner Edit Modal */}
           {ownerEditOpen && (
             <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center px-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
-                  <h3 className="font-black text-slate-900">Partner Profile</h3>
-                  <button onClick={()=>setOwnerEditOpen(false)} className="text-slate-400 text-2xl hover:text-slate-700">×</button>
-                </div>
+                <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10"><h3 className="font-black text-slate-900">Partner Profile</h3><button onClick={() => setOwnerEditOpen(false)} className="text-slate-400 text-2xl hover:text-slate-700">×</button></div>
                 <div className="p-6 space-y-4">
-                  {/* Shop Logo / Profile Photo */}
                   <div className="flex flex-col items-center gap-3 pb-4 border-b border-slate-100">
                     <div className="relative">
-                      <div className="w-24 h-24 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-4xl overflow-hidden border-4 border-slate-100 shadow-lg">
-                        {ownerAcc?.avatar_url
-                          ? <img src={ownerAcc.avatar_url} className="w-full h-full object-cover" alt=""/>
-                          : (ownerAcc?.shop_name||'S').charAt(0).toUpperCase()}
-                      </div>
-                      <label className="absolute bottom-0 right-0 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-slate-700 transition shadow-md">
-                        📷
-                        <input type="file" accept="image/*" className="hidden" onChange={async e=>{
-                          const file = e.target.files?.[0]; if (!file || !ownerAcc?.id) return;
-                          setProfilePhotoUploading(true);
-                          const ext = file.name.split('.').pop();
-                          const path = `avatars/owner_${ownerAcc.id}.${ext}`;
-                          const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
-                          if (!error) {
-                            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-                            await supabase.from('owners').update({ avatar_url: urlData.publicUrl }).eq('id', ownerAcc.id);
-                            setOwnerAcc(prev => prev ? {...prev, avatar_url: urlData.publicUrl} : prev);
-                            showToast('Profile photo updated! 📷');
-                          }
-                          setProfilePhotoUploading(false);
-                        }}/>
-                      </label>
+                      <div className="w-24 h-24 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-4xl overflow-hidden border-4 border-slate-100 shadow-lg">{ownerAcc?.avatar_url ? <img src={ownerAcc.avatar_url} className="w-full h-full object-cover" alt=""/> : (ownerAcc?.shop_name || 'S').charAt(0).toUpperCase()}</div>
+                      <label className="absolute bottom-0 right-0 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-slate-700 transition shadow-md">📷<input type="file" accept="image/*" className="hidden" onChange={async e => { const file = e.target.files?.[0]; if (!file || !ownerAcc?.id) return; setProfilePhotoUploading(true); const ext = file.name.split('.').pop(); const path = `avatars/owner_${ownerAcc.id}.${ext}`; const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true }); if (!error) { const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path); await supabase.from('owners').update({ avatar_url: urlData.publicUrl }).eq('id', ownerAcc.id); setOwnerAcc(prev => prev ? { ...prev, avatar_url: urlData.publicUrl } : prev); showToast('Profile photo updated! 📷'); } setProfilePhotoUploading(false); }}/></label>
                     </div>
                     <p className="text-sm font-black text-slate-900">{ownerAcc?.shop_name}</p>
                     <p className="text-xs text-slate-400">{ownerAcc?.email}</p>
                     {profilePhotoUploading && <p className="text-xs text-blue-500 font-bold animate-pulse">Uploading...</p>}
                   </div>
-
                   <div className="space-y-3">
-                  {[{l:t.shopName,k:'shopName'},{l:t.ownerName,k:'ownerName'},{l:t.phone,k:'phone'},{l:'WhatsApp',k:'whatsapp'}].map(f=>(
-                    <div key={f.k}><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{f.l}</label>
-                      <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition"
-                        value={(ownerEditData as any)[f.k]} onChange={e=>setOwnerEditData({...ownerEditData,[f.k]:e.target.value})}/></div>
-                  ))}
-                  <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.city}</label>
-                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none cursor-pointer" value={ownerEditData.city} onChange={e=>setOwnerEditData({...ownerEditData,city:e.target.value})}>
-                      {SL_CITIES.slice(1).map(c=><option key={c}>{c}</option>)}
-                    </select></div>
-                  <button onClick={async ()=>{
-                    if(!sessionEmail || !ownerAcc?.id) return;
-                    await supabase.from('owners').update({
-                      shop_name: ownerEditData.shopName,
-                      owner_name: ownerEditData.ownerName,
-                      phone: ownerEditData.phone,
-                      whatsapp: ownerEditData.whatsapp,
-                      city: ownerEditData.city,
-                    }).eq('id', ownerAcc.id);
-                    setOwnerAcc({...ownerAcc, shop_name:ownerEditData.shopName, owner_name:ownerEditData.ownerName, phone:ownerEditData.phone, whatsapp:ownerEditData.whatsapp, city:ownerEditData.city});
-                    setOwnerEditOpen(false); showToast(t.profileUpdated);
-                  }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.saveProfile}</button>
+                    {[{ l: t.shopName, k: 'shopName' }, { l: t.ownerName, k: 'ownerName' }, { l: t.phone, k: 'phone' }, { l: 'WhatsApp', k: 'whatsapp' }].map(f => (<div key={f.k}><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{f.l}</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:border-slate-900 transition" value={(ownerEditData as any)[f.k]} onChange={e => setOwnerEditData({ ...ownerEditData, [f.k]: e.target.value })}/></div>))}
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.city}</label><select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none cursor-pointer" value={ownerEditData.city} onChange={e => setOwnerEditData({ ...ownerEditData, city: e.target.value })}>{SL_CITIES.slice(1).map(c => <option key={c}>{c}</option>)}</select></div>
+                    <ChangePasswordForm userId={ownerAcc?.id || ''} userType="owner" showToast={showToast} />
+                    <button onClick={async () => { if (!sessionEmail || !ownerAcc?.id) return; await supabase.from('owners').update({ shop_name: ownerEditData.shopName, owner_name: ownerEditData.ownerName, phone: ownerEditData.phone, whatsapp: ownerEditData.whatsapp, city: ownerEditData.city }).eq('id', ownerAcc.id); setOwnerAcc({ ...ownerAcc, shop_name: ownerEditData.shopName, owner_name: ownerEditData.ownerName, phone: ownerEditData.phone, whatsapp: ownerEditData.whatsapp, city: ownerEditData.city }); setOwnerEditOpen(false); showToast(t.profileUpdated); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.saveProfile}</button>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── Owner Booking Detail Modal ── */}
+          {/* Owner Booking Detail Modal */}
           {ownerSelectedBooking && (
             <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center px-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b">
-                  <h3 className="font-black text-slate-900">{t.bookingDetails}</h3>
-                  <button onClick={()=>setOwnerSelectedBooking(null)} className="text-slate-400 text-2xl hover:text-slate-700">×</button>
-                </div>
+                <div className="flex items-center justify-between px-6 py-4 border-b"><h3 className="font-black text-slate-900">{t.bookingDetails}</h3><button onClick={() => setOwnerSelectedBooking(null)} className="text-slate-400 text-2xl hover:text-slate-700">×</button></div>
                 <div className="p-6 space-y-4">
-                  <div className="flex gap-4">
-                    <img src={ownerSelectedBooking.vehicle_img||''} className="w-28 h-20 rounded-xl object-cover flex-shrink-0" alt=""/>
-                    <div>
-                      <p className="font-black text-slate-900">{ownerSelectedBooking.vehicle_name||''}</p>
-                      <p className="text-xs text-slate-500 mt-1">{ownerSelectedBooking.shop_name||''} · {ownerSelectedBooking.location}</p>
-                      <span className={`inline-block mt-2 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${statusColor(ownerSelectedBooking.status)}`}>{statusLabel(ownerSelectedBooking.status)}</span>
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100">
-                    {([
-                      [t.rentalPeriod, `${ownerSelectedBooking.pickup_date||''} → ${ownerSelectedBooking.return_date||''}`],
-                      ['Pickup Time', (ownerSelectedBooking as any).pickup_time || '—'],
-                      ['Days', `${ownerSelectedBooking.days} day${ownerSelectedBooking.days>1?'s':''}`],
-                      [t.pickupType, (ownerSelectedBooking.delivery_type||'pickup')==='delivery'?t.delivery:t.selfPickup],
-                      ['Rate', `Rs. ${(ownerSelectedBooking.price_per_day||0).toLocaleString()} /day`],
-                      ...((ownerSelectedBooking.delivery_type||'pickup')==='delivery' ? [['Delivery Fee','Rs. 1,500']] : []),
-                      ['Customer Pays', `Rs. ${(ownerSelectedBooking.total||0).toLocaleString()}`],
-                      ['Drivo Fee (10%)', `− Rs. ${((ownerSelectedBooking as any).platform_fee || Math.round((ownerSelectedBooking.total||0)*0.10)).toLocaleString()}`],
-                      ['✅ Your Payout', `Rs. ${((ownerSelectedBooking as any).owner_payout || Math.round((ownerSelectedBooking.total||0)*0.90)).toLocaleString()}`],
-                      [t.status, statusLabel(ownerSelectedBooking.status)],
-                      ['Booked On', ownerSelectedBooking.booked_at ? new Date(ownerSelectedBooking.booked_at).toLocaleDateString() : ''],
-                    ] as [string,string][]).map(([k,v])=>(
-                      <div key={k} className="flex justify-between px-4 py-2.5 text-xs">
-                        <span className="text-slate-500 font-semibold">{k}</span>
-                        <span className="font-black text-slate-900">{v}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Customer details — fetched from DB */}
-                  {ownerSelectedBooking.customer_id && (
-                    <CustomerDetailCard customerId={ownerSelectedBooking.customer_id} />
-                  )}
-
-                  {/* Action buttons inside modal */}
-                  {ownerSelectedBooking.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <button onClick={async ()=>{ await updateBookingStatus(ownerSelectedBooking.id,'confirmed'); setOwnerSelectedBooking(null); }}
-                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wide transition flex items-center justify-center gap-1.5">
-                        ✓ Accept Booking
-                      </button>
-                      <button onClick={async ()=>{
-                        if(!confirm('Decline this booking?')) return;
-                        await declineBooking(ownerSelectedBooking.id);
-                        setOwnerSelectedBooking(null);
-                      }} className="px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
-                        ✕ Decline
-                      </button>
-                    </div>
-                  )}
-                  {ownerSelectedBooking.status === 'confirmed' && (
-                    <div className="flex gap-2">
-                      <button onClick={async ()=>{ await updateBookingStatus(ownerSelectedBooking.id,'completed'); setOwnerSelectedBooking(null); }}
-                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase transition">
-                        ✓ Mark Completed
-                      </button>
-                      <button onClick={async ()=>{ await cancelBooking(ownerSelectedBooking.id,'owner'); setOwnerSelectedBooking(null); }}
-                        className="px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
-                        ✕ Cancel
-                      </button>
-                    </div>
-                  )}
-                  {(ownerSelectedBooking.status === 'completed' || ownerSelectedBooking.status === 'cancelled') && (
-                    <button onClick={async ()=>{
-                      if (!confirm('Remove this booking from history?')) return;
-                      await supabase.from('bookings').delete().eq('id', ownerSelectedBooking.id);
-                      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
-                      setOwnerSelectedBooking(null);
-                      showToast('Booking removed from history');
-                    }} className="w-full py-3 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl font-black text-xs uppercase transition">
-                      🗑 Remove from History
-                    </button>
-                  )}
-                  <button onClick={()=>setOwnerSelectedBooking(null)}
-                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition">
-                    Close
-                  </button>
+                  <div className="flex gap-4"><img src={ownerSelectedBooking.vehicle_img || ''} className="w-28 h-20 rounded-xl object-cover flex-shrink-0" alt=""/><div><p className="font-black text-slate-900">{ownerSelectedBooking.vehicle_name || ''}</p><p className="text-xs text-slate-500 mt-1">{ownerSelectedBooking.shop_name || ''} · {ownerSelectedBooking.location}</p><span className={`inline-block mt-2 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${statusColor(ownerSelectedBooking.status)}`}>{statusLabel(ownerSelectedBooking.status)}</span></div></div>
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100">{([['Rental Period', `${ownerSelectedBooking.pickup_date || ''} → ${ownerSelectedBooking.return_date || ''}`], ['Pickup Time', (ownerSelectedBooking as any).pickup_time || '—'], ['Days', `${ownerSelectedBooking.days} day${ownerSelectedBooking.days > 1 ? 's' : ''}`], ['Pickup Type', (ownerSelectedBooking.delivery_type || 'pickup') === 'delivery' ? t.delivery : t.selfPickup], ['Rate', `Rs. ${(ownerSelectedBooking.price_per_day || 0).toLocaleString()} /day`], ...((ownerSelectedBooking.delivery_type || 'pickup') === 'delivery' ? [['Delivery Fee', 'Rs. 1,500']] : []), ['Customer Pays', `Rs. ${(ownerSelectedBooking.total || 0).toLocaleString()}`], ['Drivo Fee (10%)', `− Rs. ${((ownerSelectedBooking as any).platform_fee || Math.round((ownerSelectedBooking.total || 0) * 0.10)).toLocaleString()}`], ['✅ Your Payout', `Rs. ${((ownerSelectedBooking as any).owner_payout || Math.round((ownerSelectedBooking.total || 0) * 0.90)).toLocaleString()}`], ['Status', statusLabel(ownerSelectedBooking.status)], ['Booked On', ownerSelectedBooking.booked_at ? new Date(ownerSelectedBooking.booked_at).toLocaleDateString() : '']] as [string, string][]).map(([k, v]) => (<div key={k} className="flex justify-between px-4 py-2.5 text-xs"><span className="text-slate-500 font-semibold">{k}</span><span className="font-black text-slate-900">{v}</span></div>))}</div>
+                  {ownerSelectedBooking.customer_id && (<CustomerDetailCard customerId={ownerSelectedBooking.customer_id}/>)}
+                  {ownerSelectedBooking.status === 'pending' && (<div className="flex gap-2"><button onClick={async () => { await updateBookingStatus(ownerSelectedBooking.id, 'confirmed'); setOwnerSelectedBooking(null); }} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wide transition">✓ Accept Booking</button><button onClick={async () => { if (!confirm('Decline this booking?')) return; await declineBooking(ownerSelectedBooking.id); setOwnerSelectedBooking(null); }} className="px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">✕ Decline</button></div>)}
+                  {ownerSelectedBooking.status === 'confirmed' && (<div className="flex gap-2"><button onClick={async () => { await updateBookingStatus(ownerSelectedBooking.id, 'completed'); setOwnerSelectedBooking(null); }} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase transition">✓ Mark Completed</button><button onClick={async () => { await cancelBooking(ownerSelectedBooking.id, 'owner'); setOwnerSelectedBooking(null); }} className="px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">✕ Cancel</button></div>)}
+                  {(ownerSelectedBooking.status === 'completed' || ownerSelectedBooking.status === 'cancelled') && (<button onClick={async () => { if (!confirm('Remove this booking from history?')) return; await supabase.from('bookings').delete().eq('id', ownerSelectedBooking.id); if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); setOwnerSelectedBooking(null); showToast('Booking removed from history'); }} className="w-full py-3 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl font-black text-xs uppercase transition">🗑 Remove from History</button>)}
+                  <button onClick={() => setOwnerSelectedBooking(null)} className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition">Close</button>
                 </div>
               </div>
             </div>
           )}
 
           <div className="max-w-7xl mx-auto px-4 py-6 space-y-5">
-            {ownerSubTab==='bookings' && (
+
+            {/* BOOKINGS TAB */}
+            {ownerSubTab === 'bookings' && (
               <div className="space-y-3">
-                {ownerBookings.length===0 ? (
-                  <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20">
-                    <p className="text-5xl mb-3">📬</p><p className="font-black text-slate-700">{t.noBookings}</p>
-                  </div>
-                ) : ownerBookings.map(b=>(
+                {ownerBookings.length === 0 ? (
+                  <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20"><p className="text-5xl mb-3">📬</p><p className="font-black text-slate-700">{t.noBookings}</p></div>
+                ) : ownerBookings.map(b => (
                   <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="flex gap-4 p-4">
-                      <img src={b.vehicle_img||''} className="w-20 h-14 rounded-xl object-cover flex-shrink-0" alt=""/>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-black text-slate-900 text-sm">{b.vehicle_name||''}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">📅 {b.pickup_date||''} → {b.return_date||''} · {b.days}d</p>
-                            <p className="text-xs text-slate-400">{(b.delivery_type||'pickup')==='delivery'?'🚚 '+t.delivery:'📍 '+t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span> · <span className="text-emerald-600 font-black">You get Rs. {((b as any).owner_payout || Math.round(b.total*0.90)).toLocaleString()}</span></p>
-                          </div>
-                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span>
-                        </div>
-                      </div>
-                    </div>
-                    {b.status==='pending' && (
-                      <div className="border-t border-slate-100 px-4 py-3 space-y-2">
-                        <div className="flex gap-2">
-                          <button onClick={()=>updateBookingStatus(b.id,'confirmed')}
-                            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-black text-xs uppercase tracking-wide transition shadow-sm flex items-center justify-center gap-1.5">
-                            ✓ {t.accept}
-                          </button>
-                          <button onClick={async ()=>{
-                            if(!confirm('Decline this booking?')) return;
-                            await declineBooking(b.id);
-                          }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
-                            ✕ {t.decline}
-                          </button>
-                          <button onClick={()=>setOwnerSelectedBooking(b)}
-                            className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">
-                            Details
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-slate-400 text-center">The customer will receive an SMS confirmation automatically when you accept</p>
-                      </div>
-                    )}
-                    {b.status==='confirmed' && (
-                      <div className="border-t border-slate-100 px-4 py-3 space-y-2">
-                        <div className="flex gap-2">
-                          <button onClick={()=>updateBookingStatus(b.id,'completed')}
-                            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase transition">
-                            ✓ Mark Completed
-                          </button>
-                          <button onClick={()=>cancelBooking(b.id, 'owner')}
-                            className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">
-                            ✕ Cancel
-                          </button>
-                          <button onClick={()=>setOwnerSelectedBooking(b)}
-                            className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">
-                            Details
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-slate-400 text-center">Cancelling will notify the customer via SMS and make the vehicle available again</p>
-                      </div>
-                    )}
-                    {(b.status==='completed'||b.status==='cancelled') && (
-                      <div className="border-t border-slate-100 px-4 py-2.5 flex justify-end">
-                        <button onClick={()=>setOwnerSelectedBooking(b)}
-                          className="text-xs font-black text-slate-500 hover:text-slate-900 transition">
-                          {t.bookingDetails} →
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-4 p-4"><img src={b.vehicle_img || ''} className="w-20 h-14 rounded-xl object-cover flex-shrink-0" alt=""/><div className="flex-1 min-w-0"><div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-900 text-sm">{b.vehicle_name || ''}</p><p className="text-xs text-slate-400 mt-0.5">📅 {b.pickup_date || ''} → {b.return_date || ''} · {b.days}d</p><p className="text-xs text-slate-400">{(b.delivery_type || 'pickup') === 'delivery' ? '🚚 ' + t.delivery : '📍 ' + t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span> · <span className="text-emerald-600 font-black">You get Rs. {((b as any).owner_payout || Math.round(b.total * 0.90)).toLocaleString()}</span></p></div><span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span></div></div></div>
+                    {b.status === 'pending' && (<div className="border-t border-slate-100 px-4 py-3 space-y-2"><div className="flex gap-2"><button onClick={() => updateBookingStatus(b.id, 'confirmed')} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-black text-xs uppercase tracking-wide transition shadow-sm flex items-center justify-center gap-1.5">✓ {t.accept}</button><button onClick={async () => { if (!confirm('Decline this booking?')) return; await declineBooking(b.id); }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">✕ {t.decline}</button><button onClick={() => setOwnerSelectedBooking(b)} className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">Details</button></div><p className="text-[10px] text-slate-400 text-center">The customer will receive an SMS confirmation automatically when you accept</p></div>)}
+                    {b.status === 'confirmed' && (<div className="border-t border-slate-100 px-4 py-3"><div className="flex gap-2"><button onClick={() => updateBookingStatus(b.id, 'completed')} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase transition">✓ Mark Completed</button><button onClick={() => cancelBooking(b.id, 'owner')} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">✕ Cancel</button><button onClick={() => setOwnerSelectedBooking(b)} className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">Details</button></div></div>)}
+                    {(b.status === 'completed' || b.status === 'cancelled') && (<div className="border-t border-slate-100 px-4 py-2.5 flex justify-end"><button onClick={() => setOwnerSelectedBooking(b)} className="text-xs font-black text-slate-500 hover:text-slate-900 transition">{t.bookingDetails} →</button></div>)}
                   </div>
                 ))}
               </div>
             )}
 
-            {ownerSubTab==='earnings' && (
+            {/* EARNINGS TAB */}
+            {ownerSubTab === 'earnings' && (
               <div className="space-y-5">
-                {/* Period selector */}
-                <div className="flex items-center justify-between">
-                  <h2 className="font-black text-slate-900 text-lg">💰 Earnings Overview</h2>
-                  <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-                    {(['weekly','monthly','yearly'] as const).map(p=>(
-                      <button key={p} onClick={()=>setEarningsPeriod(p)}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase transition ${earningsPeriod===p?'bg-white text-slate-900 shadow':'text-slate-500 hover:text-slate-700'}`}>
-                        {p==='weekly'?'Week':p==='monthly'?'Month':'Year'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Earnings stats */}
+                <div className="flex items-center justify-between"><h2 className="font-black text-slate-900 text-lg">💰 Earnings Overview</h2><div className="flex gap-1 bg-slate-100 rounded-xl p-1">{(['weekly', 'monthly', 'yearly'] as const).map(p => (<button key={p} onClick={() => setEarningsPeriod(p)} className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase transition ${earningsPeriod === p ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700'}`}>{p === 'weekly' ? 'Week' : p === 'monthly' ? 'Month' : 'Year'}</button>))}</div></div>
                 {(() => {
                   const now = new Date();
                   const filtered = ownerBookings.filter(b => {
                     if (b.status !== 'completed') return false;
                     const d = new Date(b.booked_at || '');
-                    if (earningsPeriod === 'weekly') {
-                      const weekAgo = new Date(now); weekAgo.setDate(now.getDate()-7);
-                      return d >= weekAgo;
-                    } else if (earningsPeriod === 'monthly') {
-                      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                    } else {
-                      return d.getFullYear() === now.getFullYear();
-                    }
+                    if (earningsPeriod === 'weekly') { const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7); return d >= weekAgo; }
+                    else if (earningsPeriod === 'monthly') { return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }
+                    else { return d.getFullYear() === now.getFullYear(); }
                   });
-                  const gross     = filtered.reduce((s,b) => s+(b.total||0), 0);
-                  const fee       = filtered.reduce((s,b) => s+((b as any).platform_fee||Math.round((b.total||0)*0.10)), 0);
-                  const payout    = gross - fee;
-                  const pending   = ownerBookings.filter(b=>b.status==='pending').reduce((s,b)=>s+(b.total||0),0);
-                  const confirmed = ownerBookings.filter(b=>b.status==='confirmed').reduce((s,b)=>s+(b.total||0),0);
-
+                  const gross = filtered.reduce((s, b) => s + (b.total || 0), 0);
+                  const fee = filtered.reduce((s, b) => s + ((b as any).platform_fee || Math.round((b.total || 0) * 0.10)), 0);
+                  const payout = gross - fee;
+                  const pending = ownerBookings.filter(b => b.status === 'pending').reduce((s, b) => s + (b.total || 0), 0);
+                  const confirmed = ownerBookings.filter(b => b.status === 'confirmed').reduce((s, b) => s + (b.total || 0), 0);
                   return (
                     <>
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[
-                          {label:'Gross Revenue', value:`Rs. ${gross.toLocaleString()}`, icon:'📈', color:'bg-emerald-50 border-emerald-200', text:'text-emerald-700'},
-                          {label:'Drivo Fee (10%)', value:`Rs. ${fee.toLocaleString()}`, icon:'💳', color:'bg-blue-50 border-blue-200', text:'text-blue-700'},
-                          {label:'Your Payout', value:`Rs. ${payout.toLocaleString()}`, icon:'💰', color:'bg-slate-900 border-slate-900', text:'text-white', labelText:'text-slate-300'},
-                          {label:'Completed Rentals', value:filtered.length, icon:'✅', color:'bg-purple-50 border-purple-200', text:'text-purple-700'},
-                        ].map(s=>(
-                          <div key={s.label} className={`${s.color} border rounded-2xl p-4`}>
-                            <p className="text-xl mb-1">{s.icon}</p>
-                            <p className={`text-xl font-black ${s.text}`}>{s.value}</p>
-                            <p className={`text-xs font-semibold mt-0.5 ${(s as any).labelText||'text-slate-500'}`}>{s.label}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Upcoming earnings */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                          <p className="text-lg mb-1">⏳</p>
-                          <p className="text-lg font-black text-amber-700">Rs. {pending.toLocaleString()}</p>
-                          <p className="text-xs text-amber-600 font-semibold">Pending approval</p>
-                        </div>
-                        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
-                          <p className="text-lg mb-1">🤝</p>
-                          <p className="text-lg font-black text-teal-700">Rs. {(confirmed-fee).toLocaleString()}</p>
-                          <p className="text-xs text-teal-600 font-semibold">Confirmed (incoming)</p>
-                        </div>
-                      </div>
-
-                      {/* Recent completed bookings */}
-                      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                        <div className="px-5 py-4 border-b border-slate-100">
-                          <h3 className="font-black text-slate-900 text-sm">Completed Rentals — {earningsPeriod}</h3>
-                        </div>
-                        {filtered.length === 0 ? (
-                          <div className="text-center py-12">
-                            <p className="text-3xl mb-2">📭</p>
-                            <p className="text-sm font-black text-slate-500">No completed rentals this {earningsPeriod === 'weekly' ? 'week' : earningsPeriod === 'monthly' ? 'month' : 'year'}</p>
-                          </div>
-                        ) : (
-                          <div className="divide-y divide-slate-100">
-                            {filtered.map(b=>(
-                              <div key={b.id} className="flex items-center gap-4 px-5 py-3">
-                                <img src={b.vehicle_img||''} className="w-14 h-10 rounded-xl object-cover flex-shrink-0 bg-slate-100" alt=""/>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-black text-slate-900 text-sm">{b.vehicle_name}</p>
-                                  <p className="text-xs text-slate-400">{b.pickup_date} → {b.return_date} · {b.days}d</p>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                  <p className="font-black text-slate-900 text-sm">Rs. {((b as any).owner_payout || Math.round((b.total||0)*0.90)).toLocaleString()}</p>
-                                  <p className="text-[10px] text-slate-400">after 10% fee</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[{ label: 'Gross Revenue', value: `Rs. ${gross.toLocaleString()}`, icon: '📈', color: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' }, { label: 'Drivo Fee (10%)', value: `Rs. ${fee.toLocaleString()}`, icon: '💳', color: 'bg-blue-50 border-blue-200', text: 'text-blue-700' }, { label: 'Your Payout', value: `Rs. ${payout.toLocaleString()}`, icon: '💰', color: 'bg-slate-900 border-slate-900', text: 'text-white', labelText: 'text-slate-300' }, { label: 'Completed Rentals', value: filtered.length, icon: '✅', color: 'bg-purple-50 border-purple-200', text: 'text-purple-700' }].map(s => (<div key={s.label} className={`${s.color} border rounded-2xl p-4`}><p className="text-xl mb-1">{s.icon}</p><p className={`text-xl font-black ${s.text}`}>{s.value}</p><p className={`text-xs font-semibold mt-0.5 ${(s as any).labelText || 'text-slate-500'}`}>{s.label}</p></div>))}</div>
+                      <div className="grid grid-cols-2 gap-4"><div className="bg-amber-50 border border-amber-200 rounded-2xl p-4"><p className="text-lg mb-1">⏳</p><p className="text-lg font-black text-amber-700">Rs. {pending.toLocaleString()}</p><p className="text-xs text-amber-600 font-semibold">Pending approval</p></div><div className="bg-teal-50 border border-teal-200 rounded-2xl p-4"><p className="text-lg mb-1">🤝</p><p className="text-lg font-black text-teal-700">Rs. {(confirmed - fee).toLocaleString()}</p><p className="text-xs text-teal-600 font-semibold">Confirmed (incoming)</p></div></div>
+                      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden"><div className="px-5 py-4 border-b border-slate-100"><h3 className="font-black text-slate-900 text-sm">Completed Rentals — {earningsPeriod}</h3></div>{filtered.length === 0 ? (<div className="text-center py-12"><p className="text-3xl mb-2">📭</p><p className="text-sm font-black text-slate-500">No completed rentals this {earningsPeriod === 'weekly' ? 'week' : earningsPeriod === 'monthly' ? 'month' : 'year'}</p></div>) : (<div className="divide-y divide-slate-100">{filtered.map(b => (<div key={b.id} className="flex items-center gap-4 px-5 py-3"><img src={b.vehicle_img || ''} className="w-14 h-10 rounded-xl object-cover flex-shrink-0 bg-slate-100" alt=""/><div className="flex-1 min-w-0"><p className="font-black text-slate-900 text-sm">{b.vehicle_name}</p><p className="text-xs text-slate-400">{b.pickup_date} → {b.return_date} · {b.days}d</p></div><div className="text-right flex-shrink-0"><p className="font-black text-slate-900 text-sm">Rs. {((b as any).owner_payout || Math.round((b.total || 0) * 0.90)).toLocaleString()}</p><p className="text-[10px] text-slate-400">after 10% fee</p></div></div>))}</div>)}</div>
                     </>
                   );
                 })()}
               </div>
             )}
 
-            {ownerSubTab==='fleet' && (
+            {/* FLEET TAB */}
+            {ownerSubTab === 'fleet' && (
               <>
-                {(showAddForm||editingId) && (
+                {(showAddForm || editingId) && (
                   <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="flex items-center justify-between px-6 py-4 border-b bg-slate-50">
-                      <h3 className="font-black text-slate-900">{editingId?t.editVehicle:t.addNew}</h3>
-                      <button onClick={()=>{ setShowAddForm(false); setEditingId(null); setPhotos([]); }} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 font-black text-xl transition">×</button>
-                    </div>
+                    <div className="flex items-center justify-between px-6 py-4 border-b bg-slate-50"><h3 className="font-black text-slate-900">{editingId ? t.editVehicle : t.addNew}</h3><button onClick={() => { setShowAddForm(false); setEditingId(null); setPhotos([]); }} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 font-black text-xl transition">×</button></div>
                     <form onSubmit={handleVehicleSubmit} className="p-6 space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.vehicleName} <span className="text-red-400">*</span></label>
-                          <input required type="text" placeholder="e.g. Honda CB 150R" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition" value={newV.name} onChange={e=>setNewV({...newV,name:e.target.value})}/></div>
-                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.vehicleType}</label>
-                          <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition" value={newV.type} onChange={e=>setNewV({...newV,type:e.target.value})}>
-                            <option value="car">🚙 {t.cars}</option><option value="van">🚐 Van</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option>
-                          </select></div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.vehicleName} <span className="text-red-400">*</span></label><input required type="text" placeholder="e.g. Honda CB 150R" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition" value={newV.name} onChange={e => setNewV({ ...newV, name: e.target.value })}/></div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.vehicleType}</label><select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition" value={newV.type} onChange={e => setNewV({ ...newV, type: e.target.value })}><option value="car">🚙 {t.cars}</option><option value="van">🚐 Van</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option></select></div>
                       </div>
-                      {/* District selector */}
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📍 District <span className="text-red-400">*</span></label>
-                        <select required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition"
-                          value={(newV as any).district || ownerAcc?.city || 'Colombo'}
-                          onChange={e=>setNewV({...newV, district: e.target.value} as any)}>
-                          {SL_CITIES.slice(1).map(c=><option key={c} value={c}>{c}</option>)}
-                        </select>
-                        <p className="text-[10px] text-slate-400 mt-1">Vehicle eka available wena district eka select karanna</p>
-                      </div>
-
+                      <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📍 District <span className="text-red-400">*</span></label><select required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition" value={(newV as any).district || ownerAcc?.city || 'Colombo'} onChange={e => setNewV({ ...newV, district: e.target.value } as any)}>{SL_CITIES.slice(1).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.transmission}</label>
-                          <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-xs font-bold outline-none cursor-pointer" value={newV.transmission} onChange={e=>setNewV({...newV,transmission:e.target.value})}>
-                            <option>{t.automatic}</option><option>{t.manual}</option></select></div>
-                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.fuel}</label>
-                          <select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-xs font-bold outline-none cursor-pointer" value={newV.fuel} onChange={e=>setNewV({...newV,fuel:e.target.value})}>
-                            <option>{t.petrol}</option><option>{t.hybrid}</option><option>{t.diesel}</option><option>{t.electric}</option></select></div>
-                        <div className="col-span-2"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.priceDay} <span className="text-red-400">*</span></label>
-                          <input type="number" required min="500" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={newV.pricePerDay} onChange={e=>setNewV({...newV,pricePerDay:Number(e.target.value)})}/></div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.transmission}</label><select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-xs font-bold outline-none cursor-pointer" value={newV.transmission} onChange={e => setNewV({ ...newV, transmission: e.target.value })}><option>{t.automatic}</option><option>{t.manual}</option></select></div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.fuel}</label><select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-xs font-bold outline-none cursor-pointer" value={newV.fuel} onChange={e => setNewV({ ...newV, fuel: e.target.value })}><option>{t.petrol}</option><option>{t.hybrid}</option><option>{t.diesel}</option><option>{t.electric}</option></select></div>
+                        <div className="col-span-2"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.priceDay} <span className="text-red-400">*</span></label><input type="number" required min="500" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={newV.pricePerDay} onChange={e => setNewV({ ...newV, pricePerDay: Number(e.target.value) })}/></div>
                       </div>
-
-                      {/* ── STRUCTURED 6-ANGLE PHOTO UPLOAD ── */}
                       <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Vehicle Photos (6 Required)</label>
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${photos.filter(Boolean).length < 6 ? 'bg-red-50 text-red-500 border-red-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
-                            {photos.filter(Boolean).length}/6
-                          </span>
-                        </div>
-
-                        {/* Cover photo — full width, prominent */}
+                        <div className="flex items-center justify-between mb-3"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Vehicle Photos (6 Required)</label><span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${photos.filter(Boolean).length < 6 ? 'bg-red-50 text-red-500 border-red-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>{photos.filter(Boolean).length}/6</span></div>
                         <div className="mb-3">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <p className="text-[10px] font-black text-slate-700 uppercase tracking-wide">🚗 Cover Photo — Front + Side View</p>
-                            {photos[0] ? <span className="text-[9px] text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded-full">✓ Added</span> : <span className="text-[9px] text-red-500 font-black">Required</span>}
-                          </div>
-                          <label className="block cursor-pointer">
-                            <div className={`relative w-full aspect-[16/7] rounded-2xl overflow-hidden border-2 transition ${photos[0] ? 'border-emerald-400' : 'border-dashed border-red-300 hover:border-red-400 bg-slate-50'}`}>
-                              {photos[0] ? (
-                                <>
-                                  <img src={photos[0]} className="w-full h-full object-cover" alt="Cover"/>
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center">
-                                    <span className="text-white text-xs font-black bg-black/60 px-3 py-1.5 rounded-xl">Click to replace</span>
-                                  </div>
-                                  <span className="absolute top-2 left-2 text-[9px] bg-slate-900 text-white font-black px-2 py-0.5 rounded uppercase">Cover · Main Listing Photo</span>
-                                  <button type="button" onClick={e=>{e.preventDefault();removePhoto(0);}}
-                                    className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full text-sm font-black flex items-center justify-center hover:bg-red-600 transition">×</button>
-                                </>
-                              ) : (
-                                <div className="flex flex-col items-center justify-center h-full pointer-events-none">
-                                  <p className="text-4xl mb-2">📸</p>
-                                  <p className="text-sm font-black text-slate-600">Front + side angle — main listing photo</p>
-                                  <p className="text-xs text-slate-400 mt-1">This is the first photo customers see</p>
-                                </div>
-                              )}
-                            </div>
-                            <input type="file" accept="image/*" className="hidden"
-                              onChange={e=>{ const file=e.target.files?.[0]; if(!file) return; const r=new FileReader(); r.onloadend=()=>setPhotos(prev=>{const n=[...prev];while(n.length<=0)n.push('');n[0]=r.result as string;return n;}); r.readAsDataURL(file); }}/>
-                          </label>
+                          <div className="flex items-center justify-between mb-1.5"><p className="text-[10px] font-black text-slate-700 uppercase tracking-wide">🚗 Cover Photo</p>{photos[0] ? <span className="text-[9px] text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded-full">✓ Added</span> : <span className="text-[9px] text-red-500 font-black">Required</span>}</div>
+                          <label className="block cursor-pointer"><div className={`relative w-full aspect-[16/7] rounded-2xl overflow-hidden border-2 transition ${photos[0] ? 'border-emerald-400' : 'border-dashed border-red-300 hover:border-red-400 bg-slate-50'}`}>{photos[0] ? (<><img src={photos[0]} className="w-full h-full object-cover" alt="Cover"/><button type="button" onClick={e => { e.preventDefault(); removePhoto(0); }} className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full text-sm font-black flex items-center justify-center hover:bg-red-600 transition">×</button></>) : (<div className="flex flex-col items-center justify-center h-full pointer-events-none"><p className="text-4xl mb-2">📸</p><p className="text-sm font-black text-slate-600">Front + side angle</p></div>)}</div><input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const r = new FileReader(); r.onloadend = () => setPhotos(prev => { const n = [...prev]; while (n.length <= 0) n.push(''); n[0] = r.result as string; return n; }); r.readAsDataURL(file); }}/></label>
                         </div>
-
-                        {/* 3 corner exterior shots */}
                         <div className="mb-3">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-2">Exterior — 3 More Angles</p>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[
-                              {idx:1, label:'Front View',      hint:'Straight front'},
-                              {idx:2, label:'Side View',       hint:'Full side profile'},
-                              {idx:3, label:'Rear View',       hint:'Back of vehicle'},
-                            ].map(slot=>(
-                              <div key={slot.idx}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className="text-[9px] font-black text-slate-600">{slot.label}</p>
-                                  {photos[slot.idx] ? <span className="text-[8px] text-emerald-600 font-black">✓</span> : <span className="text-[8px] text-red-400">req</span>}
-                                </div>
-                                <label className="block cursor-pointer">
-                                  <div className={`relative aspect-video rounded-xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50'}`}>
-                                    {photos[slot.idx] ? (
-                                      <>
-                                        <img src={photos[slot.idx]} className="w-full h-full object-cover" alt={slot.label}/>
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center">
-                                          <span className="text-white text-[9px] font-black">Replace</span>
-                                        </div>
-                                        <button type="button" onClick={e=>{e.preventDefault();removePhoto(slot.idx);}}
-                                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center">×</button>
-                                      </>
-                                    ) : (
-                                      <div className="flex flex-col items-center justify-center h-full pointer-events-none py-2">
-                                        <p className="text-lg">📷</p>
-                                        <p className="text-[9px] text-slate-400 font-bold text-center px-1">{slot.hint}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <input type="file" accept="image/*" className="hidden"
-                                    onChange={e=>{ const file=e.target.files?.[0]; if(!file) return; const r=new FileReader(); r.onloadend=()=>setPhotos(prev=>{const n=[...prev];while(n.length<=slot.idx)n.push('');n[slot.idx]=r.result as string;return n;}); r.readAsDataURL(file); }}/>
-                                </label>
-                              </div>
-                            ))}
-                          </div>
+                          <div className="grid grid-cols-3 gap-2">{[{ idx: 1, label: 'Front View', hint: 'Straight front' }, { idx: 2, label: 'Side View', hint: 'Full side profile' }, { idx: 3, label: 'Rear View', hint: 'Back of vehicle' }].map(slot => (<div key={slot.idx}><div className="flex items-center justify-between mb-1"><p className="text-[9px] font-black text-slate-600">{slot.label}</p>{photos[slot.idx] ? <span className="text-[8px] text-emerald-600 font-black">✓</span> : <span className="text-[8px] text-red-400">req</span>}</div><label className="block cursor-pointer"><div className={`relative aspect-video rounded-xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50'}`}>{photos[slot.idx] ? (<><img src={photos[slot.idx]} className="w-full h-full object-cover" alt={slot.label}/><button type="button" onClick={e => { e.preventDefault(); removePhoto(slot.idx); }} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center">×</button></>) : (<div className="flex flex-col items-center justify-center h-full pointer-events-none py-2"><p className="text-lg">📷</p><p className="text-[9px] text-slate-400 font-bold text-center px-1">{slot.hint}</p></div>)}</div><input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const r = new FileReader(); r.onloadend = () => setPhotos(prev => { const n = [...prev]; while (n.length <= slot.idx) n.push(''); n[slot.idx] = r.result as string; return n; }); r.readAsDataURL(file); }}/></label></div>))}</div>
                         </div>
-
-                        {/* Interior shots */}
                         <div>
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-2">Interior — 2 Photos</p>
-                          <div className="grid grid-cols-2 gap-3">
-                            {[
-                              {idx:4, label:'🪞 Dashboard & Steering Wheel', hint:'Full dashboard view'},
-                              {idx:5, label:'💺 Seats',                      hint:'Front + rear seats'},
-                            ].map(slot=>(
-                              <div key={slot.idx}>
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <p className="text-[9px] font-black text-slate-600">{slot.label}</p>
-                                  {photos[slot.idx] ? <span className="text-[8px] text-emerald-600 font-black">✓ Added</span> : <span className="text-[8px] text-red-400">Required</span>}
-                                </div>
-                                <label className="block cursor-pointer">
-                                  <div className={`relative aspect-video rounded-xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50'}`}>
-                                    {photos[slot.idx] ? (
-                                      <>
-                                        <img src={photos[slot.idx]} className="w-full h-full object-cover" alt={slot.label}/>
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center">
-                                          <span className="text-white text-xs font-black">Click to replace</span>
-                                        </div>
-                                        <button type="button" onClick={e=>{e.preventDefault();removePhoto(slot.idx);}}
-                                          className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 text-white rounded-full text-xs font-black flex items-center justify-center">×</button>
-                                      </>
-                                    ) : (
-                                      <div className="flex flex-col items-center justify-center h-full pointer-events-none py-3">
-                                        <p className="text-2xl mb-1">📸</p>
-                                        <p className="text-[10px] font-black text-slate-500 text-center px-2">{slot.hint}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <input type="file" accept="image/*" className="hidden"
-                                    onChange={e=>{ const file=e.target.files?.[0]; if(!file) return; const r=new FileReader(); r.onloadend=()=>setPhotos(prev=>{const n=[...prev];while(n.length<=slot.idx)n.push('');n[slot.idx]=r.result as string;return n;}); r.readAsDataURL(file); }}/>
-                                </label>
-                              </div>
-                            ))}
-                          </div>
+                          <div className="grid grid-cols-2 gap-3">{[{ idx: 4, label: '🪞 Dashboard', hint: 'Full dashboard view' }, { idx: 5, label: '💺 Seats', hint: 'Front + rear seats' }].map(slot => (<div key={slot.idx}><div className="flex items-center justify-between mb-1.5"><p className="text-[9px] font-black text-slate-600">{slot.label}</p>{photos[slot.idx] ? <span className="text-[8px] text-emerald-600 font-black">✓ Added</span> : <span className="text-[8px] text-red-400">Required</span>}</div><label className="block cursor-pointer"><div className={`relative aspect-video rounded-xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50'}`}>{photos[slot.idx] ? (<><img src={photos[slot.idx]} className="w-full h-full object-cover" alt={slot.label}/><button type="button" onClick={e => { e.preventDefault(); removePhoto(slot.idx); }} className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 text-white rounded-full text-xs font-black flex items-center justify-center">×</button></>) : (<div className="flex flex-col items-center justify-center h-full pointer-events-none py-3"><p className="text-2xl mb-1">📸</p><p className="text-[10px] font-black text-slate-500 text-center px-2">{slot.hint}</p></div>)}</div><input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const r = new FileReader(); r.onloadend = () => setPhotos(prev => { const n = [...prev]; while (n.length <= slot.idx) n.push(''); n[slot.idx] = r.result as string; return n; }); r.readAsDataURL(file); }}/></label></div>))}</div>
                         </div>
-
-                        <p className="text-[10px] text-slate-400 mt-3 text-center">
-                          6 photos required · Cover photo = main listing image · All angles help customers book with confidence
-                        </p>
                       </div>
-
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
-                          📍 Pickup Location (Google Maps) <span className="text-red-400">*</span>
-                        </label>
-                        <input type="url" required
-                          placeholder="Paste Google Maps link — e.g. https://maps.google.com/?q=..."
-                          className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:bg-white transition ${newV.mapLink?'border-emerald-400 focus:border-emerald-500':'border-red-300 focus:border-slate-900'}`}
-                          value={newV.mapLink} onChange={e=>setNewV({...newV,mapLink:e.target.value})}/>
-                        <p className="text-[10px] text-slate-400 mt-1.5">Google Maps eke "Share" → "Copy link" karala paste karanna · <span className="text-red-500 font-bold">Required</span></p>
-                        {newV.mapLink && (
-                          <a href={newV.mapLink} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-blue-600 hover:underline">
-                            📍 Preview location →
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Revenue Licence + Insurance Expiry */}
+                      <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📍 Pickup Location (Google Maps) <span className="text-red-400">*</span></label><input type="url" required placeholder="Paste Google Maps link" className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:bg-white transition ${newV.mapLink ? 'border-emerald-400 focus:border-emerald-500' : 'border-red-300 focus:border-slate-900'}`} value={newV.mapLink} onChange={e => setNewV({ ...newV, mapLink: e.target.value })}/></div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
-                            📄 Revenue Licence Expiry
-                          </label>
-                          <input type="date"
-                            className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white transition cursor-pointer ${
-                              (newV as any).revenueLicenceExpiry && new Date((newV as any).revenueLicenceExpiry) < new Date()
-                                ? 'border-red-400 bg-red-50 text-red-600'
-                                : (newV as any).revenueLicenceExpiry
-                                  ? 'border-emerald-400 text-slate-800'
-                                  : 'border-slate-200 text-slate-800'
-                            }`}
-                            value={(newV as any).revenueLicenceExpiry || ''}
-                            onChange={e=>setNewV({...newV, revenueLicenceExpiry: e.target.value} as any)}
-                            style={{colorScheme:'light'}}/>
-                          {(newV as any).revenueLicenceExpiry && new Date((newV as any).revenueLicenceExpiry) < new Date() && (
-                            <p className="text-[10px] text-red-500 font-black mt-1">⚠️ EXPIRED — Renew before listing!</p>
-                          )}
-                          {(newV as any).revenueLicenceExpiry && new Date((newV as any).revenueLicenceExpiry) >= new Date() && (() => {
-                            const days = Math.ceil((new Date((newV as any).revenueLicenceExpiry).getTime() - Date.now()) / 86400000);
-                            return days <= 30 ? <p className="text-[10px] text-amber-500 font-black mt-1">⚠️ Expires in {days} days</p> : null;
-                          })()}
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
-                            🛡️ Insurance Expiry
-                          </label>
-                          <input type="date"
-                            className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white transition cursor-pointer ${
-                              (newV as any).insuranceExpiry && new Date((newV as any).insuranceExpiry) < new Date()
-                                ? 'border-red-400 bg-red-50 text-red-600'
-                                : (newV as any).insuranceExpiry
-                                  ? 'border-emerald-400 text-slate-800'
-                                  : 'border-slate-200 text-slate-800'
-                            }`}
-                            value={(newV as any).insuranceExpiry || ''}
-                            onChange={e=>setNewV({...newV, insuranceExpiry: e.target.value} as any)}
-                            style={{colorScheme:'light'}}/>
-                          {(newV as any).insuranceExpiry && new Date((newV as any).insuranceExpiry) < new Date() && (
-                            <p className="text-[10px] text-red-500 font-black mt-1">⚠️ EXPIRED — Renew before listing!</p>
-                          )}
-                          {(newV as any).insuranceExpiry && new Date((newV as any).insuranceExpiry) >= new Date() && (() => {
-                            const days = Math.ceil((new Date((newV as any).insuranceExpiry).getTime() - Date.now()) / 86400000);
-                            return days <= 30 ? <p className="text-[10px] text-amber-500 font-black mt-1">⚠️ Expires in {days} days</p> : null;
-                          })()}
-                        </div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📄 Revenue Licence Expiry</label><input type="date" className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white transition cursor-pointer ${(newV as any).revenueLicenceExpiry && new Date((newV as any).revenueLicenceExpiry) < new Date() ? 'border-red-400 bg-red-50 text-red-600' : (newV as any).revenueLicenceExpiry ? 'border-emerald-400 text-slate-800' : 'border-slate-200 text-slate-800'}`} value={(newV as any).revenueLicenceExpiry || ''} onChange={e => setNewV({ ...newV, revenueLicenceExpiry: e.target.value } as any)} style={{ colorScheme: 'light' }}/></div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🛡️ Insurance Expiry</label><input type="date" className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white transition cursor-pointer ${(newV as any).insuranceExpiry && new Date((newV as any).insuranceExpiry) < new Date() ? 'border-red-400 bg-red-50 text-red-600' : (newV as any).insuranceExpiry ? 'border-emerald-400 text-slate-800' : 'border-slate-200 text-slate-800'}`} value={(newV as any).insuranceExpiry || ''} onChange={e => setNewV({ ...newV, insuranceExpiry: e.target.value } as any)} style={{ colorScheme: 'light' }}/></div>
                       </div>
-
-                      <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.description}</label>
-                        <textarea rows={2} placeholder="AC, helmet, insurance..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition resize-none" value={newV.description} onChange={e=>setNewV({...newV,description:e.target.value})}/></div>
-
-                      {/* Weekly & Monthly Pricing */}
+                      <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.description}</label><textarea rows={2} placeholder="AC, helmet, insurance..." className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 focus:bg-white transition resize-none" value={newV.description} onChange={e => setNewV({ ...newV, description: e.target.value })}/></div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📆 Weekly Price (Rs.)</label>
-                          <input type="number" min="0" placeholder="e.g. 28000 (leave 0 if N/A)"
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
-                            value={(newV as any).weeklyPrice || ''}
-                            onChange={e=>setNewV({...newV, weeklyPrice: Number(e.target.value)} as any)}/>
-                          <p className="text-[10px] text-slate-400 mt-1">7 days flat rate · 0 = not available</p>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🗓️ Monthly Price (Rs.)</label>
-                          <input type="number" min="0" placeholder="e.g. 95000 (leave 0 if N/A)"
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
-                            value={(newV as any).monthlyPrice || ''}
-                            onChange={e=>setNewV({...newV, monthlyPrice: Number(e.target.value)} as any)}/>
-                          <p className="text-[10px] text-slate-400 mt-1">28 days flat rate · 0 = not available</p>
-                        </div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📆 Weekly Price (Rs.)</label><input type="number" min="0" placeholder="0 = N/A" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={(newV as any).weeklyPrice || ''} onChange={e => setNewV({ ...newV, weeklyPrice: Number(e.target.value) } as any)}/></div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🗓️ Monthly Price (Rs.)</label><input type="number" min="0" placeholder="0 = N/A" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={(newV as any).monthlyPrice || ''} onChange={e => setNewV({ ...newV, monthlyPrice: Number(e.target.value) } as any)}/></div>
                       </div>
-
-                      {/* KM Limit + Deposit */}
                       <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🛣️ KM/Day Limit</label>
-                          <input type="number" min="0"
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
-                            value={(newV as any).kmPerDay || 200}
-                            onChange={e=>setNewV({...newV, kmPerDay: Number(e.target.value)} as any)}/>
-                          <p className="text-[10px] text-slate-400 mt-1">0 = unlimited</p>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">⚡ Extra KM (Rs.)</label>
-                          <input type="number" min="0"
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
-                            value={(newV as any).extraKmCharge || 50}
-                            onChange={e=>setNewV({...newV, extraKmCharge: Number(e.target.value)} as any)}/>
-                          <p className="text-[10px] text-slate-400 mt-1">Per extra km charge</p>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🔐 Deposit (Rs.)</label>
-                          <input type="number" min="0"
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition"
-                            value={(newV as any).depositAmount || 0}
-                            onChange={e=>setNewV({...newV, depositAmount: Number(e.target.value)} as any)}/>
-                          <p className="text-[10px] text-slate-400 mt-1">0 = no deposit</p>
-                        </div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🛣️ KM/Day</label><input type="number" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={(newV as any).kmPerDay || 200} onChange={e => setNewV({ ...newV, kmPerDay: Number(e.target.value) } as any)}/></div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">⚡ Extra KM (Rs.)</label><input type="number" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={(newV as any).extraKmCharge || 50} onChange={e => setNewV({ ...newV, extraKmCharge: Number(e.target.value) } as any)}/></div>
+                        <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🔐 Deposit (Rs.)</label><input type="number" min="0" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={(newV as any).depositAmount || 0} onChange={e => setNewV({ ...newV, depositAmount: Number(e.target.value) } as any)}/></div>
                       </div>
-
-                      {/* Delivery Option */}
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">🚚 Delivery Option</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {([
-                            ['pickup_only',   '📍 Self Pickup Only',  'Customer comes to you'],
-                            ['delivery_only', '🚚 Delivery Only',     'You deliver to customer'],
-                            ['both',          '✅ Both Options',       'Customer chooses'],
-                          ] as [string,string,string][]).map(([val,label,note])=>(
-                            <button key={val} type="button" onClick={()=>setNewV({...newV,deliveryOption:val} as any)}
-                              className={`py-2.5 px-2 rounded-xl border text-center transition ${(newV as any).deliveryOption===val?'bg-slate-900 text-white border-slate-900':'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
-                              <p className="text-xs font-black">{label}</p>
-                              <p className="text-[10px] opacity-60 mt-0.5">{note}</p>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Driver Option */}
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">🧑‍✈️ Driver Option</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {([
-                            ['self_drive', '🚗 Self Drive', 'Customer drives'],
-                            ['with_driver', '🧑‍✈️ With Driver', 'Driver included'],
-                            ['both', '✅ Both Options', 'Customer chooses'],
-                          ] as [string,string,string][]).map(([val,label,note])=>(
-                            <button key={val} type="button" onClick={()=>setNewV({...newV,driverOption:val})}
-                              className={`py-2.5 px-2 rounded-xl border text-center transition ${(newV as any).driverOption===val?'bg-slate-900 text-white border-slate-900':'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
-                              <p className="text-xs font-black">{label}</p>
-                              <p className="text-[10px] opacity-60 mt-0.5">{note}</p>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <button type="button" onClick={()=>{ setShowAddForm(false); setEditingId(null); setPhotos([]); }} className="px-6 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-sm text-slate-700 transition">{t.cancel}</button>
-                        <button type="submit" className="flex-1 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white py-3 rounded-xl font-black text-sm uppercase tracking-wide transition shadow-md">{editingId?t.saveChanges:t.publishLive}</button>
-                      </div>
+                      <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">🚚 Delivery Option</label><div className="grid grid-cols-3 gap-2">{([['pickup_only', '📍 Self Pickup Only', 'Customer comes to you'], ['delivery_only', '🚚 Delivery Only', 'You deliver'], ['both', '✅ Both Options', 'Customer chooses']] as [string, string, string][]).map(([val, label, note]) => (<button key={val} type="button" onClick={() => setNewV({ ...newV, deliveryOption: val } as any)} className={`py-2.5 px-2 rounded-xl border text-center transition ${(newV as any).deliveryOption === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}><p className="text-xs font-black">{label}</p><p className="text-[10px] opacity-60 mt-0.5">{note}</p></button>))}</div></div>
+                      <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">🧑‍✈️ Driver Option</label><div className="grid grid-cols-3 gap-2">{([['self_drive', '🚗 Self Drive', 'Customer drives'], ['with_driver', '🧑‍✈️ With Driver', 'Driver included'], ['both', '✅ Both Options', 'Customer chooses']] as [string, string, string][]).map(([val, label, note]) => (<button key={val} type="button" onClick={() => setNewV({ ...newV, driverOption: val })} className={`py-2.5 px-2 rounded-xl border text-center transition ${(newV as any).driverOption === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}><p className="text-xs font-black">{label}</p><p className="text-[10px] opacity-60 mt-0.5">{note}</p></button>))}</div></div>
+                      <div className="flex gap-3"><button type="button" onClick={() => { setShowAddForm(false); setEditingId(null); setPhotos([]); }} className="px-6 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-sm text-slate-700 transition">{t.cancel}</button><button type="submit" className="flex-1 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white py-3 rounded-xl font-black text-sm uppercase tracking-wide transition shadow-md">{editingId ? t.saveChanges : t.publishLive}</button></div>
                     </form>
                   </div>
                 )}
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-black text-slate-800 text-base">{t.yourFleet}</h3>
-                    <span className="text-xs font-bold text-slate-500">{ownerFleet.filter(v=>vAvail(v)).length} {t.live} · {ownerFleet.filter(v=>!vAvail(v)).length} {t.hidden}</span>
-                  </div>
-                  {ownerFleet.length===0 ? (
-                    <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20">
-                      <p className="text-5xl mb-3">🚗</p><p className="font-black text-slate-700">{t.noVehicles}</p>
-                      <button onClick={()=>setShowAddForm(true)} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.addFirst}</button>
-                    </div>
+                  <div className="flex items-center justify-between mb-4"><h3 className="font-black text-slate-800 text-base">{t.yourFleet}</h3><span className="text-xs font-bold text-slate-500">{ownerFleet.filter(v => vAvail(v)).length} {t.live} · {ownerFleet.filter(v => !vAvail(v)).length} {t.hidden}</span></div>
+                  {ownerFleet.length === 0 ? (
+                    <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20"><p className="text-5xl mb-3">🚗</p><p className="font-black text-slate-700">{t.noVehicles}</p><button onClick={() => setShowAddForm(true)} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.addFirst}</button></div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {ownerFleet.map(v=>(
-                        <div key={v.id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition ${vAvail(v)?'border-slate-200':'border-slate-200 opacity-70'}`}>
-                          <div className="relative aspect-[16/9] bg-slate-100 overflow-hidden">
-                            <img src={v.image} alt={v.name} className="w-full h-full object-cover"/>
-                            <div className={`absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shadow-sm ${vAvail(v)?'bg-emerald-500 text-white':'bg-slate-700 text-white'}`}>{vAvail(v)?t.liveLabel:t.hiddenLabel}</div>
-                            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-black">{typeIcon(v.type)}</div>
-                          </div>
-                          <div className="p-4">
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <h4 className="font-black text-slate-900 text-sm leading-tight">{v.name}</h4>
-                              <div className="text-right flex-shrink-0">
-                              <p className="font-black text-slate-900 text-sm">Rs.{vPrice(v).toLocaleString()}</p>
-                              <p className="text-[10px] text-emerald-600 font-bold">You get Rs.{Math.round(vPrice(v)*0.90).toLocaleString()}/day</p>
-                            </div>
-                            </div>
-                            <p className="text-xs text-slate-400 mb-1">{v.transmission} · {v.fuel} · {v.location}</p>
-                            {(()=>{
-                              const today = new Date(); today.setHours(0,0,0,0);
-                              const revExp = (v as any).revenue_licence_expiry ? new Date((v as any).revenue_licence_expiry) : null;
-                              const insExp = (v as any).insurance_expiry ? new Date((v as any).insurance_expiry) : null;
-                              const revExpired = revExp && revExp < today;
-                              const insExpired = insExp && insExp < today;
-                              const revSoon = revExp && !revExpired && Math.ceil((revExp.getTime()-today.getTime())/86400000) <= 30;
-                              const insSoon = insExp && !insExpired && Math.ceil((insExp.getTime()-today.getTime())/86400000) <= 30;
-                              if (!revExpired && !insExpired && !revSoon && !insSoon) return null;
-                              return (
-                                <div className="flex flex-wrap gap-1 mb-2">
-                                  {revExpired && <span className="text-[9px] font-black bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded">📄 Rev. Lic EXPIRED</span>}
-                                  {insExpired && <span className="text-[9px] font-black bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded">🛡️ Insurance EXPIRED</span>}
-                                  {revSoon && <span className="text-[9px] font-black bg-amber-100 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded">📄 Rev. Lic expiring soon</span>}
-                                  {insSoon && <span className="text-[9px] font-black bg-amber-100 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded">🛡️ Insurance expiring soon</span>}
-                                </div>
-                              );
-                            })()}
-                            <div className="flex gap-2 pt-3 border-t border-slate-100">
-                              <button onClick={()=>toggleAvail(v.id)} className={`flex-1 py-2 rounded-xl font-black text-[11px] uppercase tracking-wide border transition ${vAvail(v)?'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600':'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>{vAvail(v)?t.hide:t.goLive}</button>
-                              <button onClick={()=>{ setEditingId(v.id); setShowAddForm(false); setNewV({name:v.name,type:v.type,transmission:v.transmission,fuel:v.fuel,pricePerDay:vPrice(v),description:v.description||'',mapLink:(v as any).mapLink||''}); setPhotos(v.images&&v.images.length>0?[...v.images]:[v.image]); window.scrollTo({top:0,behavior:'smooth'}); }} className="flex-1 py-2 rounded-xl font-black text-[11px] uppercase border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition">Edit</button>
-                              <button onClick={()=>deleteVehicle(v.id)} className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition">🗑</button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">{ownerFleet.map(v => (<div key={v.id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition ${vAvail(v) ? 'border-slate-200' : 'border-slate-200 opacity-70'}`}><div className="relative aspect-[16/9] bg-slate-100 overflow-hidden"><img src={v.image} alt={v.name} className="w-full h-full object-cover"/><div className={`absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shadow-sm ${vAvail(v) ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-white'}`}>{vAvail(v) ? t.liveLabel : t.hiddenLabel}</div><div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-black">{typeIcon(v.type)}</div></div><div className="p-4"><div className="flex items-start justify-between gap-2 mb-1"><h4 className="font-black text-slate-900 text-sm leading-tight">{v.name}</h4><div className="text-right flex-shrink-0"><p className="font-black text-slate-900 text-sm">Rs.{vPrice(v).toLocaleString()}</p><p className="text-[10px] text-emerald-600 font-bold">You get Rs.{Math.round(vPrice(v) * 0.90).toLocaleString()}/day</p></div></div><p className="text-xs text-slate-400 mb-1">{v.transmission} · {v.fuel} · {v.location}</p><div className="flex gap-2 pt-3 border-t border-slate-100"><button onClick={() => toggleAvail(v.id)} className={`flex-1 py-2 rounded-xl font-black text-[11px] uppercase tracking-wide border transition ${vAvail(v) ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600' : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>{vAvail(v) ? t.hide : t.goLive}</button><button onClick={() => { setEditingId(v.id); setShowAddForm(false); setNewV({ name: v.name, type: v.type, transmission: v.transmission, fuel: v.fuel, pricePerDay: vPrice(v), description: v.description || '', mapLink: (v as any).mapLink || '', weeklyPrice: (v as any).weekly_price || 0, monthlyPrice: (v as any).monthly_price || 0, kmPerDay: (v as any).km_per_day || 200, extraKmCharge: (v as any).extra_km_charge || 50, depositAmount: (v as any).deposit_amount || 0, driverOption: (v as any).driver_option || 'self_drive', district: v.location || '', deliveryOption: (v as any).delivery_option || 'both', revenueLicenceExpiry: (v as any).revenue_licence_expiry || '', insuranceExpiry: (v as any).insurance_expiry || '' }); setPhotos(v.images && v.images.length > 0 ? [...v.images] : [v.image]); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex-1 py-2 rounded-xl font-black text-[11px] uppercase border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition">Edit</button><button onClick={() => deleteVehicle(v.id)} className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition">🗑</button></div></div></div>))}</div>
                   )}
                 </div>
               </>
@@ -2548,510 +1191,124 @@ export default function Home() {
         </div>
       )}
 
-      {/* ══ HOME + DETAIL ══ */}
-      {(view==='home'||view==='detail') && (
+      {/* HOME + DETAIL */}
+      {(view === 'home' || view === 'detail') && (
         <>
-          {view==='home' && (
+          {view === 'home' && (
             <>
               <header className="relative bg-slate-900 text-white pt-14 pb-12 px-4 text-center overflow-hidden">
-                <div className="absolute inset-0 pointer-events-none select-none">
-                  <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1600" className="w-full h-full object-cover opacity-20" alt=""/>
-                  <div className="absolute inset-0 bg-gradient-to-b from-slate-900/10 to-slate-900/80"/>
-                </div>
-                <div className="relative max-w-3xl mx-auto space-y-3 pointer-events-none">
-                  <span className="inline-block text-xs bg-white/10 border border-white/20 text-white/80 font-bold px-3 py-1 rounded-full">🇱🇰 Sri Lanka's #1 Vehicle Rental Platform</span>
-                  <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight">Rent cars, bikes &<br/>tuk-tuks in Sri Lanka</h1>
-                  <p className="text-slate-300 text-sm md:text-base font-medium">Verified hubs · No hidden fees · Book in 60 seconds</p>
-                </div>
+                <div className="absolute inset-0 pointer-events-none select-none"><img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1600" className="w-full h-full object-cover opacity-20" alt=""/><div className="absolute inset-0 bg-gradient-to-b from-slate-900/10 to-slate-900/80"/></div>
+                <div className="relative max-w-3xl mx-auto space-y-3 pointer-events-none"><span className="inline-block text-xs bg-white/10 border border-white/20 text-white/80 font-bold px-3 py-1 rounded-full">🇱🇰 Sri Lanka's #1 Vehicle Rental Platform</span><h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight">Rent cars, bikes &<br/>tuk-tuks in Sri Lanka</h1><p className="text-slate-300 text-sm md:text-base font-medium">Verified hubs · No hidden fees · Book in 60 seconds</p></div>
               </header>
               <div className="bg-white border-b border-slate-200 shadow-md">
                 <div className="max-w-6xl mx-auto px-4 py-4">
                   <div className="flex flex-col md:flex-row gap-2">
                     {[
-                      {label:t.cityLoc, el:<select value={filterCity} onChange={e=>setFilterCity(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none">{SL_CITIES.map(c=><option key={c} value={c}>{c}</option>)}</select>},
-                      {label:t.vehicleType, el:<select value={filterType} onChange={e=>setFilterType(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none"><option value="all">{t.allTypes}</option><option value="car">🚙 {t.cars}</option><option value="van">🚐 Van</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option></select>},
-                      {label:t.pickupDate, el:<input type="date" value={filterPickup} onChange={e=>setFilterPickup(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none" style={{colorScheme:'light'}}/>},
-                      {label:t.returnDate, el:<input type="date" value={filterReturn} onChange={e=>setFilterReturn(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none" style={{colorScheme:'light'}}/>},
-                    ].map(f=>(
-                      <div key={f.label} className="flex-1 min-w-0 bg-slate-50 border border-slate-200 hover:border-slate-400 focus-within:border-red-400 rounded-xl px-4 py-3 transition">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider leading-none mb-1.5">{f.label}</p>
-                        {f.el}
-                      </div>
-                    ))}
-                    <button onClick={()=>showToast(`${displayed.length} ${t.vehicles} ${t.available}${filterCity!=='All Sri Lanka'?' in '+filterCity:''}`, 'ok')}
-                      className="flex-none bg-red-500 hover:bg-red-600 active:scale-95 text-white font-black rounded-xl px-8 py-3 text-sm uppercase tracking-wide transition shadow-md flex items-center gap-2 whitespace-nowrap">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                      {t.search}
-                    </button>
+                      { label: t.cityLoc, el: <select value={filterCity} onChange={e => setFilterCity(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none">{SL_CITIES.map(c => <option key={c} value={c}>{c}</option>)}</select> },
+                      { label: t.vehicleType, el: <select value={filterType} onChange={e => setFilterType(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none"><option value="all">{t.allTypes}</option><option value="car">🚙 {t.cars}</option><option value="van">🚐 Van</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option></select> },
+                      { label: t.pickupDate, el: <input type="date" value={filterPickup} onChange={e => setFilterPickup(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none" style={{ colorScheme: 'light' }}/> },
+                      { label: t.returnDate, el: <input type="date" value={filterReturn} onChange={e => setFilterReturn(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none" style={{ colorScheme: 'light' }}/> },
+                    ].map(f => (<div key={f.label} className="flex-1 min-w-0 bg-slate-50 border border-slate-200 hover:border-slate-400 focus-within:border-red-400 rounded-xl px-4 py-3 transition"><p className="text-[10px] font-black text-slate-400 uppercase tracking-wider leading-none mb-1.5">{f.label}</p>{f.el}</div>))}
+                    <button onClick={() => showToast(`${displayed.length} ${t.vehicles} ${t.available}${filterCity !== 'All Sri Lanka' ? ' in ' + filterCity : ''}`, 'ok')} className="flex-none bg-red-500 hover:bg-red-600 active:scale-95 text-white font-black rounded-xl px-8 py-3 text-sm uppercase tracking-wide transition shadow-md flex items-center gap-2 whitespace-nowrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>{t.search}</button>
                   </div>
                 </div>
               </div>
-              {/* ══ ADVANCED FILTERS ══ */}
               <div className="bg-white border-b border-slate-200">
                 <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
-                  <button onClick={()=>setShowAdvFilter(!showAdvFilter)}
-                    className={`flex items-center gap-2 text-xs font-black px-3 py-2 rounded-xl border transition ${showAdvFilter?'bg-slate-900 text-white border-slate-900':'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
-                    ⚙️ Advanced Filters {showAdvFilter ? '▲' : '▼'}
-                  </button>
-                  {(filterPriceMax < 50000 || filterTrans !== 'all' || filterFuel !== 'all') && (
-                    <button onClick={()=>{ setFilterPriceMin(0); setFilterPriceMax(50000); setFilterTrans('all'); setFilterFuel('all'); }}
-                      className="text-xs font-bold text-red-500 hover:text-red-700 transition">Clear filters ×</button>
-                  )}
+                  <button onClick={() => setShowAdvFilter(!showAdvFilter)} className={`flex items-center gap-2 text-xs font-black px-3 py-2 rounded-xl border transition ${showAdvFilter ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>⚙️ Advanced Filters {showAdvFilter ? '▲' : '▼'}</button>
+                  {(filterPriceMax < 50000 || filterTrans !== 'all' || filterFuel !== 'all') && (<button onClick={() => { setFilterPriceMin(0); setFilterPriceMax(50000); setFilterTrans('all'); setFilterFuel('all'); }} className="text-xs font-bold text-red-500 hover:text-red-700 transition">Clear filters ×</button>)}
                 </div>
-                {showAdvFilter && (
-                  <div className="max-w-6xl mx-auto px-4 pb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Min Price (Rs.)</label>
-                      <input type="number" min="0" max="50000" step="500"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-slate-900 transition"
-                        value={filterPriceMin || ''} placeholder="0"
-                        onChange={e=>setFilterPriceMin(Number(e.target.value)||0)}/>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Max Price (Rs.)</label>
-                      <input type="number" min="0" max="100000" step="500"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-slate-900 transition"
-                        value={filterPriceMax === 50000 ? '' : filterPriceMax} placeholder="Any"
-                        onChange={e=>setFilterPriceMax(Number(e.target.value)||50000)}/>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Transmission</label>
-                      <select value={filterTrans} onChange={e=>setFilterTrans(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition">
-                        <option value="all">Any</option>
-                        <option value="automatic">Automatic</option>
-                        <option value="manual">Manual</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Fuel Type</label>
-                      <select value={filterFuel} onChange={e=>setFilterFuel(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition">
-                        <option value="all">Any</option>
-                        <option value="petrol">Petrol</option>
-                        <option value="diesel">Diesel</option>
-                        <option value="hybrid">Hybrid</option>
-                        <option value="electric">Electric</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🧑‍✈️ Driver</label>
-                      <select value={filterDriver} onChange={e=>setFilterDriver(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition">
-                        <option value="all">Any</option>
-                        <option value="self_drive">Self Drive</option>
-                        <option value="with_driver">With Driver</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
+                {showAdvFilter && (<div className="max-w-6xl mx-auto px-4 pb-4 grid grid-cols-2 md:grid-cols-4 gap-3"><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Min Price (Rs.)</label><input type="number" min="0" max="50000" step="500" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-slate-900 transition" value={filterPriceMin || ''} placeholder="0" onChange={e => setFilterPriceMin(Number(e.target.value) || 0)}/></div><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Max Price (Rs.)</label><input type="number" min="0" max="100000" step="500" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:border-slate-900 transition" value={filterPriceMax === 50000 ? '' : filterPriceMax} placeholder="Any" onChange={e => setFilterPriceMax(Number(e.target.value) || 50000)}/></div><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Transmission</label><select value={filterTrans} onChange={e => setFilterTrans(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition"><option value="all">Any</option><option value="automatic">Automatic</option><option value="manual">Manual</option></select></div><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Fuel Type</label><select value={filterFuel} onChange={e => setFilterFuel(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition"><option value="all">Any</option><option value="petrol">Petrol</option><option value="diesel">Diesel</option><option value="hybrid">Hybrid</option><option value="electric">Electric</option></select></div><div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🧑‍✈️ Driver</label><select value={filterDriver} onChange={e => setFilterDriver(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none cursor-pointer focus:border-slate-900 transition"><option value="all">Any</option><option value="self_drive">Self Drive</option><option value="with_driver">With Driver</option></select></div></div>)}
               </div>
-
               <section className="max-w-7xl mx-auto px-4 pt-5 pb-3">
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  {[
-                    {label:t.allDeals,city:'All Sri Lanka',type:'all'},
-                    {label:'🚙 '+t.cars,city:'All Sri Lanka',type:'car'},
-                    {label:'🏍️ '+t.bikes,city:'All Sri Lanka',type:'bike'},
-                    {label:'🚐 Vans',city:'All Sri Lanka',type:'van'},
-                    {label:'🛺 '+t.tuks,city:'All Sri Lanka',type:'tuk'},
-                    {label:'📍 Colombo',city:'Colombo',type:'all'},
-                    {label:'📍 Galle',city:'Galle',type:'all'},
-                    {label:'📍 Kandy',city:'Kandy',type:'all'},
-                    {label:'📍 Gampaha',city:'Gampaha',type:'all'},
-                    {label:'📍 Matara',city:'Matara',type:'all'},
-                    {label:'📍 Negombo',city:'Negombo',type:'all'},
-                    {label:'📍 Jaffna',city:'Jaffna',type:'all'},
-                    {label:'📍 Trincomalee',city:'Trincomalee',type:'all'},
-                    {label:'📍 Batticaloa',city:'Batticaloa',type:'all'},
-                    {label:'📍 Anuradhapura',city:'Anuradhapura',type:'all'},
-                    {label:'📍 Ella/Badulla',city:'Badulla',type:'all'},
-                    {label:'📍 Nuwara Eliya',city:'Nuwara Eliya',type:'all'},
-                    {label:'📍 Ratnapura',city:'Ratnapura',type:'all'},
-                    {label:'📍 Hambantota',city:'Hambantota',type:'all'},
-                  ].map(tag=>(
-                    <button key={tag.label} onClick={()=>{ setFilterCity(tag.city); setFilterType(tag.type); }}
-                      className={`text-xs font-bold border px-4 py-2 rounded-xl whitespace-nowrap transition ${filterCity===tag.city&&filterType===tag.type?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{tag.label}</button>
-                  ))}
+                  {[{ label: t.allDeals, city: 'All Sri Lanka', type: 'all' }, { label: '🚙 ' + t.cars, city: 'All Sri Lanka', type: 'car' }, { label: '🏍️ ' + t.bikes, city: 'All Sri Lanka', type: 'bike' }, { label: '🚐 Vans', city: 'All Sri Lanka', type: 'van' }, { label: '🛺 ' + t.tuks, city: 'All Sri Lanka', type: 'tuk' }, { label: '📍 Colombo', city: 'Colombo', type: 'all' }, { label: '📍 Galle', city: 'Galle', type: 'all' }, { label: '📍 Kandy', city: 'Kandy', type: 'all' }, { label: '📍 Gampaha', city: 'Gampaha', type: 'all' }, { label: '📍 Matara', city: 'Matara', type: 'all' }, { label: '📍 Negombo', city: 'Negombo', type: 'all' }, { label: '📍 Jaffna', city: 'Jaffna', type: 'all' }, { label: '📍 Trincomalee', city: 'Trincomalee', type: 'all' }, { label: '📍 Batticaloa', city: 'Batticaloa', type: 'all' }, { label: '📍 Anuradhapura', city: 'Anuradhapura', type: 'all' }, { label: '📍 Ella/Badulla', city: 'Badulla', type: 'all' }, { label: '📍 Nuwara Eliya', city: 'Nuwara Eliya', type: 'all' }, { label: '📍 Ratnapura', city: 'Ratnapura', type: 'all' }, { label: '📍 Hambantota', city: 'Hambantota', type: 'all' }].map(tag => (<button key={tag.label} onClick={() => { setFilterCity(tag.city); setFilterType(tag.type); }} className={`text-xs font-bold border px-4 py-2 rounded-xl whitespace-nowrap transition ${filterCity === tag.city && filterType === tag.type ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{tag.label}</button>))}
                 </div>
               </section>
               <section className="max-w-7xl mx-auto px-4 mt-2 mb-24">
-                <h2 className="text-xl font-black text-slate-900 mb-5"><span className="text-red-500">{displayed.length}</span> {t.vehicles} {t.available}{filterCity!=='All Sri Lanka'?` in ${filterCity}`:''}</h2>
+                <h2 className="text-xl font-black text-slate-900 mb-5"><span className="text-red-500">{displayed.length}</span> {t.vehicles} {t.available}{filterCity !== 'All Sri Lanka' ? ` in ${filterCity}` : ''}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                  {displayed.map(v=>(
-                    <article key={v.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group cursor-pointer"
-                      onClick={()=>{ setSelectedVehicle(v); setView('detail'); window.scrollTo({top:0,behavior:'smooth'}); }}>
-                      <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
-                        <img src={v.image} alt={v.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          onClick={e=>{
-                            e.stopPropagation();
-                            const allImgs = (v as any).images?.filter(Boolean) || [v.image].filter(Boolean);
-                            if(allImgs.length>0) setLightbox({imgs:allImgs, idx:0});
-                          }}/>
-                        {(v as any).owner_verified ? (
-                          <span className="absolute top-3 left-3 bg-blue-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow flex items-center gap-1">
-                            ✅ Verified Partner
-                          </span>
-                        ) : (
-                          <span className="absolute top-3 left-3 bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow uppercase">{t.verified}</span>
-                        )}
-                        <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                          <button onClick={e=>{ e.stopPropagation(); toggleWishlist(v.id); }}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${wishlist.includes(v.id)?'bg-red-500 text-white':'bg-white/90 text-slate-400 hover:text-red-500'}`}>
-                            {wishlist.includes(v.id) ? '❤️' : '🤍'}
-                          </button>
-                          <span className="text-lg">{typeIcon(v.type)}</span>
-                        </div>
-                      </div>
-                      <div className="p-4 flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                            <span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.transmission}</span>
-                            <span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.fuel}</span>
-                            {(v as any).driver_option === 'with_driver' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Driver</span>}
-                            {(v as any).driver_option === 'both' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Optional</span>}
-                            <span className="text-[9px] font-extrabold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase ml-auto">{v.location}</span>
-                          </div>
-                          <h3 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-red-500 transition-colors">{v.name}</h3>
-                          <p className="text-xs text-slate-400 mt-1">{vShop(v)}</p>
-                        </div>
-                        <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100">
-                          <div>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">{t.perDay}</p>
-                            <span className="text-base font-black text-slate-900">{fmt(vPrice(v))}</span>
-                            <p className="text-[9px] text-blue-500 font-bold mt-0.5">+{fmt(Math.round(vPrice(v)*0.10))} booking fee</p>
-                          </div>
-                          <div className="flex items-center gap-1"><span className="text-amber-400 text-xs">★</span><span className="text-xs font-bold text-slate-700">{v.rating.toFixed(1)}</span></div>
-                        </div>
-                      </div>
+                  {displayed.map(v => (
+                    <article key={v.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group cursor-pointer" onClick={() => { setSelectedVehicle(v); setView('detail'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+                      <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden"><img src={v.image} alt={v.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onClick={e => { e.stopPropagation(); const allImgs = (v as any).images?.filter(Boolean) || [v.image].filter(Boolean); if (allImgs.length > 0) setLightbox({ imgs: allImgs, idx: 0 }); }}/>{(v as any).owner_verified ? (<span className="absolute top-3 left-3 bg-blue-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow flex items-center gap-1">✅ Verified Partner</span>) : (<span className="absolute top-3 left-3 bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow uppercase">{t.verified}</span>)}<div className="absolute top-3 right-3 flex items-center gap-1.5"><button onClick={e => { e.stopPropagation(); toggleWishlist(v.id); }} className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${wishlist.includes(v.id) ? 'bg-red-500 text-white' : 'bg-white/90 text-slate-400 hover:text-red-500'}`}>{wishlist.includes(v.id) ? '❤️' : '🤍'}</button><span className="text-lg">{typeIcon(v.type)}</span></div></div>
+                      <div className="p-4 flex-1 flex flex-col justify-between"><div><div className="flex items-center gap-1.5 mb-2 flex-wrap"><span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.transmission}</span><span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.fuel}</span>{(v as any).driver_option === 'with_driver' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Driver</span>}{(v as any).driver_option === 'both' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Optional</span>}<span className="text-[9px] font-extrabold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase ml-auto">{v.location}</span></div><h3 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-red-500 transition-colors">{v.name}</h3><p className="text-xs text-slate-400 mt-1">{vShop(v)}</p></div><div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100"><div><p className="text-[10px] text-slate-400 font-bold uppercase">{t.perDay}</p><span className="text-base font-black text-slate-900">{fmt(vPrice(v))}</span><p className="text-[9px] text-blue-500 font-bold mt-0.5">+{fmt(Math.round(vPrice(v) * 0.10))} booking fee</p></div><div className="flex items-center gap-1"><span className="text-amber-400 text-xs">★</span><span className="text-xs font-bold text-slate-700">{v.rating.toFixed(1)}</span></div></div></div>
                     </article>
                   ))}
-                  {displayed.length===0 && (
-                    <div className="col-span-full text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
-                      <p className="text-5xl mb-4">🚗</p>
-                      <p className="text-base font-black text-slate-700">
-                        {filterCity !== 'All Sri Lanka' || filterType !== 'all' ? t.noVehiclesFound : 'No vehicles listed yet'}
-                      </p>
-                      <p className="text-sm text-slate-400 mt-2 max-w-xs mx-auto">
-                        {filterCity !== 'All Sri Lanka' || filterType !== 'all'
-                          ? <button onClick={()=>{ setFilterCity('All Sri Lanka'); setFilterType('all'); }} className="text-red-500 underline font-bold">{t.clearFilters}</button>
-                          : 'Vehicle owners can list their cars, bikes & tuk-tuks via Partner Hub'}
-                      </p>
-                    </div>
-                  )}
+                  {displayed.length === 0 && (<div className="col-span-full text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200"><p className="text-5xl mb-4">🚗</p><p className="text-base font-black text-slate-700">{filterCity !== 'All Sri Lanka' || filterType !== 'all' ? t.noVehiclesFound : 'No vehicles listed yet'}</p><p className="text-sm text-slate-400 mt-2 max-w-xs mx-auto">{filterCity !== 'All Sri Lanka' || filterType !== 'all' ? <button onClick={() => { setFilterCity('All Sri Lanka'); setFilterType('all'); }} className="text-red-500 underline font-bold">{t.clearFilters}</button> : 'Vehicle owners can list their cars, bikes & tuk-tuks via Partner Hub'}</p></div>)}
                 </div>
               </section>
-              {/* ══ FAQ SECTION ══ */}
               <FaqSection />
-
-              {/* ══ WHY BOOK WITH DRIVO ══ */}
               <section className="bg-white py-16 px-4 border-t border-slate-100">
                 <div className="max-w-5xl mx-auto">
-                  <div className="text-center mb-12">
-                    <span className="text-xs font-black text-red-500 uppercase tracking-widest">All Inclusive with Drivo</span>
-                    <h2 className="text-3xl md:text-4xl font-black text-slate-900 mt-2">Why Book with Us?</h2>
-                    <p className="text-slate-500 mt-3 text-sm max-w-lg mx-auto">Every vehicle on Drivo is verified. Simply book, show up, and enjoy your ride.</p>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                    {[
-                      { icon: '✅', title: 'Verified Vehicles', desc: 'Every car, bike & tuk-tuk is inspected and verified by our team' },
-                      { icon: '🛡️', title: 'Secure Booking', desc: 'NIC & license verified renters. Your vehicle is in safe hands' },
-                      { icon: '💬', title: 'WhatsApp Support', desc: 'Direct contact with the shop. 24/7 communication guaranteed' },
-                      { icon: '🗺️', title: 'GPS Pickup Location', desc: 'Every listing has a Google Maps pin. No confusion at pickup' },
-                      { icon: '🚗', title: 'Cars, Bikes & Tuk-tuks', desc: 'Sri Lanka largest multi-vehicle rental marketplace' },
-                      { icon: '💸', title: 'No Hidden Fees', desc: 'Transparent pricing. Only a 10% booking fee, nothing more' },
-                      { icon: '🇱🇰', title: 'Support Local', desc: 'Every booking supports a local Sri Lankan vehicle owner' },
-                      { icon: '⚡', title: 'Book in 60 Seconds', desc: 'Pick dates, select time, confirm. Instant booking request sent' },
-                    ].map(item => (
-                      <div key={item.title} className="text-center group">
-                        <div className="w-16 h-16 bg-slate-50 border-2 border-slate-100 group-hover:border-red-200 group-hover:bg-red-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 transition-all duration-300">
-                          {item.icon}
-                        </div>
-                        <h3 className="font-black text-slate-900 text-sm mb-1">{item.title}</h3>
-                        <p className="text-xs text-slate-400 leading-relaxed">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Stats bar */}
-                  <div className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                      { num: '100%', label: 'Verified Listings' },
-                      { num: '60s', label: 'Average Booking Time' },
-                      { num: '0', label: 'Hidden Charges' },
-                      { num: '24/7', label: 'WhatsApp Support' },
-                    ].map(s => (
-                      <div key={s.label} className="bg-slate-900 rounded-2xl p-5 text-center">
-                        <p className="text-2xl font-black text-white">{s.num}</p>
-                        <p className="text-xs text-slate-400 mt-1 font-semibold">{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
+                  <div className="text-center mb-12"><span className="text-xs font-black text-red-500 uppercase tracking-widest">All Inclusive with Drivo</span><h2 className="text-3xl md:text-4xl font-black text-slate-900 mt-2">Why Book with Us?</h2><p className="text-slate-500 mt-3 text-sm max-w-lg mx-auto">Every vehicle on Drivo is verified. Simply book, show up, and enjoy your ride.</p></div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8">{[{ icon: '✅', title: 'Verified Vehicles', desc: 'Every car, bike & tuk-tuk is inspected and verified by our team' }, { icon: '🛡️', title: 'Secure Booking', desc: 'NIC & license verified renters. Your vehicle is in safe hands' }, { icon: '💬', title: 'WhatsApp Support', desc: 'Direct contact with the shop. 24/7 communication guaranteed' }, { icon: '🗺️', title: 'GPS Pickup Location', desc: 'Every listing has a Google Maps pin. No confusion at pickup' }, { icon: '🚗', title: 'Cars, Bikes & Tuk-tuks', desc: 'Sri Lanka largest multi-vehicle rental marketplace' }, { icon: '💸', title: 'No Hidden Fees', desc: 'Transparent pricing. Only a 10% booking fee, nothing more' }, { icon: '🇱🇰', title: 'Support Local', desc: 'Every booking supports a local Sri Lankan vehicle owner' }, { icon: '⚡', title: 'Book in 60 Seconds', desc: 'Pick dates, select time, confirm. Instant booking request sent' }].map(item => (<div key={item.title} className="text-center group"><div className="w-16 h-16 bg-slate-50 border-2 border-slate-100 group-hover:border-red-200 group-hover:bg-red-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 transition-all duration-300">{item.icon}</div><h3 className="font-black text-slate-900 text-sm mb-1">{item.title}</h3><p className="text-xs text-slate-400 leading-relaxed">{item.desc}</p></div>))}</div>
+                  <div className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4">{[{ num: '100%', label: 'Verified Listings' }, { num: '60s', label: 'Average Booking Time' }, { num: '0', label: 'Hidden Charges' }, { num: '24/7', label: 'WhatsApp Support' }].map(s => (<div key={s.label} className="bg-slate-900 rounded-2xl p-5 text-center"><p className="text-2xl font-black text-white">{s.num}</p><p className="text-xs text-slate-400 mt-1 font-semibold">{s.label}</p></div>))}</div>
                 </div>
               </section>
-
-              <footer className="bg-slate-900 text-slate-500 py-8 px-4 text-center text-xs">
-                <div className="flex items-center justify-center gap-2 mb-2"><DrivoLogo className="w-6 h-6"/><span className="font-black text-white text-sm">drivo</span><span className="text-slate-700">·</span><span>Sri Lanka's Vehicle Rental Marketplace</span></div>
-                <p className="text-slate-700">© 2026 Drivo LK</p>
-              </footer>
+              <footer className="bg-slate-900 text-slate-500 py-8 px-4 text-center text-xs"><div className="flex items-center justify-center gap-2 mb-2"><DrivoLogo className="w-6 h-6"/><span className="font-black text-white text-sm">drivo</span><span className="text-slate-700">·</span><span>Sri Lanka's Vehicle Rental Marketplace</span></div><p className="text-slate-700">© 2026 Drivo LK</p></footer>
             </>
           )}
 
-          {view==='detail' && selectedVehicle && (
+          {view === 'detail' && selectedVehicle && (
             <section className="max-w-7xl mx-auto px-4 lg:px-8 pt-6 pb-24">
-              <button onClick={()=>{ setView('home'); setSelectedVehicle(null); setBookingDone(false); }} className="text-sm font-bold text-slate-500 hover:text-red-500 mb-6 flex items-center gap-1.5 transition group">
-                <span className="group-hover:-translate-x-1 transition-transform">←</span> {t.backToAll}
-              </button>
+              <button onClick={() => { setView('home'); setSelectedVehicle(null); setBookingDone(false); }} className="text-sm font-bold text-slate-500 hover:text-red-500 mb-6 flex items-center gap-1.5 transition group"><span className="group-hover:-translate-x-1 transition-transform">←</span> {t.backToAll}</button>
               {bookingDone ? (
                 <div className="max-w-md mx-auto text-center py-16">
                   <div className="text-6xl mb-4">🎉</div>
                   <h2 className="text-2xl font-black text-slate-900 mb-2">{t.bookingSent}</h2>
                   <p className="text-slate-500 text-sm mb-6">{vShop(selectedVehicle)} will contact you via WhatsApp within 30 minutes.</p>
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-sm space-y-2 mb-4">
-                    {([
-                      [t.vehicleRented, selectedVehicle.name],
-                      ['Pickup Date', `${filterPickup} at ${pickupTime}`],
-                      ['Return Date', filterReturn],
-                      ['Days', `${days} day${days>1?'s':''}`],
-                      ['Total to Pay', `Rs. ${total.toLocaleString()}`],
-                    ] as [string,string][]).map(([k,v])=>(
-                      <div key={k} className={`flex justify-between ${k==='Total to Pay'?'font-black text-slate-900 border-t border-slate-200 pt-2 mt-1':''}`}>
-                        <span className="text-slate-500">{k}</span>
-                        <span className={k==='Total to Pay'?'text-red-500 font-black':'font-bold'}>{v}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Action buttons — revealed after booking */}
-                  <div className="space-y-3 mb-4">
-                    <OwnerContactButtons vehicleId={selectedVehicle.id} ownerId={selectedVehicle.owner_id} mapLink={vMap(selectedVehicle)} vehicleName={selectedVehicle.name} />
-                  </div>
-                  {sessionRole==='customer' && <p className="text-xs text-emerald-600 font-bold mb-4">✓ Saved to your booking history</p>}
-                  <div className="flex gap-3 justify-center flex-wrap">
-                    {sessionRole==='customer' && <button onClick={()=>setView('custDash')} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.myBookings}</button>}
-                    <button onClick={resetToHome} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.backToHome}</button>
-                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-sm space-y-2 mb-4">{([['Vehicle', selectedVehicle.name], ['Pickup Date', `${filterPickup} at ${pickupTime}`], ['Return Date', filterReturn], ['Days', `${days} day${days > 1 ? 's' : ''}`], ['Total to Pay', `Rs. ${total.toLocaleString()}`]] as [string, string][]).map(([k, v]) => (<div key={k} className={`flex justify-between ${k === 'Total to Pay' ? 'font-black text-slate-900 border-t border-slate-200 pt-2 mt-1' : ''}`}><span className="text-slate-500">{k}</span><span className={k === 'Total to Pay' ? 'text-red-500 font-black' : 'font-bold'}>{v}</span></div>))}</div>
+                  <div className="space-y-3 mb-4"><OwnerContactButtons vehicleId={selectedVehicle.id} ownerId={selectedVehicle.owner_id} mapLink={vMap(selectedVehicle)} vehicleName={selectedVehicle.name}/></div>
+                  {sessionRole === 'customer' && <p className="text-xs text-emerald-600 font-bold mb-4">✓ Saved to your booking history</p>}
+                  <div className="flex gap-3 justify-center flex-wrap">{sessionRole === 'customer' && <button onClick={() => setView('custDash')} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.myBookings}</button>}<button onClick={resetToHome} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.backToHome}</button></div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                   <div className="lg:col-span-2 space-y-6">
                     <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xl">{typeIcon(selectedVehicle.type)}</span>
-                        <span className="text-xs font-black bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded border border-blue-100 uppercase">{selectedVehicle.type}</span>
-                        <span className="text-xs text-amber-500 font-bold">★ {selectedVehicle.rating.toFixed(1)}</span>
-                      </div>
+                      <div className="flex items-center gap-2 mb-2"><span className="text-xl">{typeIcon(selectedVehicle.type)}</span><span className="text-xs font-black bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded border border-blue-100 uppercase">{selectedVehicle.type}</span><span className="text-xs text-amber-500 font-bold">★ {selectedVehicle.rating.toFixed(1)}</span></div>
                       <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{selectedVehicle.name}</h2>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <p className="text-sm text-slate-500">{vShop(selectedVehicle)} · <span className="text-blue-600 font-medium">{selectedVehicle.location}</span></p>
-                        {(selectedVehicle as any).owner_verified && (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-black bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full">
-                            ✅ Verified Partner
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-400 mt-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 inline-flex items-center gap-2">
-                        🔒 <span>Pickup location revealed after booking & payment</span>
-                      </p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap"><p className="text-sm text-slate-500">{vShop(selectedVehicle)} · <span className="text-blue-600 font-medium">{selectedVehicle.location}</span></p>{(selectedVehicle as any).owner_verified && (<span className="inline-flex items-center gap-1 text-[11px] font-black bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full">✅ Verified Partner</span>)}</div>
+                      <p className="text-xs text-slate-400 mt-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 inline-flex items-center gap-2">🔒 <span>Pickup location revealed after booking & payment</span></p>
                     </div>
-                    {/* Structured gallery — cover + 3 corners + 2 interior */}
                     {(() => {
-                      const imgs = selectedVehicle.images && selectedVehicle.images.filter(Boolean).length > 0
-                        ? selectedVehicle.images.filter(Boolean)
-                        : [selectedVehicle.image].filter(Boolean);
+                      const imgs = selectedVehicle.images && selectedVehicle.images.filter(Boolean).length > 0 ? selectedVehicle.images.filter(Boolean) : [selectedVehicle.image].filter(Boolean);
                       const labels = ['Cover', 'Front', 'Side', 'Rear', 'Dashboard', 'Seats'];
                       return (
                         <div className="space-y-3">
-                          {/* Cover — full width, clickable */}
-                          {imgs[0] && (
-                            <div className="relative aspect-[16/8] bg-slate-200 rounded-2xl overflow-hidden cursor-zoom-in group"
-                              onClick={()=>setLightbox({imgs, idx:0})}>
-                              <img src={imgs[0]} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
-                              <span className="absolute top-3 left-3 text-[10px] bg-slate-900/80 text-white font-black px-2.5 py-1 rounded-xl uppercase backdrop-blur-sm">Cover · Front & Side</span>
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
-                                <span className="opacity-0 group-hover:opacity-100 transition bg-black/60 text-white text-xs font-black px-3 py-1.5 rounded-xl backdrop-blur-sm">🔍 View all {imgs.length} photos</span>
-                              </div>
-                            </div>
-                          )}
-                          {/* 3 exterior corners */}
-                          {imgs.slice(1,4).length > 0 && (
-                            <div className="grid grid-cols-3 gap-2">
-                              {imgs.slice(1,4).map((img,i)=>(
-                                <div key={i} className="relative aspect-video bg-slate-200 rounded-xl overflow-hidden cursor-zoom-in group"
-                                  onClick={()=>setLightbox({imgs, idx:i+1})}>
-                                  <img src={img} alt={labels[i+1]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
-                                  <span className="absolute bottom-1.5 left-1.5 text-[8px] bg-black/60 text-white font-black px-1.5 py-0.5 rounded uppercase backdrop-blur-sm">{labels[i+1]}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {/* 2 interior photos */}
-                          {imgs.slice(4,6).length > 0 && (
-                            <div className="grid grid-cols-2 gap-2">
-                              {imgs.slice(4,6).map((img,i)=>(
-                                <div key={i} className="relative aspect-[4/3] bg-slate-200 rounded-xl overflow-hidden cursor-zoom-in group"
-                                  onClick={()=>setLightbox({imgs, idx:i+4})}>
-                                  <img src={img} alt={labels[i+4]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
-                                  <span className="absolute bottom-1.5 left-1.5 text-[8px] bg-black/60 text-white font-black px-1.5 py-0.5 rounded uppercase backdrop-blur-sm">{labels[i+4]}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          {imgs[0] && (<div className="relative aspect-[16/8] bg-slate-200 rounded-2xl overflow-hidden cursor-zoom-in group" onClick={() => setLightbox({ imgs, idx: 0 })}><img src={imgs[0]} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/><span className="absolute top-3 left-3 text-[10px] bg-slate-900/80 text-white font-black px-2.5 py-1 rounded-xl uppercase backdrop-blur-sm">Cover · Front & Side</span><div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center"><span className="opacity-0 group-hover:opacity-100 transition bg-black/60 text-white text-xs font-black px-3 py-1.5 rounded-xl backdrop-blur-sm">🔍 View all {imgs.length} photos</span></div></div>)}
+                          {imgs.slice(1, 4).length > 0 && (<div className="grid grid-cols-3 gap-2">{imgs.slice(1, 4).map((img, i) => (<div key={i} className="relative aspect-video bg-slate-200 rounded-xl overflow-hidden cursor-zoom-in group" onClick={() => setLightbox({ imgs, idx: i + 1 })}><img src={img} alt={labels[i + 1]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/><span className="absolute bottom-1.5 left-1.5 text-[8px] bg-black/60 text-white font-black px-1.5 py-0.5 rounded uppercase backdrop-blur-sm">{labels[i + 1]}</span></div>))}</div>)}
+                          {imgs.slice(4, 6).length > 0 && (<div className="grid grid-cols-2 gap-2">{imgs.slice(4, 6).map((img, i) => (<div key={i} className="relative aspect-[4/3] bg-slate-200 rounded-xl overflow-hidden cursor-zoom-in group" onClick={() => setLightbox({ imgs, idx: i + 4 })}><img src={img} alt={labels[i + 4]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/><span className="absolute bottom-1.5 left-1.5 text-[8px] bg-black/60 text-white font-black px-1.5 py-0.5 rounded uppercase backdrop-blur-sm">{labels[i + 4]}</span></div>))}</div>)}
                         </div>
                       );
                     })()}
                     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                      <div className="flex border-b border-slate-200 bg-slate-50">
-                        {([['details',t.details],['docs',t.documents],['faq',t.faq]] as [string,string][]).map(([k,l])=>(
-                          <button key={k} onClick={()=>setDetailTab(k as any)} className={`flex-1 py-3.5 text-xs font-black uppercase tracking-wider transition ${detailTab===k?'bg-white text-slate-900 border-b-2 border-red-500':'text-slate-400 hover:text-slate-700'}`}>{l}</button>
-                        ))}
-                      </div>
+                      <div className="flex border-b border-slate-200 bg-slate-50">{([['details', t.details], ['docs', t.documents], ['faq', t.faq]] as [string, string][]).map(([k, l]) => (<button key={k} onClick={() => setDetailTab(k as any)} className={`flex-1 py-3.5 text-xs font-black uppercase tracking-wider transition ${detailTab === k ? 'bg-white text-slate-900 border-b-2 border-red-500' : 'text-slate-400 hover:text-slate-700'}`}>{l}</button>))}</div>
                       <div className="p-5">
-                        {detailTab==='details' && (
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                              {([[t.transmission,selectedVehicle.transmission],[t.fuel,selectedVehicle.fuel],['KM/Day',(selectedVehicle as any).km_per_day>0?`${(selectedVehicle as any).km_per_day} km`:'Unlimited'],['Deposit',(selectedVehicle as any).deposit_amount>0?`Rs. ${(selectedVehicle as any).deposit_amount.toLocaleString()}`:'No deposit']] as [string,string][]).map(([l,v])=>(
-                                <div key={l} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="text-[10px] text-slate-400 font-bold uppercase">{l}</p><p className="font-bold text-sm text-slate-800 mt-0.5">{v}</p></div>
-                              ))}
-                            </div>
-                            {(selectedVehicle as any).extra_km_charge > 0 && (selectedVehicle as any).km_per_day > 0 && (
-                              <p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-4 py-2.5 border border-slate-200">
-                                🛣️ First <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included · Extra km charged at <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span>
-                              </p>
-                            )}
-                            {((selectedVehicle as any).weekly_price > 0 || (selectedVehicle as any).monthly_price > 0) && (
-                              <div className="grid grid-cols-2 gap-3">
-                                {(selectedVehicle as any).weekly_price > 0 && (
-                                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
-                                    <p className="text-[10px] text-blue-400 font-black uppercase">Weekly Rate</p>
-                                    <p className="font-black text-blue-700 text-lg">Rs. {(selectedVehicle as any).weekly_price.toLocaleString()}</p>
-                                    <p className="text-[10px] text-blue-400">per week (7 days)</p>
-                                  </div>
-                                )}
-                                {(selectedVehicle as any).monthly_price > 0 && (
-                                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
-                                    <p className="text-[10px] text-emerald-400 font-black uppercase">Monthly Rate</p>
-                                    <p className="font-black text-emerald-700 text-lg">Rs. {(selectedVehicle as any).monthly_price.toLocaleString()}</p>
-                                    <p className="text-[10px] text-emerald-400">per month (28 days)</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <p className="text-sm text-slate-600 leading-relaxed">{selectedVehicle.description}</p>
-                            <VehicleReviews vehicleId={selectedVehicle.id} />
-                          </div>
-                        )}
-                        {detailTab==='docs' && <div className="space-y-2 text-sm"><p className="font-bold text-slate-900 mb-3">Required at pickup:</p>{['National ID (NIC)','Valid Driving License','Phone for WhatsApp'].map(i=>(<div key={i} className="flex items-center gap-2 text-slate-700"><span className="text-emerald-500 font-bold">✓</span>{i}</div>))}</div>}
-                        {detailTab==='faq' && <div className="space-y-3">{[['Is fuel included?','No — return with same level.'],['Can I extend?','Yes — WhatsApp the shop.'],['Security deposit?','Most vehicles: no deposit.']].map(([q,a])=>(<div key={q} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="font-bold text-slate-900 text-sm">{q}</p><p className="text-slate-500 mt-0.5 text-xs">{a}</p></div>))}</div>}
-                        {detailTab==='details' && selectedVehicle && <VehicleReviews vehicleId={selectedVehicle.id} />}
+                        {detailTab === 'details' && (<div className="space-y-4"><div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">{([[t.transmission, selectedVehicle.transmission], [t.fuel, selectedVehicle.fuel], ['KM/Day', (selectedVehicle as any).km_per_day > 0 ? `${(selectedVehicle as any).km_per_day} km` : 'Unlimited'], ['Deposit', (selectedVehicle as any).deposit_amount > 0 ? `Rs. ${(selectedVehicle as any).deposit_amount.toLocaleString()}` : 'No deposit']] as [string, string][]).map(([l, v]) => (<div key={l} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="text-[10px] text-slate-400 font-bold uppercase">{l}</p><p className="font-bold text-sm text-slate-800 mt-0.5">{v}</p></div>))}</div>{(selectedVehicle as any).extra_km_charge > 0 && (selectedVehicle as any).km_per_day > 0 && (<p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-4 py-2.5 border border-slate-200">🛣️ First <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included · Extra km charged at <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span></p>)}{((selectedVehicle as any).weekly_price > 0 || (selectedVehicle as any).monthly_price > 0) && (<div className="grid grid-cols-2 gap-3">{(selectedVehicle as any).weekly_price > 0 && (<div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center"><p className="text-[10px] text-blue-400 font-black uppercase">Weekly Rate</p><p className="font-black text-blue-700 text-lg">Rs. {(selectedVehicle as any).weekly_price.toLocaleString()}</p><p className="text-[10px] text-blue-400">per week (7 days)</p></div>)}{(selectedVehicle as any).monthly_price > 0 && (<div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center"><p className="text-[10px] text-emerald-400 font-black uppercase">Monthly Rate</p><p className="font-black text-emerald-700 text-lg">Rs. {(selectedVehicle as any).monthly_price.toLocaleString()}</p><p className="text-[10px] text-emerald-400">per month (28 days)</p></div>)}</div>)}<p className="text-sm text-slate-600 leading-relaxed">{selectedVehicle.description}</p><VehicleReviews vehicleId={selectedVehicle.id}/></div>)}
+                        {detailTab === 'docs' && (<div className="space-y-2 text-sm"><p className="font-bold text-slate-900 mb-3">Required at pickup:</p>{['National ID (NIC)', 'Valid Driving License', 'Phone for WhatsApp'].map(i => (<div key={i} className="flex items-center gap-2 text-slate-700"><span className="text-emerald-500 font-bold">✓</span>{i}</div>))}</div>)}
+                        {detailTab === 'faq' && (<div className="space-y-3">{[['Is fuel included?', 'No — return with same level.'], ['Can I extend?', 'Yes — WhatsApp the shop.'], ['Security deposit?', 'Most vehicles: no deposit.']].map(([q, a]) => (<div key={q} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="font-bold text-slate-900 text-sm">{q}</p><p className="text-slate-500 mt-0.5 text-xs">{a}</p></div>))}</div>)}
                       </div>
                     </div>
                   </div>
-                  <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl space-y-4 lg:sticky lg:top-24">
-                    <div className="flex items-baseline justify-between">
-                      <h3 className="font-black text-lg text-slate-900">{t.bookThisRide}</h3>
-                      <span className="text-sm font-black text-red-500">{fmt(vPrice(selectedVehicle))}<span className="text-xs font-semibold text-slate-400">/{t.perDay.toLowerCase()}</span></span>
-                    </div>
-                    {/* Rental Period Selector */}
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Rental Period</label>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {([
-                          ['daily',   '📅 Daily',   `Rs. ${(vPrice(selectedVehicle)).toLocaleString()}/day`],
-                          ['weekly',  '📆 Weekly',  (selectedVehicle as any).weekly_price > 0 ? `Rs. ${((selectedVehicle as any).weekly_price).toLocaleString()}/wk` : 'N/A'],
-                          ['monthly', '🗓️ Monthly', (selectedVehicle as any).monthly_price > 0 ? `Rs. ${((selectedVehicle as any).monthly_price).toLocaleString()}/mo` : 'N/A'],
-                        ] as [string,string,string][]).map(([val,label,price])=>(
-                          <button key={val} onClick={()=>setRentalPeriod(val as any)}
-                            disabled={val==='weekly'&&!((selectedVehicle as any).weekly_price>0) || val==='monthly'&&!((selectedVehicle as any).monthly_price>0)}
-                            className={`py-2 rounded-xl border text-center transition disabled:opacity-40 disabled:cursor-not-allowed ${rentalPeriod===val?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>
-                            <p className="text-[11px] font-black">{label}</p>
-                            <p className="text-[9px] opacity-70 mt-0.5">{price}</p>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.pickupDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterPickup} onChange={e=>setFilterPickup(e.target.value)}/></div>
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.returnDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterReturn} onChange={e=>setFilterReturn(e.target.value)}/></div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.duration}</label>
-                      <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
-                        <button onClick={()=>setDays(d=>Math.max(1,d-1))} className="px-4 py-2.5 font-black hover:bg-slate-200 transition text-lg">−</button>
-                        <span className="w-full text-center font-black text-sm text-slate-900">{days} day{days>1?'s':''}</span>
-                        <button onClick={()=>setDays(d=>d+1)} className="px-4 py-2.5 font-black hover:bg-slate-200 transition text-lg">+</button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">⏰ Pickup Time</label>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'].map(t=>(
-                          <button key={t} onClick={()=>setPickupTime(t)}
-                            className={`py-2 rounded-xl text-[11px] font-black border transition ${pickupTime===t?'bg-slate-900 text-white border-slate-900':'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'}`}>
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-1.5">Selected: <span className="font-black text-slate-700">{pickupTime}</span> · Confirm with shop via WhatsApp</p>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.pickupMethod}</label>
-                      {(()=>{
-                        const dOpt = (selectedVehicle as any).delivery_option || 'both';
-                        // pickup_only — only show self pickup
-                        if (dOpt === 'pickup_only') return (
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                            <p className="text-sm font-black text-slate-900">📍 {t.selfPickup}</p>
-                            <p className="text-xs text-slate-400 mt-1">This vehicle is pickup only — come to the shop</p>
-                          </div>
-                        );
-                        // delivery_only — only show delivery
-                        if (dOpt === 'delivery_only') return (
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                            <p className="text-sm font-black text-slate-900">🚚 {t.delivery}</p>
-                            <p className="text-xs text-emerald-600 font-bold mt-1">+Rs. 1,500 delivery fee</p>
-                            <p className="text-xs text-slate-400">Vehicle will be delivered to your location</p>
-                          </div>
-                        );
-                        // both — show both options
-                        return (
-                          <div className="grid grid-cols-2 gap-2">
-                            {([['pickup','📍 '+t.selfPickup,'Free'],['delivery','🚚 '+t.delivery,'+Rs.1,500']] as [string,string,string][]).map(([val,label,note])=>(
-                              <button key={val} onClick={()=>setDeliveryType(val as any)} className={`py-2.5 text-xs font-bold rounded-xl border transition ${deliveryType===val?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>{label}<br/><span className="text-[10px] font-medium opacity-70">{note}</span></button>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </div>
+                  {/* BOOKING SIDEBAR */}
+                  <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl space-y-4 lg:sticky lg:top-24">
+                    <div className="flex items-baseline justify-between"><h3 className="font-black text-lg text-slate-900">{t.bookThisRide}</h3><span className="text-sm font-black text-red-500">{fmt(vPrice(selectedVehicle))}<span className="text-xs font-semibold text-slate-400">/{t.perDay.toLowerCase()}</span></span></div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Rental Period</label><div className="grid grid-cols-3 gap-1.5">{([['daily', '📅 Daily', `Rs. ${(vPrice(selectedVehicle)).toLocaleString()}/day`], ['weekly', '📆 Weekly', (selectedVehicle as any).weekly_price > 0 ? `Rs. ${((selectedVehicle as any).weekly_price).toLocaleString()}/wk` : 'N/A'], ['monthly', '🗓️ Monthly', (selectedVehicle as any).monthly_price > 0 ? `Rs. ${((selectedVehicle as any).monthly_price).toLocaleString()}/mo` : 'N/A']] as [string, string, string][]).map(([val, label, price]) => (<button key={val} onClick={() => setRentalPeriod(val as any)} disabled={val === 'weekly' && !((selectedVehicle as any).weekly_price > 0) || val === 'monthly' && !((selectedVehicle as any).monthly_price > 0)} className={`py-2 rounded-xl border text-center transition disabled:opacity-40 disabled:cursor-not-allowed ${rentalPeriod === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}><p className="text-[11px] font-black">{label}</p><p className="text-[9px] opacity-70 mt-0.5">{price}</p></button>))}</div></div>
+                    <div className="grid grid-cols-2 gap-2"><div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.pickupDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterPickup} onChange={e => setFilterPickup(e.target.value)}/></div><div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.returnDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterReturn} onChange={e => setFilterReturn(e.target.value)}/></div></div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.duration}</label><div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50"><button onClick={() => setDays(d => Math.max(1, d - 1))} className="px-4 py-2.5 font-black hover:bg-slate-200 transition text-lg">−</button><span className="w-full text-center font-black text-sm text-slate-900">{days} day{days > 1 ? 's' : ''}</span><button onClick={() => setDays(d => d + 1)} className="px-4 py-2.5 font-black hover:bg-slate-200 transition text-lg">+</button></div></div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">⏰ Pickup Time</label><div className="grid grid-cols-4 gap-1.5">{['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map(ti => (<button key={ti} onClick={() => setPickupTime(ti)} className={`py-2 rounded-xl text-[11px] font-black border transition ${pickupTime === ti ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'}`}>{ti}</button>))}</div><p className="text-[10px] text-slate-400 mt-1.5">Selected: <span className="font-black text-slate-700">{pickupTime}</span></p></div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.pickupMethod}</label>{(() => { const dOpt = (selectedVehicle as any).delivery_option || 'both'; if (dOpt === 'pickup_only') return (<div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center"><p className="text-sm font-black text-slate-900">📍 {t.selfPickup}</p><p className="text-xs text-slate-400 mt-1">This vehicle is pickup only</p></div>); if (dOpt === 'delivery_only') return (<div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center"><p className="text-sm font-black text-slate-900">🚚 {t.delivery}</p><p className="text-xs text-emerald-600 font-bold mt-1">+Rs. 1,500 delivery fee</p></div>); return (<div className="grid grid-cols-2 gap-2">{([['pickup', '📍 ' + t.selfPickup, 'Free'], ['delivery', '🚚 ' + t.delivery, '+Rs.1,500']] as [string, string, string][]).map(([val, label, note]) => (<button key={val} onClick={() => setDeliveryType(val as any)} className={`py-2.5 text-xs font-bold rounded-xl border transition ${deliveryType === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>{label}<br/><span className="text-[10px] font-medium opacity-70">{note}</span></button>))}</div>); })()}</div>
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
-                      <div className="flex justify-between">
-                        <span>{fmt(periodInfo.price)} × {periodsCount} {periodInfo.unit}{periodsCount>1?'s':''}</span>
-                        <span className="font-bold text-slate-900">{fmt(base)}</span>
-                      </div>
-                      {deliveryType==='delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
-                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Rental Total</span><span className="text-slate-900">{fmt(total)}</span></div>
-                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 space-y-1">
-                        <div className="flex justify-between text-blue-700"><span>🔒 Booking Fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div>
-                      </div>
-                      {depositAmt > 0 && (
-                        <div className="flex justify-between text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-                          <span>🔐 Security Deposit (refundable)</span>
-                          <span className="font-black">{fmt(depositAmt)}</span>
-                        </div>
-                      )}
-                      {(selectedVehicle as any).km_per_day > 0 && (
-                        <div className="text-[10px] text-slate-500 bg-slate-100 rounded-lg px-3 py-2 space-y-0.5">
-                          <p>🛣️ <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included</p>
-                          {(selectedVehicle as any).extra_km_charge > 0 && <p>Extra km: <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span></p>}
-                        </div>
-                      )}
+                      <div className="flex justify-between"><span>{fmt(periodInfo.price)} × {periodsCount} {periodInfo.unit}{periodsCount > 1 ? 's' : ''}</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
+                      {deliveryType === 'delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
+                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Rental Total</span><span>{fmt(total)}</span></div>
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 space-y-1"><div className="flex justify-between text-blue-700"><span>🔒 Booking Fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div></div>
+                      {depositAmt > 0 && (<div className="flex justify-between text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2"><span>🔐 Security Deposit (refundable)</span><span className="font-black">{fmt(depositAmt)}</span></div>)}
+                      {(selectedVehicle as any).km_per_day > 0 && (<div className="text-[10px] text-slate-500 bg-slate-100 rounded-lg px-3 py-2 space-y-0.5"><p>🛣️ <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included</p>{(selectedVehicle as any).extra_km_charge > 0 && <p>Extra km: <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span></p>}</div>)}
                     </div>
-                    <button onClick={confirmBooking} disabled={bookingLoading}
-                      className={`w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition flex items-center justify-center gap-2 ${bookingLoading?'bg-slate-400 cursor-not-allowed':'bg-red-500 hover:bg-red-600 active:scale-95'} text-white`}>
-                      {bookingLoading
-                        ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Processing...</>
-                        : 'Confirm Booking →'}
-                    </button>
+                    <button onClick={confirmBooking} disabled={bookingLoading} className={`w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition flex items-center justify-center gap-2 ${bookingLoading ? 'bg-slate-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 active:scale-95'} text-white`}>{bookingLoading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Processing...</> : 'Confirm Booking →'}</button>
                     <p className="text-[10px] text-center text-slate-400">{t.noPayment}</p>
                   </div>
                 </div>
