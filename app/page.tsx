@@ -299,6 +299,96 @@ function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { veh
   );
 }
 
+function LiveStatsSection() {
+  const [stats, setStats] = useState({ customers: 0, partners: 0, bookings: 0, vehicles: 0 });
+  const [displayed, setDisplayed] = useState({ customers: 0, partners: 0, bookings: 0, vehicles: 0 });
+  const [loaded, setLoaded] = useState(false);
+
+  const fmt = (n: number) => {
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.0', '') + 'M+';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace('.0', '') + 'K+';
+    return n.toString();
+  };
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [c, o, b, v] = await Promise.all([
+          supabase.from('customers').select('id', { count: 'exact', head: true }),
+          supabase.from('owners').select('id', { count: 'exact', head: true }),
+          supabase.from('bookings').select('id', { count: 'exact', head: true }),
+          supabase.from('vehicles').select('id', { count: 'exact', head: true }).eq('is_available', true),
+        ]);
+        setStats({ customers: c.count || 0, partners: o.count || 0, bookings: b.count || 0, vehicles: v.count || 0 });
+        setLoaded(true);
+      } catch { setLoaded(true); }
+    };
+    fetchStats();
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    const steps = 80;
+    let step = 0;
+    const timer = setInterval(() => {
+      step++;
+      const ease = 1 - Math.pow(1 - step / steps, 3);
+      setDisplayed({
+        customers: Math.round(stats.customers * ease),
+        partners: Math.round(stats.partners * ease),
+        bookings: Math.round(stats.bookings * ease),
+        vehicles: Math.round(stats.vehicles * ease),
+      });
+      if (step >= steps) { clearInterval(timer); setDisplayed(stats); }
+    }, 2200 / steps);
+    return () => clearInterval(timer);
+  }, [loaded, stats]);
+
+  const items = [
+    { value: displayed.customers, label: 'Happy Renters', icon: '👤', bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
+    { value: displayed.partners, label: 'Verified Partners', icon: '🏪', bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+    { value: displayed.bookings, label: 'Total Bookings', icon: '📋', bg: 'bg-purple-50', border: 'border-purple-100', text: 'text-purple-700', dot: 'bg-purple-500' },
+    { value: displayed.vehicles, label: 'Vehicles Live', icon: '🚗', bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
+  ];
+
+  return (
+    <section className="bg-slate-900 py-16 px-4">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-4">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-white/80 text-xs font-bold uppercase tracking-wider">Live Statistics</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">Growing every day 🇱🇰</h2>
+          <p className="text-slate-400 text-sm mt-2">Real-time numbers from across Sri Lanka</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {items.map((item) => (
+            <div key={item.label} className={`${item.bg} ${item.border} border rounded-2xl p-5 text-center relative overflow-hidden`}>
+              <div className="absolute top-3 right-3">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${item.dot} opacity-75`}></span>
+                  <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${item.dot}`}></span>
+                </span>
+              </div>
+              <p className="text-3xl mb-3">{item.icon}</p>
+              <p className={`text-3xl md:text-4xl font-black ${item.text} leading-none`}>
+                {loaded ? fmt(item.value) : '—'}
+              </p>
+              <p className="text-xs font-black text-slate-500 uppercase tracking-wider mt-2">{item.label}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-slate-500 text-xs mt-8 font-medium">Numbers update in real-time · Powered by Drivo LK</p>
+      </div>
+    </section>
+  );
+}
+
+
 function FaqSection() {
   const [activeTab, setActiveTab] = useState<'general'|'booking'|'price'|'documents'>('general');
   const [openIdx, setOpenIdx] = useState<number|null>(0);
@@ -1266,6 +1356,7 @@ export default function Home() {
                   {displayed.length === 0 && (<div className="col-span-full text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200"><p className="text-5xl mb-4">🚗</p><p className="text-base font-black text-slate-700">{filterCity !== 'All Sri Lanka' || filterType !== 'all' ? t.noVehiclesFound : 'No vehicles listed yet'}</p><p className="text-sm text-slate-400 mt-2 max-w-xs mx-auto">{filterCity !== 'All Sri Lanka' || filterType !== 'all' ? <button onClick={() => { setFilterCity('All Sri Lanka'); setFilterType('all'); }} className="text-red-500 underline font-bold">{t.clearFilters}</button> : 'Vehicle owners can list their cars, bikes & tuk-tuks via Partner Hub'}</p></div>)}
                 </div>
               </section>
+              <LiveStatsSection />
               <FaqSection />
               <section className="bg-white py-16 px-4 border-t border-slate-100">
                 <div className="max-w-5xl mx-auto">
