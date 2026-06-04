@@ -1,141 +1,87 @@
+// app/layout.tsx — REPLACE your existing layout.tsx with this
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 
-const BASE_URL = 'https://www.thedrivo.com';
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  // ── Core
-  metadataBase: new URL(BASE_URL),
+  metadataBase: new URL('https://www.thedrivo.com'),
   title: {
-    default: 'Drivo — Rent Cars, Bikes & Tuk-tuks in Sri Lanka',
-    template: '%s | Drivo Sri Lanka',
+    default: 'Drivo LK — Rent Cars, Bikes & Tuk-Tuks in Sri Lanka',
+    template: '%s | Drivo LK',
   },
-  description:
-    'Find and book cars, motorbikes and tuk-tuks from verified rental shops across Sri Lanka. Best prices in Colombo, Galle, Kandy, Negombo & more. Book in 60 seconds — no hidden fees.',
-
-  // ── Keywords (long-tail Sri Lanka focused)
+  description: 'Sri Lanka\'s #1 vehicle rental marketplace. Rent verified cars, motorbikes, tuk-tuks and vans island-wide. Colombo, Galle, Kandy, Negombo & more. Book in 60 seconds.',
   keywords: [
-    'car rental sri lanka',
-    'rent a car sri lanka',
-    'vehicle rental sri lanka',
-    'bike rental sri lanka',
-    'tuk tuk rental sri lanka',
-    'car hire colombo',
-    'car hire galle',
-    'car hire kandy',
-    'motorbike rental sri lanka',
-    'cheap car rental sri lanka',
-    'daily car rental colombo',
-    'rent car negombo',
-    'vehicle hire katunayake airport',
-    'drivo',
-    'drivo sri lanka',
-    'thedrivo',
-    'thedrivo.com',
+    'car rental Sri Lanka', 'vehicle rental Sri Lanka', 'rent a car Colombo',
+    'motorbike rental Sri Lanka', 'tuk tuk rental Sri Lanka', 'van rental Sri Lanka',
+    'car hire Galle', 'car hire Kandy', 'car hire Negombo', 'car hire Ella',
+    'cheap car rental Sri Lanka', 'self drive car Sri Lanka', 'Sri Lanka travel rental',
+    'tourist car rental Sri Lanka', 'Drivo LK', 'thedrivo.com',
   ],
-
-  // ── Canonical
-  alternates: {
-    canonical: BASE_URL,
-    languages: {
-      'en': BASE_URL,
-      'si': `${BASE_URL}?lang=SI`,
-    },
-  },
-
-  // ── Open Graph (Facebook, WhatsApp, LinkedIn preview)
-  openGraph: {
-    type: 'website',
-    url: BASE_URL,
-    siteName: 'Drivo Sri Lanka',
-    title: 'Drivo — Rent Cars, Bikes & Tuk-tuks in Sri Lanka',
-    description:
-      'Book cars, motorbikes and tuk-tuks from verified local shops. Best rental prices in Colombo, Galle, Kandy & across Sri Lanka.',
-    images: [
-      {
-        url: `${BASE_URL}/og-image.jpg`,
-        width: 1200,
-        height: 630,
-        alt: 'Drivo — Sri Lanka Vehicle Rental Platform',
-      },
-    ],
-    locale: 'en_US',
-  },
-
-  // ── Twitter / X card
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Drivo — Rent Cars, Bikes & Tuk-tuks in Sri Lanka',
-    description:
-      'Book vehicles from verified rental shops across Sri Lanka. No hidden fees.',
-    images: [`${BASE_URL}/og-image.jpg`],
-    site: '@drivosl',
-    creator: '@drivosl',
-  },
-
-  // ── Robots
+  authors: [{ name: 'Drivo LK', url: 'https://www.thedrivo.com' }],
+  creator: 'Drivo LK',
+  publisher: 'Drivo LK',
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
   },
-
-  // ── Icons
-  icons: {
-    icon: [
-      { url: '/favicon.ico' },
-      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://www.thedrivo.com',
+    siteName: 'Drivo LK',
+    title: 'Drivo LK — Rent Cars, Bikes & Tuk-Tuks in Sri Lanka',
+    description: 'Sri Lanka\'s #1 vehicle rental marketplace. Verified cars, bikes & tuk-tuks island-wide. Book in 60 seconds.',
+    images: [
+      {
+        url: '/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Drivo LK — Sri Lanka Vehicle Rental',
+      },
     ],
-    apple: [{ url: '/apple-icon.png', sizes: '180x180' }],
-    shortcut: '/favicon.ico',
   },
-
-  // ── Manifest (PWA)
-  manifest: '/manifest.json',
-
-  // ── Verification (add keys after Google Search Console + Bing setup)
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Drivo LK — Rent Cars, Bikes & Tuk-Tuks in Sri Lanka',
+    description: 'Sri Lanka\'s #1 vehicle rental marketplace. Book verified vehicles island-wide in 60 seconds.',
+    images: ['/og-image.jpg'],
+    creator: '@drivolanka',
+  },
+  alternates: {
+    canonical: 'https://www.thedrivo.com',
+  },
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon-16x16.png',
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/site.webmanifest',
   verification: {
-    // google: 'YOUR_GOOGLE_VERIFICATION_CODE',
-    // yandex: 'YOUR_YANDEX_CODE',
+    google: 'ADD_YOUR_GOOGLE_SEARCH_CONSOLE_CODE_HERE',
   },
-
-  // ── App info
-  applicationName: 'Drivo Sri Lanka',
-  category: 'travel',
-  creator: 'Drivo LK',
-  publisher: 'Drivo LK',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* ── Structured Data: Organization */}
+        {/* Structured Data — Organization */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'Organization',
-              name: 'Drivo Sri Lanka',
-              url: BASE_URL,
-              logo: `${BASE_URL}/logo.png`,
-              description: 'Sri Lanka vehicle rental marketplace — cars, bikes and tuk-tuks.',
-              address: {
-                '@type': 'PostalAddress',
-                addressCountry: 'LK',
-              },
+              name: 'Drivo LK',
+              url: 'https://www.thedrivo.com',
+              logo: 'https://www.thedrivo.com/logo.png',
+              description: 'Sri Lanka\'s #1 vehicle rental marketplace',
               contactPoint: {
                 '@type': 'ContactPoint',
-                contactType: 'customer support',
-                email: 'thedrivo.info@gmail.com',
+                contactType: 'customer service',
                 availableLanguage: ['English', 'Sinhala'],
               },
               sameAs: [
@@ -145,48 +91,54 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }),
           }}
         />
-
-        {/* ── Structured Data: Website + SearchAction */}
+        {/* Structured Data — WebSite with SearchAction */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'WebSite',
-              name: 'Drivo Sri Lanka',
-              url: BASE_URL,
+              name: 'Drivo LK',
+              url: 'https://www.thedrivo.com',
               potentialAction: {
                 '@type': 'SearchAction',
                 target: {
                   '@type': 'EntryPoint',
-                  urlTemplate: `${BASE_URL}/?city={search_term_string}`,
+                  urlTemplate: 'https://www.thedrivo.com/?city={search_term_string}',
                 },
                 'query-input': 'required name=search_term_string',
               },
             }),
           }}
         />
-
-        {/* ── Preconnect for performance */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://images.unsplash.com" />
-
-        {/* ── Geo tags (Sri Lanka) */}
-        <meta name="geo.region" content="LK" />
-        <meta name="geo.country" content="Sri Lanka" />
-        <meta name="language" content="English, Sinhala" />
-
-        {/* ── Theme color (browser tab color on mobile) */}
-        <meta name="theme-color" content="#111111" />
-        <meta name="msapplication-TileColor" content="#111111" />
-
-        {/* ── Mobile app capable */}
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Drivo" />
+        {/* Structured Data — LocalBusiness */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'LocalBusiness',
+              '@id': 'https://www.thedrivo.com',
+              name: 'Drivo LK',
+              description: 'Sri Lanka vehicle rental marketplace — cars, bikes, tuk-tuks & vans island-wide',
+              url: 'https://www.thedrivo.com',
+              image: 'https://www.thedrivo.com/og-image.jpg',
+              priceRange: 'Rs. 2,500 — Rs. 25,000 per day',
+              currenciesAccepted: 'LKR',
+              paymentAccepted: 'Cash, Bank Transfer',
+              areaServed: {
+                '@type': 'Country',
+                name: 'Sri Lanka',
+              },
+              address: {
+                '@type': 'PostalAddress',
+                addressCountry: 'LK',
+              },
+            }),
+          }}
+        />
       </head>
-      <body>{children}</body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

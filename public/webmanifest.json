@@ -1,0 +1,31 @@
+{
+  "name": "Drivo LK — Sri Lanka Vehicle Rental",
+  "short_name": "Drivo LK",
+  "description": "Rent cars, bikes & tuk-tuks across Sri Lanka. Verified vehicles, no hidden fees.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ],
+  "categories": ["travel", "transportation", "shopping"],
+  "lang": "en",
+  "scope": "/",
+  "shortcuts": [
+    {
+      "name": "Rent a Car",
+      "short_name": "Cars",
+      "url": "/?type=car",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Rent a Bike",
+      "short_name": "Bikes",
+      "url": "/?type=bike",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

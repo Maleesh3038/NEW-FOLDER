@@ -1,3 +1,4 @@
+// app/robots.ts — robots.txt auto generation
 import { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
@@ -6,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin', '/admin/*'],
+        disallow: ['/admin', '/api/'],
       },
     ],
     sitemap: 'https://www.thedrivo.com/sitemap.xml',
