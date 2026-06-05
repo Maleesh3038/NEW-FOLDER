@@ -1210,7 +1210,24 @@ export default function Home() {
                   <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100">{([['Rental Period', `${ownerSelectedBooking.pickup_date || ''} → ${ownerSelectedBooking.return_date || ''}`], ['Pickup Time', (ownerSelectedBooking as any).pickup_time || '—'], ['Days', `${ownerSelectedBooking.days} day${ownerSelectedBooking.days > 1 ? 's' : ''}`], ['Pickup Type', (ownerSelectedBooking.delivery_type || 'pickup') === 'delivery' ? t.delivery : t.selfPickup], ['Rate', `Rs. ${(ownerSelectedBooking.price_per_day || 0).toLocaleString()} /day`], ...((ownerSelectedBooking.delivery_type || 'pickup') === 'delivery' ? [['Delivery Fee', 'Rs. 1,500']] : []), ['Customer Pays', `Rs. ${(ownerSelectedBooking.total || 0).toLocaleString()}`], ['Drivo Fee (10%)', `− Rs. ${((ownerSelectedBooking as any).platform_fee || Math.round((ownerSelectedBooking.total || 0) * 0.10)).toLocaleString()}`], ['✅ Your Payout', `Rs. ${((ownerSelectedBooking as any).owner_payout || Math.round((ownerSelectedBooking.total || 0) * 0.90)).toLocaleString()}`], ['Status', statusLabel(ownerSelectedBooking.status)], ['Booked On', ownerSelectedBooking.booked_at ? new Date(ownerSelectedBooking.booked_at).toLocaleDateString() : '']] as [string, string][]).map(([k, v]) => (<div key={k} className="flex justify-between px-4 py-2.5 text-xs"><span className="text-slate-500 font-semibold">{k}</span><span className="font-black text-slate-900">{v}</span></div>))}</div>
                   {ownerSelectedBooking.customer_id && (<CustomerDetailCard customerId={ownerSelectedBooking.customer_id}/>)}
                   {ownerSelectedBooking.status === 'pending' && (<div className="flex gap-2"><button onClick={async () => { await updateBookingStatus(ownerSelectedBooking.id, 'confirmed'); setOwnerSelectedBooking(null); }} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wide transition">✓ Accept Booking</button><button onClick={async () => { if (!confirm('Decline this booking?')) return; await declineBooking(ownerSelectedBooking.id); setOwnerSelectedBooking(null); }} className="px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">✕ Decline</button></div>)}
-                  {ownerSelectedBooking.status === 'confirmed' && (<div className="flex gap-2"><button onClick={async () => { await updateBookingStatus(ownerSelectedBooking.id, 'completed'); setOwnerSelectedBooking(null); }} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase transition">✓ Mark Completed</button><button onClick={async () => { await cancelBooking(ownerSelectedBooking.id, 'owner'); setOwnerSelectedBooking(null); }} className="px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">✕ Cancel</button></div>)}
+                  {ownerSelectedBooking.status === 'confirmed' && (
+                    <div className="space-y-3">
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                        <p className="text-xs font-black text-emerald-700 mb-1">🤝 Booking is Active</p>
+                        <p className="text-[11px] text-emerald-600 leading-relaxed">
+                          When you hand over the vehicle to the customer, click <strong>"Vehicle Given"</strong> to mark it as completed and free up your vehicle for new bookings.
+                        </p>
+                      </div>
+                      <button onClick={async () => { await updateBookingStatus(ownerSelectedBooking.id, 'completed'); setOwnerSelectedBooking(null); }}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm uppercase tracking-wide transition flex items-center justify-center gap-2">
+                        🚗 Vehicle Given — Mark Complete
+                      </button>
+                      <button onClick={async () => { if(!confirm('Cancel this confirmed booking? Customer will be notified.')) return; await cancelBooking(ownerSelectedBooking.id, 'owner'); setOwnerSelectedBooking(null); }}
+                        className="w-full py-2.5 bg-white hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl font-black text-xs uppercase transition">
+                        ✕ Cancel This Booking
+                      </button>
+                    </div>
+                  )}
                   {(ownerSelectedBooking.status === 'completed' || ownerSelectedBooking.status === 'cancelled') && (<button onClick={async () => { if (!confirm('Remove this booking from history?')) return; await supabase.from('bookings').delete().eq('id', ownerSelectedBooking.id); if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); setOwnerSelectedBooking(null); showToast('Booking removed from history'); }} className="w-full py-3 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl font-black text-xs uppercase transition">🗑 Remove from History</button>)}
                   <button onClick={() => setOwnerSelectedBooking(null)} className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition">Close</button>
                 </div>
@@ -1229,7 +1246,33 @@ export default function Home() {
                   <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="flex gap-4 p-4"><img src={b.vehicle_img || ''} className="w-20 h-14 rounded-xl object-cover flex-shrink-0" alt=""/><div className="flex-1 min-w-0"><div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-900 text-sm">{b.vehicle_name || ''}</p><p className="text-xs text-slate-400 mt-0.5">📅 {b.pickup_date || ''} → {b.return_date || ''} · {b.days}d</p><p className="text-xs text-slate-400">{(b.delivery_type || 'pickup') === 'delivery' ? '🚚 ' + t.delivery : '📍 ' + t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span> · <span className="text-emerald-600 font-black">You get Rs. {((b as any).owner_payout || Math.round(b.total * 0.90)).toLocaleString()}</span></p></div><span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span></div></div></div>
                     {b.status === 'pending' && (<div className="border-t border-slate-100 px-4 py-3 space-y-2"><div className="flex gap-2"><button onClick={() => updateBookingStatus(b.id, 'confirmed')} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-black text-xs uppercase tracking-wide transition shadow-sm flex items-center justify-center gap-1.5">✓ {t.accept}</button><button onClick={async () => { if (!confirm('Decline this booking?')) return; await declineBooking(b.id); }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">✕ {t.decline}</button><button onClick={() => setOwnerSelectedBooking(b)} className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">Details</button></div><p className="text-[10px] text-slate-400 text-center">The customer will receive an SMS confirmation automatically when you accept</p></div>)}
-                    {b.status === 'confirmed' && (<div className="border-t border-slate-100 px-4 py-3"><div className="flex gap-2"><button onClick={() => updateBookingStatus(b.id, 'completed')} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase transition">✓ Mark Completed</button><button onClick={() => cancelBooking(b.id, 'owner')} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">✕ Cancel</button><button onClick={() => setOwnerSelectedBooking(b)} className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">Details</button></div></div>)}
+                    {b.status === 'confirmed' && (
+                      <div className="border-t border-slate-100 px-4 py-3 space-y-2">
+                        {/* Info banner */}
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 flex items-center gap-2">
+                          <span className="text-lg">🤝</span>
+                          <div>
+                            <p className="text-xs font-black text-emerald-700">Booking Confirmed!</p>
+                            <p className="text-[10px] text-emerald-600">Vehicle handed over? Click "Vehicle Given" to complete the rental.</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => updateBookingStatus(b.id, 'completed')}
+                            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-black text-xs uppercase tracking-wide transition shadow-sm flex items-center justify-center gap-1.5">
+                            🚗 Vehicle Given — Complete
+                          </button>
+                          <button onClick={() => setOwnerSelectedBooking(b)}
+                            className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">
+                            Details
+                          </button>
+                          <button onClick={() => { if(confirm('Cancel this confirmed booking? Customer will be notified.')) cancelBooking(b.id, 'owner'); }}
+                            className="px-3 py-2.5 bg-white hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-400 hover:text-red-500 rounded-xl font-black text-xs transition"
+                            title="Cancel booking">
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {(b.status === 'completed' || b.status === 'cancelled') && (<div className="border-t border-slate-100 px-4 py-2.5 flex justify-end"><button onClick={() => setOwnerSelectedBooking(b)} className="text-xs font-black text-slate-500 hover:text-slate-900 transition">{t.bookingDetails} →</button></div>)}
                   </div>
                 ))}
