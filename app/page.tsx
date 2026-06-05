@@ -781,7 +781,26 @@ export default function Home() {
   const submitReview = async () => { if (!reviewModal || !custAcc?.id) return; if (reviewRating < 1 || reviewRating > 5) { showToast('Select a rating', 'err'); return; } const { error } = await supabase.from('reviews').insert({ vehicle_id: reviewModal.vehicleId, customer_id: custAcc.id, booking_id: reviewModal.bookingId, owner_id: allVehicles.find(v => v.id === reviewModal.vehicleId)?.owner_id, rating: reviewRating, comment: reviewComment.trim() }); if (error) { showToast('Review failed: ' + error.message, 'err'); return; } const { data: reviews } = await supabase.from('reviews').select('rating').eq('vehicle_id', reviewModal.vehicleId); if (reviews && reviews.length > 0) { const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length; await supabase.from('vehicles').update({ rating: Math.round(avg * 10) / 10 }).eq('id', reviewModal.vehicleId); } setReviewModal(null); setReviewRating(5); setReviewComment(''); showToast('Review submitted! Thank you 🌟'); };
 
   useEffect(() => { if (!selectedVehicle) return; const dOpt = (selectedVehicle as any).delivery_option || 'both'; if (dOpt === 'pickup_only') setDeliveryType('pickup'); if (dOpt === 'delivery_only') setDeliveryType('delivery'); }, [selectedVehicle]);
-  useEffect(() => { if (rentalPeriod === 'weekly' && days < 7) setDays(7); if (rentalPeriod === 'monthly' && days < 28) setDays(28); if (rentalPeriod === 'daily' && days > 6) setDays(1); }, [rentalPeriod]);
+  useEffect(() => {
+    // When rental period changes, snap days to minimum for that period
+    // then update return date based on new days
+    let newDays = days;
+    if (rentalPeriod === 'weekly') {
+      newDays = Math.max(7, Math.ceil(days / 7) * 7);
+    } else if (rentalPeriod === 'monthly') {
+      newDays = Math.max(28, Math.ceil(days / 28) * 28);
+    }
+    // daily — keep existing days, no reset
+    if (newDays !== days) {
+      setDays(newDays);
+      // Update return date
+      if (filterPickup) {
+        const pickup = new Date(filterPickup);
+        pickup.setDate(pickup.getDate() + newDays);
+        setFilterReturn(pickup.toISOString().split('T')[0]);
+      }
+    }
+  }, [rentalPeriod]);
 
   const getPeriodPrice = (v: any) => { if (rentalPeriod === 'weekly' && v?.weekly_price > 0) return { price: v.weekly_price, unit: 'week', mult: 7 }; if (rentalPeriod === 'monthly' && v?.monthly_price > 0) return { price: v.monthly_price, unit: 'month', mult: 28 }; return { price: v?.price_per_day || v?.pricePerDay || 0, unit: 'day', mult: 1 }; };
   const periodInfo = selectedVehicle ? getPeriodPrice(selectedVehicle) : { price: 0, unit: 'day', mult: 1 };
@@ -1439,7 +1458,7 @@ export default function Home() {
                       <div className="space-y-3">
                         <a href="mailto:admin@drivo.lk" className="flex items-center gap-3 text-sm text-slate-400 hover:text-white transition-colors group">
                           <span className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-slate-700 transition">✉️</span>
-                          thedrivo.info@gmail.com
+                          admin@drivo.lk
                         </a>
                         <a href="https://wa.me/94767868513" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm text-slate-400 hover:text-white transition-colors group">
                           <span className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-slate-700 transition">📱</span>
@@ -1523,7 +1542,21 @@ export default function Home() {
                     <div className="flex items-baseline justify-between"><h3 className="font-black text-lg text-slate-900">{t.bookThisRide}</h3><span className="text-sm font-black text-red-500">{fmt(vPrice(selectedVehicle))}<span className="text-xs font-semibold text-slate-400">/{t.perDay.toLowerCase()}</span></span></div>
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Rental Period</label><div className="grid grid-cols-3 gap-1.5">{([['daily', '📅 Daily', `Rs. ${(vPrice(selectedVehicle)).toLocaleString()}/day`], ['weekly', '📆 Weekly', (selectedVehicle as any).weekly_price > 0 ? `Rs. ${((selectedVehicle as any).weekly_price).toLocaleString()}/wk` : 'N/A'], ['monthly', '🗓️ Monthly', (selectedVehicle as any).monthly_price > 0 ? `Rs. ${((selectedVehicle as any).monthly_price).toLocaleString()}/mo` : 'N/A']] as [string, string, string][]).map(([val, label, price]) => (<button key={val} onClick={() => setRentalPeriod(val as any)} disabled={val === 'weekly' && !((selectedVehicle as any).weekly_price > 0) || val === 'monthly' && !((selectedVehicle as any).monthly_price > 0)} className={`py-2 rounded-xl border text-center transition disabled:opacity-40 disabled:cursor-not-allowed ${rentalPeriod === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}><p className="text-[11px] font-black">{label}</p><p className="text-[9px] opacity-70 mt-0.5">{price}</p></button>))}</div></div>
                     <div className="grid grid-cols-2 gap-2"><div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.pickupDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterPickup} onChange={e => setFilterPickup(e.target.value)}/></div><div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.returnDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterReturn} onChange={e => setFilterReturn(e.target.value)}/></div></div>
-                    <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.duration}</label><div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50"><button onClick={() => setDays(d => Math.max(1, d - 1))} className="px-4 py-2.5 font-black hover:bg-slate-200 transition text-lg">−</button><span className="w-full text-center font-black text-sm text-slate-900">{days} day{days > 1 ? 's' : ''}</span><button onClick={() => setDays(d => d + 1)} className="px-4 py-2.5 font-black hover:bg-slate-200 transition text-lg">+</button></div></div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.duration}</label><div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50"><button onClick={() => {
+                          if (rentalPeriod === 'weekly') setDays(d => Math.max(7, d - 7));
+                          else if (rentalPeriod === 'monthly') setDays(d => Math.max(28, d - 28));
+                          else setDays(d => Math.max(1, d - 1));
+                        }} className="px-4 py-2.5 font-black hover:bg-slate-200 transition text-lg">−</button><span className="w-full text-center font-black text-sm text-slate-900">
+                          {rentalPeriod === 'weekly'
+                            ? `${Math.ceil(days / 7)} week${Math.ceil(days / 7) > 1 ? 's' : ''} (${days} days)`
+                            : rentalPeriod === 'monthly'
+                            ? `${Math.ceil(days / 28)} month${Math.ceil(days / 28) > 1 ? 's' : ''} (${days} days)`
+                            : `${days} day${days > 1 ? 's' : ''}`}
+                        </span><button onClick={() => {
+                          if (rentalPeriod === 'weekly') setDays(d => d + 7);
+                          else if (rentalPeriod === 'monthly') setDays(d => d + 28);
+                          else setDays(d => d + 1);
+                        }} className="px-4 py-2.5 font-black hover:bg-slate-200 transition text-lg">+</button></div></div>
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">⏰ Pickup Time</label><div className="grid grid-cols-4 gap-1.5">{['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map(ti => (<button key={ti} onClick={() => setPickupTime(ti)} className={`py-2 rounded-xl text-[11px] font-black border transition ${pickupTime === ti ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'}`}>{ti}</button>))}</div><p className="text-[10px] text-slate-400 mt-1.5">Selected: <span className="font-black text-slate-700">{pickupTime}</span></p></div>
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.pickupMethod}</label>{(() => { const dOpt = (selectedVehicle as any).delivery_option || 'both'; if (dOpt === 'pickup_only') return (<div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center"><p className="text-sm font-black text-slate-900">📍 {t.selfPickup}</p><p className="text-xs text-slate-400 mt-1">This vehicle is pickup only</p></div>); if (dOpt === 'delivery_only') return (<div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center"><p className="text-sm font-black text-slate-900">🚚 {t.delivery}</p><p className="text-xs text-emerald-600 font-bold mt-1">+Rs. 1,500 delivery fee</p></div>); return (<div className="grid grid-cols-2 gap-2">{([['pickup', '📍 ' + t.selfPickup, 'Free'], ['delivery', '🚚 ' + t.delivery, '+Rs.1,500']] as [string, string, string][]).map(([val, label, note]) => (<button key={val} onClick={() => setDeliveryType(val as any)} className={`py-2.5 text-xs font-bold rounded-xl border transition ${deliveryType === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>{label}<br/><span className="text-[10px] font-medium opacity-70">{note}</span></button>))}</div>); })()}</div>
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
