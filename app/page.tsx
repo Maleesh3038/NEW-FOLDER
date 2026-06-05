@@ -781,28 +781,23 @@ export default function Home() {
   const submitReview = async () => { if (!reviewModal || !custAcc?.id) return; if (reviewRating < 1 || reviewRating > 5) { showToast('Select a rating', 'err'); return; } const { error } = await supabase.from('reviews').insert({ vehicle_id: reviewModal.vehicleId, customer_id: custAcc.id, booking_id: reviewModal.bookingId, owner_id: allVehicles.find(v => v.id === reviewModal.vehicleId)?.owner_id, rating: reviewRating, comment: reviewComment.trim() }); if (error) { showToast('Review failed: ' + error.message, 'err'); return; } const { data: reviews } = await supabase.from('reviews').select('rating').eq('vehicle_id', reviewModal.vehicleId); if (reviews && reviews.length > 0) { const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length; await supabase.from('vehicles').update({ rating: Math.round(avg * 10) / 10 }).eq('id', reviewModal.vehicleId); } setReviewModal(null); setReviewRating(5); setReviewComment(''); showToast('Review submitted! Thank you 🌟'); };
 
   useEffect(() => { if (!selectedVehicle) return; const dOpt = (selectedVehicle as any).delivery_option || 'both'; if (dOpt === 'pickup_only') setDeliveryType('pickup'); if (dOpt === 'delivery_only') setDeliveryType('delivery'); }, [selectedVehicle]);
-  useEffect(() => {
-    // When rental period changes, snap days to minimum for that period
-    // then update return date based on new days
-    let newDays = days;
-    if (rentalPeriod === 'weekly') {
-      newDays = Math.max(7, Math.ceil(days / 7) * 7);
-    } else if (rentalPeriod === 'monthly') {
-      newDays = Math.max(28, Math.ceil(days / 28) * 28);
-    }
-    // daily — keep existing days, no reset
-    if (newDays !== days) {
-      setDays(newDays);
-      // Update return date
-      if (filterPickup) {
-        const pickup = new Date(filterPickup);
-        pickup.setDate(pickup.getDate() + newDays);
-        setFilterReturn(pickup.toISOString().split('T')[0]);
-      }
-    }
-  }, [rentalPeriod]);
+  // rentalPeriod useEffect removed — handled directly in button click
 
-  const getPeriodPrice = (v: any) => { if (rentalPeriod === 'weekly' && v?.weekly_price > 0) return { price: v.weekly_price, unit: 'week', mult: 7 }; if (rentalPeriod === 'monthly' && v?.monthly_price > 0) return { price: v.monthly_price, unit: 'month', mult: 28 }; return { price: v?.price_per_day || v?.pricePerDay || 0, unit: 'day', mult: 1 }; };
+  const getPeriodPrice = (v: any) => {
+    if (!v) return { price: 0, unit: 'day', mult: 1 };
+    const daily = v.price_per_day || v.pricePerDay || 0;
+    if (rentalPeriod === 'weekly') {
+      // Use weekly_price if set, otherwise calculate from daily × 7
+      const wp = v.weekly_price > 0 ? v.weekly_price : daily * 7;
+      return { price: wp, unit: 'week', mult: 7 };
+    }
+    if (rentalPeriod === 'monthly') {
+      // Use monthly_price if set, otherwise calculate from daily × 28
+      const mp = v.monthly_price > 0 ? v.monthly_price : daily * 28;
+      return { price: mp, unit: 'month', mult: 28 };
+    }
+    return { price: daily, unit: 'day', mult: 1 };
+  };
   const periodInfo = selectedVehicle ? getPeriodPrice(selectedVehicle) : { price: 0, unit: 'day', mult: 1 };
   const periodsCount = rentalPeriod === 'daily' ? days : rentalPeriod === 'weekly' ? Math.ceil(days / 7) : Math.ceil(days / 28);
   const base = periodInfo.price * periodsCount;
@@ -1540,7 +1535,27 @@ export default function Home() {
                   {/* BOOKING SIDEBAR */}
                   <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl space-y-4 lg:sticky lg:top-24">
                     <div className="flex items-baseline justify-between"><h3 className="font-black text-lg text-slate-900">{t.bookThisRide}</h3><span className="text-sm font-black text-red-500">{fmt(vPrice(selectedVehicle))}<span className="text-xs font-semibold text-slate-400">/{t.perDay.toLowerCase()}</span></span></div>
-                    <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Rental Period</label><div className="grid grid-cols-3 gap-1.5">{([['daily', '📅 Daily', `Rs. ${(vPrice(selectedVehicle)).toLocaleString()}/day`], ['weekly', '📆 Weekly', (selectedVehicle as any).weekly_price > 0 ? `Rs. ${((selectedVehicle as any).weekly_price).toLocaleString()}/wk` : 'N/A'], ['monthly', '🗓️ Monthly', (selectedVehicle as any).monthly_price > 0 ? `Rs. ${((selectedVehicle as any).monthly_price).toLocaleString()}/mo` : 'N/A']] as [string, string, string][]).map(([val, label, price]) => (<button key={val} onClick={() => setRentalPeriod(val as any)} disabled={val === 'weekly' && !((selectedVehicle as any).weekly_price > 0) || val === 'monthly' && !((selectedVehicle as any).monthly_price > 0)} className={`py-2 rounded-xl border text-center transition disabled:opacity-40 disabled:cursor-not-allowed ${rentalPeriod === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}><p className="text-[11px] font-black">{label}</p><p className="text-[9px] opacity-70 mt-0.5">{price}</p></button>))}</div></div>
+                    <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Rental Period</label><div className="grid grid-cols-3 gap-1.5">{([['daily', '📅 Daily', `Rs. ${(vPrice(selectedVehicle)).toLocaleString()}/day`], ['weekly', '📆 Weekly', (selectedVehicle as any).weekly_price > 0 ? `Rs. ${((selectedVehicle as any).weekly_price).toLocaleString()}/wk` : 'N/A'], ['monthly', '🗓️ Monthly', (selectedVehicle as any).monthly_price > 0 ? `Rs. ${((selectedVehicle as any).monthly_price).toLocaleString()}/mo` : 'N/A']] as [string, string, string][]).map(([val, label, price]) => (<button key={val} onClick={() => {
+                          const newPeriod = val as 'daily'|'weekly'|'monthly';
+                          setRentalPeriod(newPeriod);
+                          // Immediately snap days to correct period
+                          let newDays = days;
+                          if (newPeriod === 'weekly') {
+                            newDays = Math.max(7, Math.ceil(days / 7) * 7);
+                          } else if (newPeriod === 'monthly') {
+                            newDays = Math.max(28, Math.ceil(days / 28) * 28);
+                          } else {
+                            // daily — keep days as is, no reset
+                            newDays = Math.max(1, days);
+                          }
+                          setDays(newDays);
+                          // Sync return date
+                          if (filterPickup) {
+                            const p = new Date(filterPickup);
+                            p.setDate(p.getDate() + newDays);
+                            setFilterReturn(p.toISOString().split('T')[0]);
+                          }
+                        }} disabled={val === 'weekly' && !((selectedVehicle as any).weekly_price > 0) || val === 'monthly' && !((selectedVehicle as any).monthly_price > 0)} className={`py-2 rounded-xl border text-center transition disabled:opacity-40 disabled:cursor-not-allowed ${rentalPeriod === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}><p className="text-[11px] font-black">{label}</p><p className="text-[9px] opacity-70 mt-0.5">{price}</p></button>))}</div></div>
                     <div className="grid grid-cols-2 gap-2"><div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.pickupDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterPickup} onChange={e => setFilterPickup(e.target.value)}/></div><div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5"><label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.returnDate}</label><input type="date" className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer" value={filterReturn} onChange={e => setFilterReturn(e.target.value)}/></div></div>
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.duration}</label><div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50"><button onClick={() => {
                           if (rentalPeriod === 'weekly') setDays(d => Math.max(7, d - 7));
