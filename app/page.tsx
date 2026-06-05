@@ -1439,7 +1439,7 @@ export default function Home() {
                       <div className="space-y-3">
                         <a href="mailto:admin@drivo.lk" className="flex items-center gap-3 text-sm text-slate-400 hover:text-white transition-colors group">
                           <span className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-slate-700 transition">✉️</span>
-                          admin@drivo.lk
+                          thedrivo.info@gmail.com
                         </a>
                         <a href="https://wa.me/94767868513" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm text-slate-400 hover:text-white transition-colors group">
                           <span className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-slate-700 transition">📱</span>
