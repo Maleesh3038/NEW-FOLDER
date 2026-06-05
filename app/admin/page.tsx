@@ -292,11 +292,18 @@ export default function AdminPage() {
     (o.shop_name||'').toLowerCase().includes(partnerSearch.toLowerCase()) ||
     (o.email||'').toLowerCase().includes(partnerSearch.toLowerCase())
   );
-  const filteredCustomers = customers.filter(c=>
-    custSearch==='' ? true :
-    (`${c.first_name||''} ${c.last_name||''}`).toLowerCase().includes(custSearch.toLowerCase()) ||
-    (c.email||'').toLowerCase().includes(custSearch.toLowerCase())
-  );
+  const filteredCustomers = customers.filter(c=>{
+    if(custSearch==='') return true;
+    const q = custSearch.toLowerCase();
+    return (
+      (`${c.first_name||''} ${c.last_name||''}`).toLowerCase().includes(q) ||
+      (c.email||'').toLowerCase().includes(q) ||
+      (c.nic||'').toLowerCase().includes(q) ||
+      (c.driving_license||'').toLowerCase().includes(q) ||
+      (c.phone||'').toLowerCase().includes(q) ||
+      (c.id||'').toLowerCase().includes(q)
+    );
+  });
 
   // LOGIN
   if(!authed) return (
@@ -734,7 +741,7 @@ export default function AdminPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div><h1 className="text-2xl font-black text-white">Customers</h1><p className="text-slate-500 text-sm">{customers.length} registered · {customers.filter(c=>c.blocked).length} blocked</p></div>
-                <input placeholder="Search by name or email..." value={custSearch} onChange={e=>setCustSearch(e.target.value)}
+                <input placeholder="Search by name, email, NIC, license, phone..." value={custSearch} onChange={e=>setCustSearch(e.target.value)}
                   className="bg-slate-800 border border-slate-700 text-white text-sm rounded-xl px-4 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600 w-64"/>
               </div>
               <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl overflow-hidden">
@@ -757,8 +764,20 @@ export default function AdminPage() {
                           </td>
                           <td className="px-4 py-3 text-slate-400">{c.email}</td>
                           <td className="px-4 py-3 text-slate-300">{c.city||'—'}</td>
-                          <td className="px-4 py-3 text-slate-300">{c.nic||'—'}</td>
-                          <td className="px-4 py-3 text-slate-300">{c.driving_license||'—'}</td>
+                          <td className="px-4 py-3">
+                            {c.nic ? (
+                              <span className="text-xs font-black text-emerald-400 bg-emerald-950 border border-emerald-800 px-2 py-1 rounded-lg">{c.nic}</span>
+                            ) : (
+                              <span className="text-slate-600 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {c.driving_license ? (
+                              <span className="text-xs font-black text-blue-400 bg-blue-950 border border-blue-800 px-2 py-1 rounded-lg">{c.driving_license}</span>
+                            ) : (
+                              <span className="text-slate-600 text-xs">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 font-black text-white">{bookings.filter(b=>b.customer_id===c.id).length}</td>
                           <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${c.blocked?'bg-red-900/50 text-red-400':'bg-emerald-900/50 text-emerald-400'}`}>{c.blocked?'Blocked':'Active'}</span></td>
                           <td className="px-4 py-3 text-right space-x-1" onClick={e=>e.stopPropagation()}>
