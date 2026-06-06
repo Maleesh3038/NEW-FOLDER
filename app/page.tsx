@@ -526,7 +526,7 @@ function LiveStatsSection() {
           <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">Growing every day 🇱🇰</h2>
           <p className="text-slate-400 text-sm mt-2">Real-time numbers from across Sri Lanka</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {items.map((item) => (
             <div key={item.label} className={`${item.bg} ${item.border} border rounded-2xl p-5 text-center relative overflow-hidden`}>
               <div className="absolute top-3 right-3">
@@ -1006,6 +1006,13 @@ export default function Home() {
                 <><button onClick={() => openAuth('customer')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition">🚗 Rent a Vehicle</button><button onClick={() => openAuth('owner')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 transition">{t.partnerLogin}</button></>
               )}
             </div>
+            {/* Mobile logged in indicator */}
+            {sessionRole && (
+              <button className="md:hidden flex items-center justify-center w-9 h-9 bg-slate-900 text-white rounded-xl text-xs font-black flex-shrink-0"
+                onClick={() => setView(sessionRole === 'owner' ? 'ownerDash' : 'custDash')}>
+                {sessionRole === 'owner' ? '🔑' : '👤'}
+              </button>
+            )}
           </div>
         </div>
         {mobileMenuOpen && (
@@ -1097,7 +1104,7 @@ export default function Home() {
         <div className="min-h-[calc(100vh-64px)] bg-slate-100 flex items-center justify-center px-4 py-12">
           <div className="w-full max-w-[460px]">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-              <div className="bg-slate-900 px-8 py-8 text-center">
+              <div className="bg-slate-900 px-5 sm:px-8 py-6 sm:py-8 text-center">
                 <div className="flex items-center justify-center gap-2 mb-3"><DrivoLogo className="w-9 h-9"/><span className="text-white font-black text-xl">drivo</span><span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ml-1 ${authMode === 'owner' ? 'bg-emerald-500 text-slate-900' : 'bg-blue-400 text-white'}`}>{authMode === 'owner' ? 'Partner' : 'Customer'}</span></div>
                 <h2 className="text-white text-2xl font-black">{authTab === 'login' ? t.welcomeBack : authTab === 'forgot' ? 'Reset Password' : authTab === 'verify' ? 'Enter OTP' : (authMode === 'owner' ? t.createShop : t.register)}</h2>
                 <p className="text-slate-400 text-sm mt-1">{authTab === 'login' ? (authMode === 'owner' ? t.manageFleet : t.myBookings) : t.startListing}</p>
@@ -1124,7 +1131,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="px-8 py-7">
+              <div className="px-5 sm:px-8 py-5 sm:py-7">
                 {/* LOGIN */}
                 {authTab === 'login' && (
                   <div className="space-y-4">
@@ -1288,7 +1295,20 @@ export default function Home() {
 
           <div className="max-w-7xl mx-auto px-4 py-6">
             <div className="flex gap-2 mb-5 flex-wrap">
-              {(['all', 'upcoming', 'past', 'favourites'] as const).map(tab => (<button key={tab} onClick={() => setOwnerSubTab(tab as any)} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition ${ownerSubTab === tab ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>{tab === 'all' ? t.myBookings : tab === 'upcoming' ? t.upcomingRentals : tab === 'past' ? t.pastRentals : '❤️ Favourites'}</button>))}
+              {([
+                { key: 'all', label: t.myBookings, icon: '📋' },
+                { key: 'upcoming', label: t.upcomingRentals, icon: '🗓️' },
+                { key: 'past', label: t.pastRentals, icon: '✅' },
+                { key: 'favourites', label: 'My Favourites', icon: '❤️' },
+              ] as const).map(tab => (
+                <button key={tab.key} onClick={() => setOwnerSubTab(tab.key as any)}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition ${ownerSubTab === tab.key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}>
+                  <span>{tab.icon}</span> {tab.label}
+                  {tab.key === 'favourites' && wishlist.length > 0 && (
+                    <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">{wishlist.length}</span>
+                  )}
+                </button>
+              ))}
             </div>
             {ownerSubTab === 'favourites' ? (
               <div>{wishlist.length === 0 ? (<div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20"><p className="text-5xl mb-3">🤍</p><p className="font-black text-slate-700">No favourites yet</p><button onClick={resetToHome} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">Browse Vehicles</button></div>) : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{allVehicles.filter(v => wishlist.includes(v.id)).map(v => (<div key={v.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer" onClick={() => { setSelectedVehicle(v); setView('detail'); }}><div className="relative aspect-video bg-slate-100 overflow-hidden"><img src={v.image} alt={v.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"/><button onClick={e => { e.stopPropagation(); toggleWishlist(v.id); }} className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition">❤️</button></div><div className="p-3"><p className="font-black text-slate-900 text-sm">{v.name}</p><p className="text-xs text-slate-400 mt-0.5">{vShop(v)} · {v.location}</p><p className="font-black text-slate-900 text-sm mt-2">Rs. {vPrice(v).toLocaleString()} <span className="text-xs font-normal text-slate-400">/day</span></p></div></div>))}</div>)}</div>
@@ -1612,11 +1632,11 @@ export default function Home() {
             <>
               <header className="relative bg-slate-900 text-white pt-14 pb-12 px-4 text-center overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none select-none"><img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1600" className="w-full h-full object-cover opacity-20" alt=""/><div className="absolute inset-0 bg-gradient-to-b from-slate-900/10 to-slate-900/80"/></div>
-                <div className="relative max-w-3xl mx-auto space-y-3 pointer-events-none"><span className="inline-block text-xs bg-white/10 border border-white/20 text-white/80 font-bold px-3 py-1 rounded-full">🇱🇰 Sri Lanka's #1 Vehicle Rental Platform</span><h1 className="text-4xl md:text-6xl font-black tracking-tight leading-tight">Rent cars, bikes &<br/>tuk-tuks in Sri Lanka</h1><p className="text-slate-300 text-sm md:text-base font-medium">Verified hubs · No hidden fees · Book in 60 seconds</p></div>
+                <div className="relative max-w-3xl mx-auto space-y-3 pointer-events-none"><span className="inline-block text-xs bg-white/10 border border-white/20 text-white/80 font-bold px-3 py-1 rounded-full">🇱🇰 Sri Lanka's #1 Vehicle Rental Platform</span><h1 className="text-3xl md:text-6xl font-black tracking-tight leading-tight">Rent cars, bikes &<br className="hidden sm:block"/> tuk-tuks in<br className="hidden sm:block"/> Sri Lanka</h1><p className="text-slate-300 text-sm md:text-base font-medium">Verified hubs · No hidden fees · Book in 60 seconds</p></div>
               </header>
               <div className="bg-white border-b border-slate-200 shadow-md">
                 <div className="max-w-6xl mx-auto px-4 py-4">
-                  <div className="flex flex-col md:flex-row gap-2">
+                  <div className="grid grid-cols-2 md:flex gap-2">
                     {[
                       { label: t.cityLoc, el: <select value={filterCity} onChange={e => setFilterCity(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none">{SL_CITIES.map(c => <option key={c} value={c}>{c}</option>)}</select> },
                       { label: t.vehicleType, el: <select value={filterType} onChange={e => setFilterType(e.target.value)} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer leading-none"><option value="all">{t.allTypes}</option><option value="car">🚙 {t.cars}</option><option value="van">🚐 Van</option><option value="bike">🏍️ {t.bikes}</option><option value="tuk">🛺 {t.tuks}</option></select> },
@@ -1639,25 +1659,25 @@ export default function Home() {
                   {[{ label: t.allDeals, city: 'All Sri Lanka', type: 'all' }, { label: '🚙 ' + t.cars, city: 'All Sri Lanka', type: 'car' }, { label: '🏍️ ' + t.bikes, city: 'All Sri Lanka', type: 'bike' }, { label: '🚐 Vans', city: 'All Sri Lanka', type: 'van' }, { label: '🛺 ' + t.tuks, city: 'All Sri Lanka', type: 'tuk' }, { label: '📍 Colombo', city: 'Colombo', type: 'all' }, { label: '📍 Galle', city: 'Galle', type: 'all' }, { label: '📍 Kandy', city: 'Kandy', type: 'all' }, { label: '📍 Gampaha', city: 'Gampaha', type: 'all' }, { label: '📍 Matara', city: 'Matara', type: 'all' }, { label: '📍 Negombo', city: 'Negombo', type: 'all' }, { label: '📍 Jaffna', city: 'Jaffna', type: 'all' }, { label: '📍 Trincomalee', city: 'Trincomalee', type: 'all' }, { label: '📍 Batticaloa', city: 'Batticaloa', type: 'all' }, { label: '📍 Anuradhapura', city: 'Anuradhapura', type: 'all' }, { label: '📍 Ella/Badulla', city: 'Badulla', type: 'all' }, { label: '📍 Nuwara Eliya', city: 'Nuwara Eliya', type: 'all' }, { label: '📍 Ratnapura', city: 'Ratnapura', type: 'all' }, { label: '📍 Hambantota', city: 'Hambantota', type: 'all' }].map(tag => (<button key={tag.label} onClick={() => { setFilterCity(tag.city); setFilterType(tag.type); }} className={`text-xs font-bold border px-4 py-2 rounded-xl whitespace-nowrap transition ${filterCity === tag.city && filterType === tag.type ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{tag.label}</button>))}
                 </div>
               </section>
-              <PartnerLeaderboard />
               <section className="max-w-7xl mx-auto px-4 mt-2 mb-24">
                 <h2 className="text-xl font-black text-slate-900 mb-5"><span className="text-red-500">{displayed.length}</span> {t.vehicles} {t.available}{filterCity !== 'All Sri Lanka' ? ` in ${filterCity}` : ''}</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
                   {displayed.map(v => (
                     <article key={v.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group cursor-pointer" onClick={() => { setSelectedVehicle(v); setView('detail'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
                       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden"><img src={v.image} alt={v.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onClick={e => { e.stopPropagation(); const allImgs = (v as any).images?.filter(Boolean) || [v.image].filter(Boolean); if (allImgs.length > 0) setLightbox({ imgs: allImgs, idx: 0 }); }}/>{(v as any).owner_verified ? (<span className="absolute top-3 left-3 bg-blue-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow flex items-center gap-1">✅ Verified Partner</span>) : (<span className="absolute top-3 left-3 bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow uppercase">{t.verified}</span>)}<div className="absolute top-3 right-3 flex items-center gap-1.5"><button onClick={e => { e.stopPropagation(); toggleWishlist(v.id); }} className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all ${wishlist.includes(v.id) ? 'bg-red-500 text-white' : 'bg-white/90 text-slate-400 hover:text-red-500'}`}>{wishlist.includes(v.id) ? '❤️' : '🤍'}</button><span className="text-lg">{typeIcon(v.type)}</span></div></div>
-                      <div className="p-4 flex-1 flex flex-col justify-between"><div><div className="flex items-center gap-1.5 mb-2 flex-wrap"><span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.transmission}</span><span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.fuel}</span>{(v as any).driver_option === 'with_driver' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Driver</span>}{(v as any).driver_option === 'both' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Optional</span>}<span className="text-[9px] font-extrabold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase ml-auto">{v.location}</span></div><h3 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-red-500 transition-colors">{v.name}</h3><p className="text-xs text-slate-400 mt-1">{vShop(v)}</p></div><div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100"><div><p className="text-[10px] text-slate-400 font-bold uppercase">{t.perDay}</p><span className="text-base font-black text-slate-900">{fmt(vPrice(v))}</span><p className="text-[9px] text-blue-500 font-bold mt-0.5">+{fmt(Math.round(vPrice(v) * 0.10))} booking fee</p></div><div className="flex items-center gap-1"><span className="text-amber-400 text-xs">★</span><span className="text-xs font-bold text-slate-700">{v.rating.toFixed(1)}</span></div></div></div>
+                      <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between"><div><div className="flex items-center gap-1.5 mb-2 flex-wrap"><span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.transmission}</span><span className="text-[9px] font-extrabold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase">{v.fuel}</span>{(v as any).driver_option === 'with_driver' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Driver</span>}{(v as any).driver_option === 'both' && <span className="text-[9px] font-extrabold bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100 uppercase">🧑‍✈️ Optional</span>}<span className="text-[9px] font-extrabold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase ml-auto">{v.location}</span></div><h3 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-red-500 transition-colors">{v.name}</h3><p className="text-xs text-slate-400 mt-1">{vShop(v)}</p></div><div className="flex justify-between items-center mt-3 pt-2.5 border-t border-slate-100"><div><span className="text-sm font-black text-slate-900">{fmt(vPrice(v))}</span><span className="text-[10px] text-slate-400 font-bold ml-1">/{t.perDay.toLowerCase()}</span></div><div className="flex items-center gap-1"><span className="text-amber-400 text-xs">★</span><span className="text-xs font-bold text-slate-700">{v.rating.toFixed(1)}</span></div></div></div>
                     </article>
                   ))}
                   {displayed.length === 0 && (<div className="col-span-full text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200"><p className="text-5xl mb-4">🚗</p><p className="text-base font-black text-slate-700">{filterCity !== 'All Sri Lanka' || filterType !== 'all' ? t.noVehiclesFound : 'No vehicles listed yet'}</p><p className="text-sm text-slate-400 mt-2 max-w-xs mx-auto">{filterCity !== 'All Sri Lanka' || filterType !== 'all' ? <button onClick={() => { setFilterCity('All Sri Lanka'); setFilterType('all'); }} className="text-red-500 underline font-bold">{t.clearFilters}</button> : 'Vehicle owners can list their cars, bikes & tuk-tuks via Partner Hub'}</p></div>)}
                 </div>
               </section>
               <LiveStatsSection />
+              <PartnerLeaderboard />
               <FaqSection />
               <section className="bg-white py-16 px-4 border-t border-slate-100">
                 <div className="max-w-5xl mx-auto">
                   <div className="text-center mb-12"><span className="text-xs font-black text-red-500 uppercase tracking-widest">All Inclusive with Drivo</span><h2 className="text-3xl md:text-4xl font-black text-slate-900 mt-2">Why Book with Us?</h2><p className="text-slate-500 mt-3 text-sm max-w-lg mx-auto">Every vehicle on Drivo is verified. Simply book, show up, and enjoy your ride.</p></div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8">{[{ icon: '✅', title: 'Verified Vehicles', desc: 'Every car, bike & tuk-tuk is inspected and verified by our team' }, { icon: '🛡️', title: 'Secure Booking', desc: 'NIC & license verified renters. Your vehicle is in safe hands' }, { icon: '💬', title: 'WhatsApp Support', desc: 'Direct contact with the shop. 24/7 communication guaranteed' }, { icon: '🗺️', title: 'GPS Pickup Location', desc: 'Every listing has a Google Maps pin. No confusion at pickup' }, { icon: '🚗', title: 'Cars, Bikes & Tuk-tuks', desc: 'Sri Lanka largest multi-vehicle rental marketplace' }, { icon: '💸', title: 'No Hidden Fees', desc: 'Transparent pricing. Only a 10% booking fee, nothing more' }, { icon: '🇱🇰', title: 'Support Local', desc: 'Every booking supports a local Sri Lankan vehicle owner' }, { icon: '⚡', title: 'Book in 60 Seconds', desc: 'Pick dates, select time, confirm. Instant booking request sent' }].map(item => (<div key={item.title} className="text-center group"><div className="w-16 h-16 bg-slate-50 border-2 border-slate-100 group-hover:border-red-200 group-hover:bg-red-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 transition-all duration-300">{item.icon}</div><h3 className="font-black text-slate-900 text-sm mb-1">{item.title}</h3><p className="text-xs text-slate-400 leading-relaxed">{item.desc}</p></div>))}</div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8">{[{ icon: '✅', title: 'Verified Vehicles', desc: 'Every car, bike & tuk-tuk is inspected and verified by our team' }, { icon: '🛡️', title: 'Secure Booking', desc: 'NIC & license verified renters. Your vehicle is in safe hands' }, { icon: '💬', title: 'WhatsApp Support', desc: 'Direct contact with the shop. 24/7 communication guaranteed' }, { icon: '🗺️', title: 'GPS Pickup Location', desc: 'Every listing has a Google Maps pin. No confusion at pickup' }, { icon: '🚗', title: 'Cars, Bikes & Tuk-tuks', desc: 'Sri Lanka largest multi-vehicle rental marketplace' }, { icon: '💸', title: 'No Hidden Fees', desc: 'Transparent pricing. Only a 10% booking fee, nothing more' }, { icon: '🇱🇰', title: 'Support Local', desc: 'Every booking supports a local Sri Lankan vehicle owner' }, { icon: '⚡', title: 'Book in 60 Seconds', desc: 'Pick dates, select time, confirm. Instant booking request sent' }].map(item => (<div key={item.title} className="text-center group"><div className="w-16 h-16 bg-slate-50 border-2 border-slate-100 group-hover:border-red-200 group-hover:bg-red-50 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 transition-all duration-300">{item.icon}</div><h3 className="font-black text-slate-900 text-sm mb-1">{item.title}</h3><p className="text-xs text-slate-400 leading-relaxed">{item.desc}</p></div>))}</div>
                   <div className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4">{[{ num: '100%', label: 'Verified Listings' }, { num: '60s', label: 'Average Booking Time' }, { num: '0', label: 'Hidden Charges' }, { num: '24/7', label: 'WhatsApp Support' }].map(s => (<div key={s.label} className="bg-slate-900 rounded-2xl p-5 text-center"><p className="text-2xl font-black text-white">{s.num}</p><p className="text-xs text-slate-400 mt-1 font-semibold">{s.label}</p></div>))}</div>
                 </div>
               </section>
@@ -1807,7 +1827,7 @@ export default function Home() {
                   </div>
 
                   {/* BOOKING SIDEBAR */}
-                  <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xl space-y-4 lg:sticky lg:top-24">
+                  <div className="bg-white border border-slate-200 p-4 sm:p-5 rounded-2xl shadow-xl space-y-4 lg:sticky lg:top-24">
                     <div className="flex items-baseline justify-between"><h3 className="font-black text-lg text-slate-900">{t.bookThisRide}</h3><span className="text-sm font-black text-red-500">{fmt(vPrice(selectedVehicle))}<span className="text-xs font-semibold text-slate-400">/{t.perDay.toLowerCase()}</span></span></div>
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Rental Period</label><div className="grid grid-cols-3 gap-1.5">{([['daily', '📅 Daily', `Rs. ${(vPrice(selectedVehicle)).toLocaleString()}/day`], ['weekly', '📆 Weekly', (selectedVehicle as any).weekly_price > 0 ? `Rs. ${((selectedVehicle as any).weekly_price).toLocaleString()}/wk` : 'N/A'], ['monthly', '🗓️ Monthly', (selectedVehicle as any).monthly_price > 0 ? `Rs. ${((selectedVehicle as any).monthly_price).toLocaleString()}/mo` : 'N/A']] as [string, string, string][]).map(([val, label, price]) => (<button key={val} onClick={() => {
                           const newPeriod = val as 'daily'|'weekly'|'monthly';
@@ -1857,6 +1877,17 @@ export default function Home() {
                       {(selectedVehicle as any).km_per_day > 0 && (<div className="text-[10px] text-slate-500 bg-slate-100 rounded-lg px-3 py-2 space-y-0.5"><p>🛣️ <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included</p>{(selectedVehicle as any).extra_km_charge > 0 && <p>Extra km: <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span></p>}</div>)}
                     </div>
                     <button onClick={confirmBooking} disabled={bookingLoading} className={`w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wide shadow-md transition flex items-center justify-center gap-2 ${bookingLoading ? 'bg-slate-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 active:scale-95'} text-white`}>{bookingLoading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Processing...</> : 'Confirm Booking →'}</button>
+                    {/* Mobile sticky bottom bar */}
+                    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-3 shadow-2xl">
+                      <div className="flex-1">
+                        <p className="text-xs text-slate-500 font-semibold">{selectedVehicle?.name}</p>
+                        <p className="font-black text-slate-900 text-sm">{fmt(total)} <span className="text-xs font-normal text-slate-400">· {days} day{days>1?'s':''}</span></p>
+                      </div>
+                      <button onClick={confirmBooking} disabled={bookingLoading}
+                        className={`px-6 py-3 rounded-xl font-black text-sm text-white shadow-lg transition ${bookingLoading ? 'bg-slate-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 active:scale-95'}`}>
+                        {bookingLoading ? '...' : 'Book Now →'}
+                      </button>
+                    </div>
                     <p className="text-[10px] text-center text-slate-400">{t.noPayment}</p>
                   </div>
                 </div>
