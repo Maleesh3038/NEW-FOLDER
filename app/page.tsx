@@ -299,6 +299,167 @@ function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { veh
   );
 }
 
+
+function PartnerLeaderboard() {
+  const [partners, setPartners] = useState<any[]>([]);
+  const [tab, setTab] = useState<'bookings'|'rating'>('bookings');
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        // Get all owners with their vehicles
+        const { data: owners } = await supabase
+          .from('owners')
+          .select('id, shop_name, city, verified, avatar_url')
+          .eq('blocked', false)
+          .limit(20);
+
+        if (!owners || owners.length === 0) { setLoaded(true); return; }
+
+        // Get booking counts per owner
+        const { data: bookings } = await supabase
+          .from('bookings')
+          .select('owner_id')
+          .in('status', ['confirmed', 'completed']);
+
+        // Get review averages per owner
+        const { data: reviews } = await supabase
+          .from('reviews')
+          .select('owner_id, rating');
+
+        // Get vehicle counts per owner
+        const { data: vehicles } = await supabase
+          .from('vehicles')
+          .select('owner_id')
+          .eq('is_available', true);
+
+        const stats = owners.map(owner => {
+          const ownerBookings = (bookings || []).filter(b => b.owner_id === owner.id);
+          const ownerReviews = (reviews || []).filter(r => r.owner_id === owner.id);
+          const ownerVehicles = (vehicles || []).filter(v => v.owner_id === owner.id);
+          const avgRating = ownerReviews.length > 0
+            ? ownerReviews.reduce((s, r) => s + r.rating, 0) / ownerReviews.length
+            : 0;
+          return {
+            ...owner,
+            bookingCount: ownerBookings.length,
+            reviewCount: ownerReviews.length,
+            avgRating: Math.round(avgRating * 10) / 10,
+            vehicleCount: ownerVehicles.length,
+          };
+        }).filter(p => p.bookingCount > 0 || p.vehicleCount > 0);
+
+        setPartners(stats);
+        setLoaded(true);
+      } catch { setLoaded(true); }
+    };
+    fetchLeaderboard();
+  }, []);
+
+  const sorted = [...partners].sort((a, b) =>
+    tab === 'bookings'
+      ? b.bookingCount - a.bookingCount
+      : b.avgRating - a.avgRating || b.reviewCount - a.reviewCount
+  ).slice(0, 5);
+
+  const medalColor = (i: number) =>
+    i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-amber-700' : 'text-slate-300';
+  const medalIcon = (i: number) =>
+    i === 0 ? 'ti-trophy' : i === 1 ? 'ti-medal' : i === 2 ? 'ti-award' : 'ti-minus';
+  const avatarColors = [
+    'bg-blue-100 text-blue-700',
+    'bg-emerald-100 text-emerald-700',
+    'bg-purple-100 text-purple-700',
+    'bg-amber-100 text-amber-700',
+    'bg-red-100 text-red-700',
+  ];
+
+  if (loaded && sorted.length === 0) return null;
+
+  return (
+    <section className="max-w-7xl mx-auto px-4 pt-6 pb-2">
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h2 className="font-black text-slate-900 text-base">🏆 Top Partners</h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">Ranked by real customer data · Updated daily</p>
+          </div>
+          <div className="flex gap-1.5 bg-slate-100 rounded-xl p-1">
+            {(['bookings', 'rating'] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wide transition ${tab === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                {t === 'bookings' ? '📋 Bookings' : '⭐ Rating'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="divide-y divide-slate-50">
+          {!loaded ? (
+            [1,2,3].map(i => (
+              <div key={i} className="flex items-center gap-3 px-5 py-3 animate-pulse">
+                <div className="w-7 h-5 bg-slate-100 rounded"/>
+                <div className="w-9 h-9 bg-slate-100 rounded-full"/>
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-slate-100 rounded w-32"/>
+                  <div className="h-2.5 bg-slate-100 rounded w-20"/>
+                </div>
+                <div className="w-12 h-6 bg-slate-100 rounded"/>
+              </div>
+            ))
+          ) : sorted.map((p, i) => (
+            <div key={p.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition">
+              {/* Rank */}
+              <div className="w-7 flex-shrink-0 text-center">
+                <i className={`ti ${medalIcon(i)} text-lg ${medalColor(i)}`} aria-hidden="true"/>
+              </div>
+              {/* Avatar */}
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 overflow-hidden ${avatarColors[i % avatarColors.length]}`}>
+                {p.avatar_url ? <img src={p.avatar_url} className="w-full h-full object-cover" alt=""/> : (p.shop_name || 'S').charAt(0).toUpperCase()}
+              </div>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="font-black text-slate-900 text-sm truncate">{p.shop_name}</p>
+                  {p.verified && <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded-full font-black flex-shrink-0">✅</span>}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">📍 {p.city || 'Sri Lanka'} · 🚗 {p.vehicleCount} vehicle{p.vehicleCount !== 1 ? 's' : ''}</p>
+              </div>
+              {/* Score */}
+              <div className="text-right flex-shrink-0">
+                {tab === 'bookings' ? (
+                  <>
+                    <p className="font-black text-slate-900 text-sm">{p.bookingCount}</p>
+                    <p className="text-[10px] text-slate-400">bookings</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-black text-slate-900 text-sm">
+                      {p.avgRating > 0 ? <>⭐ {p.avgRating.toFixed(1)}</> : <span className="text-slate-300">—</span>}
+                    </p>
+                    <p className="text-[10px] text-slate-400">{p.reviewCount} review{p.reviewCount !== 1 ? 's' : ''}</p>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        {loaded && sorted.length > 0 && (
+          <div className="px-5 py-3 border-t border-slate-50 bg-slate-50">
+            <p className="text-[10px] text-slate-400 text-center">Rankings update automatically as bookings & reviews come in 🔄</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+
 function LiveStatsSection() {
   const [stats, setStats] = useState({ customers: 0, partners: 0, bookings: 0, vehicles: 0 });
   const [displayed, setDisplayed] = useState({ customers: 0, partners: 0, bookings: 0, vehicles: 0 });
@@ -1478,6 +1639,7 @@ export default function Home() {
                   {[{ label: t.allDeals, city: 'All Sri Lanka', type: 'all' }, { label: '🚙 ' + t.cars, city: 'All Sri Lanka', type: 'car' }, { label: '🏍️ ' + t.bikes, city: 'All Sri Lanka', type: 'bike' }, { label: '🚐 Vans', city: 'All Sri Lanka', type: 'van' }, { label: '🛺 ' + t.tuks, city: 'All Sri Lanka', type: 'tuk' }, { label: '📍 Colombo', city: 'Colombo', type: 'all' }, { label: '📍 Galle', city: 'Galle', type: 'all' }, { label: '📍 Kandy', city: 'Kandy', type: 'all' }, { label: '📍 Gampaha', city: 'Gampaha', type: 'all' }, { label: '📍 Matara', city: 'Matara', type: 'all' }, { label: '📍 Negombo', city: 'Negombo', type: 'all' }, { label: '📍 Jaffna', city: 'Jaffna', type: 'all' }, { label: '📍 Trincomalee', city: 'Trincomalee', type: 'all' }, { label: '📍 Batticaloa', city: 'Batticaloa', type: 'all' }, { label: '📍 Anuradhapura', city: 'Anuradhapura', type: 'all' }, { label: '📍 Ella/Badulla', city: 'Badulla', type: 'all' }, { label: '📍 Nuwara Eliya', city: 'Nuwara Eliya', type: 'all' }, { label: '📍 Ratnapura', city: 'Ratnapura', type: 'all' }, { label: '📍 Hambantota', city: 'Hambantota', type: 'all' }].map(tag => (<button key={tag.label} onClick={() => { setFilterCity(tag.city); setFilterType(tag.type); }} className={`text-xs font-bold border px-4 py-2 rounded-xl whitespace-nowrap transition ${filterCity === tag.city && filterType === tag.type ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{tag.label}</button>))}
                 </div>
               </section>
+              <PartnerLeaderboard />
               <section className="max-w-7xl mx-auto px-4 mt-2 mb-24">
                 <h2 className="text-xl font-black text-slate-900 mb-5"><span className="text-red-500">{displayed.length}</span> {t.vehicles} {t.available}{filterCity !== 'All Sri Lanka' ? ` in ${filterCity}` : ''}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
