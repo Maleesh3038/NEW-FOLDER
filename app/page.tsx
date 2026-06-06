@@ -1326,19 +1326,88 @@ export default function Home() {
                         <div className="col-span-2"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">{t.priceDay} <span className="text-red-400">*</span></label><input type="number" required min="500" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-slate-900 focus:bg-white transition" value={newV.pricePerDay} onChange={e => setNewV({ ...newV, pricePerDay: Number(e.target.value) })}/></div>
                       </div>
                       <div>
-                        <div className="flex items-center justify-between mb-3"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Vehicle Photos (6 Required)</label><span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${photos.filter(Boolean).length < 6 ? 'bg-red-50 text-red-500 border-red-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>{photos.filter(Boolean).length}/6</span></div>
-                        <div className="mb-3">
-                          <div className="flex items-center justify-between mb-1.5"><p className="text-[10px] font-black text-slate-700 uppercase tracking-wide">🚗 Cover Photo</p>{photos[0] ? <span className="text-[9px] text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded-full">✓ Added</span> : <span className="text-[9px] text-red-500 font-black">Required</span>}</div>
-                          <label className="block cursor-pointer"><div className={`relative w-full aspect-[16/7] rounded-2xl overflow-hidden border-2 transition ${photos[0] ? 'border-emerald-400' : 'border-dashed border-red-300 hover:border-red-400 bg-slate-50'}`}>{photos[0] ? (<><img src={photos[0]} className="w-full h-full object-cover" alt="Cover"/><button type="button" onClick={e => { e.preventDefault(); removePhoto(0); }} className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full text-sm font-black flex items-center justify-center hover:bg-red-600 transition">×</button></>) : (<div className="flex flex-col items-center justify-center h-full pointer-events-none"><p className="text-4xl mb-2">📸</p><p className="text-sm font-black text-slate-600">Front + side angle</p></div>)}</div><input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const r = new FileReader(); r.onloadend = () => setPhotos(prev => { const n = [...prev]; while (n.length <= 0) n.push(''); n[0] = r.result as string; return n; }); r.readAsDataURL(file); }}/></label>
-                        </div>
-                        <div className="mb-3">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-2">Exterior — 3 More Angles</p>
-                          <div className="grid grid-cols-3 gap-2">{[{ idx: 1, label: 'Front View', hint: 'Straight front' }, { idx: 2, label: 'Side View', hint: 'Full side profile' }, { idx: 3, label: 'Rear View', hint: 'Back of vehicle' }].map(slot => (<div key={slot.idx}><div className="flex items-center justify-between mb-1"><p className="text-[9px] font-black text-slate-600">{slot.label}</p>{photos[slot.idx] ? <span className="text-[8px] text-emerald-600 font-black">✓</span> : <span className="text-[8px] text-red-400">req</span>}</div><label className="block cursor-pointer"><div className={`relative aspect-video rounded-xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50'}`}>{photos[slot.idx] ? (<><img src={photos[slot.idx]} className="w-full h-full object-cover" alt={slot.label}/><button type="button" onClick={e => { e.preventDefault(); removePhoto(slot.idx); }} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center">×</button></>) : (<div className="flex flex-col items-center justify-center h-full pointer-events-none py-2"><p className="text-lg">📷</p><p className="text-[9px] text-slate-400 font-bold text-center px-1">{slot.hint}</p></div>)}</div><input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const r = new FileReader(); r.onloadend = () => setPhotos(prev => { const n = [...prev]; while (n.length <= slot.idx) n.push(''); n[slot.idx] = r.result as string; return n; }); r.readAsDataURL(file); }}/></label></div>))}</div>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-2">Interior — 2 Photos</p>
-                          <div className="grid grid-cols-2 gap-3">{[{ idx: 4, label: '🪞 Dashboard', hint: 'Full dashboard view' }, { idx: 5, label: '💺 Seats', hint: 'Front + rear seats' }].map(slot => (<div key={slot.idx}><div className="flex items-center justify-between mb-1.5"><p className="text-[9px] font-black text-slate-600">{slot.label}</p>{photos[slot.idx] ? <span className="text-[8px] text-emerald-600 font-black">✓ Added</span> : <span className="text-[8px] text-red-400">Required</span>}</div><label className="block cursor-pointer"><div className={`relative aspect-video rounded-xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50'}`}>{photos[slot.idx] ? (<><img src={photos[slot.idx]} className="w-full h-full object-cover" alt={slot.label}/><button type="button" onClick={e => { e.preventDefault(); removePhoto(slot.idx); }} className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 text-white rounded-full text-xs font-black flex items-center justify-center">×</button></>) : (<div className="flex flex-col items-center justify-center h-full pointer-events-none py-3"><p className="text-2xl mb-1">📸</p><p className="text-[10px] font-black text-slate-500 text-center px-2">{slot.hint}</p></div>)}</div><input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (!file) return; const r = new FileReader(); r.onloadend = () => setPhotos(prev => { const n = [...prev]; while (n.length <= slot.idx) n.push(''); n[slot.idx] = r.result as string; return n; }); r.readAsDataURL(file); }}/></label></div>))}</div>
-                        </div>
+                        {(() => {
+                          const isBikeOrTuk = newV.type === 'bike' || newV.type === 'tuk';
+                          const requiredCount = isBikeOrTuk ? 4 : 6;
+                          const photoSlots = newV.type === 'bike'
+                            ? [
+                                { idx: 0, label: '📸 Cover Photo', hint: 'Best angle of bike', wide: true },
+                                { idx: 1, label: '⬅️ Left Side', hint: 'Full left side' },
+                                { idx: 2, label: '➡️ Right Side', hint: 'Full right side' },
+                                { idx: 3, label: '🎛️ Dashboard', hint: 'Speedo & controls' },
+                              ]
+                            : newV.type === 'tuk'
+                            ? [
+                                { idx: 0, label: '📸 Cover Photo', hint: 'Best angle of tuk', wide: true },
+                                { idx: 1, label: '🔜 Front View', hint: 'Straight front' },
+                                { idx: 2, label: '📐 Side View', hint: 'Full side profile' },
+                                { idx: 3, label: '🪑 Interior', hint: 'Passenger area' },
+                              ]
+                            : [
+                                { idx: 0, label: '📸 Cover Photo', hint: 'Front + side angle', wide: true },
+                                { idx: 1, label: '🔜 Front View', hint: 'Straight front' },
+                                { idx: 2, label: '📐 Side View', hint: 'Full side profile' },
+                                { idx: 3, label: '🔙 Rear View', hint: 'Back of vehicle' },
+                                { idx: 4, label: '🪞 Dashboard', hint: 'Full dashboard' },
+                                { idx: 5, label: '💺 Seats', hint: 'Front + rear seats' },
+                              ];
+                          const makeInput = (idx: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
+                            const file = e.target.files?.[0]; if (!file) return;
+                            const r = new FileReader();
+                            r.onloadend = () => setPhotos(prev => { const n = [...prev]; while (n.length <= idx) n.push(''); n[idx] = r.result as string; return n; });
+                            r.readAsDataURL(file);
+                          };
+                          return (
+                            <div>
+                              <div className="flex items-center justify-between mb-3">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Vehicle Photos ({requiredCount} Required)</label>
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${photos.filter(Boolean).length < requiredCount ? 'bg-red-50 text-red-500 border-red-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>{photos.filter(Boolean).length}/{requiredCount}</span>
+                              </div>
+                              {/* Cover photo wide */}
+                              {photoSlots.filter(s => s.wide).map(slot => (
+                                <div key={slot.idx} className="mb-3">
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <p className="text-[10px] font-black text-slate-700 uppercase tracking-wide">{slot.label}</p>
+                                    {photos[slot.idx] ? <span className="text-[9px] text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded-full">✓ Added</span> : <span className="text-[9px] text-red-500 font-black">Required</span>}
+                                  </div>
+                                  <label className="block cursor-pointer">
+                                    <div className={`relative w-full aspect-[16/7] rounded-2xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-red-300 hover:border-red-400 bg-slate-50'}`}>
+                                      {photos[slot.idx] ? (<><img src={photos[slot.idx]} className="w-full h-full object-cover" alt="Cover"/><button type="button" onClick={e => { e.preventDefault(); removePhoto(slot.idx); }} className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full text-sm font-black flex items-center justify-center">×</button></>) : (<div className="flex flex-col items-center justify-center h-full pointer-events-none"><p className="text-4xl mb-2">📸</p><p className="text-sm font-black text-slate-600">{slot.hint}</p></div>)}
+                                    </div>
+                                    <input type="file" accept="image/*" className="hidden" onChange={makeInput(slot.idx)}/>
+                                  </label>
+                                </div>
+                              ))}
+                              {/* Other photos grid */}
+                              <div className={`grid gap-2 ${photoSlots.filter(s => !s.wide).length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                {photoSlots.filter(s => !s.wide).map(slot => (
+                                  <div key={slot.idx}>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <p className="text-[9px] font-black text-slate-600">{slot.label}</p>
+                                      {photos[slot.idx] ? <span className="text-[8px] text-emerald-600 font-black">✓</span> : <span className="text-[8px] text-red-400">req</span>}
+                                    </div>
+                                    <label className="block cursor-pointer">
+                                      <div className={`relative aspect-video rounded-xl overflow-hidden border-2 transition ${photos[slot.idx] ? 'border-emerald-400' : 'border-dashed border-slate-300 hover:border-slate-400 bg-slate-50'}`}>
+                                        {photos[slot.idx] ? (<><img src={photos[slot.idx]} className="w-full h-full object-cover" alt={slot.label}/><button type="button" onClick={e => { e.preventDefault(); removePhoto(slot.idx); }} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center">×</button></>) : (<div className="flex flex-col items-center justify-center h-full pointer-events-none py-2"><p className="text-lg">📷</p><p className="text-[9px] text-slate-400 font-bold text-center px-1">{slot.hint}</p></div>)}
+                                      </div>
+                                      <input type="file" accept="image/*" className="hidden" onChange={makeInput(slot.idx)}/>
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Helmet option — bikes only */}
+                              {newV.type === 'bike' && (
+                                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                                  <input type="checkbox" id="helmetCheck" checked={(newV as any).helmetIncluded || false} onChange={e => setNewV({ ...newV, helmetIncluded: e.target.checked } as any)} className="w-4 h-4 accent-slate-900 cursor-pointer flex-shrink-0"/>
+                                  <label htmlFor="helmetCheck" className="cursor-pointer">
+                                    <p className="text-xs font-black text-amber-800">🪖 Helmet Included with this Bike</p>
+                                    <p className="text-[10px] text-amber-600 mt-0.5">Tick if you provide a helmet to the renter</p>
+                                  </label>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📍 Pickup Location (Google Maps) <span className="text-red-400">*</span></label><input type="url" required placeholder="Paste Google Maps link" className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:bg-white transition ${newV.mapLink ? 'border-emerald-400 focus:border-emerald-500' : 'border-red-300 focus:border-slate-900'}`} value={newV.mapLink} onChange={e => setNewV({ ...newV, mapLink: e.target.value })}/></div>
                       <div className="grid grid-cols-2 gap-3">
