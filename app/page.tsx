@@ -467,6 +467,106 @@ function MapPickerModal({ onSelect, onClose }: {
   );
 }
 
+
+function NearbyVehiclesSection({ allVehicles, onVehicleClick }: {
+  allVehicles: any[];
+  onVehicleClick: (v: any) => void;
+}) {
+  const [nearbyCity, setNearbyCity] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const districts = [
+    { name: 'Colombo', lat: 6.9271, lng: 79.8612 },
+    { name: 'Galle', lat: 6.0535, lng: 80.2210 },
+    { name: 'Kandy', lat: 7.2906, lng: 80.6337 },
+    { name: 'Gampaha', lat: 7.0840, lng: 80.0098 },
+    { name: 'Matara', lat: 5.9549, lng: 80.5550 },
+    { name: 'Negombo', lat: 7.2008, lng: 79.8380 },
+    { name: 'Jaffna', lat: 9.6615, lng: 80.0255 },
+    { name: 'Trincomalee', lat: 8.5874, lng: 81.2152 },
+    { name: 'Batticaloa', lat: 7.7102, lng: 81.6924 },
+    { name: 'Anuradhapura', lat: 8.3114, lng: 80.4037 },
+    { name: 'Badulla', lat: 6.9934, lng: 81.0550 },
+    { name: 'Nuwara Eliya', lat: 6.9497, lng: 80.7891 },
+    { name: 'Ratnapura', lat: 6.6828, lng: 80.3992 },
+    { name: 'Hambantota', lat: 6.1429, lng: 81.1212 },
+    { name: 'Kurunegala', lat: 7.4818, lng: 80.3609 },
+  ];
+
+  const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setLoading(false); return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        let closest = districts[0];
+        let minDist = Infinity;
+        districts.forEach(d => {
+          const dist = getDistance(latitude, longitude, d.lat, d.lng);
+          if (dist < minDist) { minDist = dist; closest = d; }
+        });
+        setNearbyCity(closest.name);
+        setLoading(false);
+      },
+      () => setLoading(false),
+      { timeout: 5000 }
+    );
+  }, []);
+
+  if (loading || !nearbyCity) return null;
+
+  const nearby = allVehicles.filter(v =>
+    v.location?.toLowerCase().includes(nearbyCity.toLowerCase())
+  ).slice(0, 6);
+
+  if (nearby.length === 0) return null;
+
+  return (
+    <section className="max-w-7xl mx-auto px-4 pt-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/>
+            </span>
+            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wide">Near You</span>
+          </div>
+          <p className="font-black text-slate-900 text-sm">Vehicles in {nearbyCity}</p>
+        </div>
+        <p className="text-xs text-slate-400">{nearby.length} found</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {nearby.map(v => (
+          <div key={v.id} onClick={() => onVehicleClick(v)}
+            className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer group">
+            <div className="aspect-video bg-slate-100 overflow-hidden relative">
+              <img src={v.image || ''} alt={v.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"/>
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5">
+                <p className="text-white text-[10px] font-black truncate">{v.name}</p>
+              </div>
+            </div>
+            <div className="p-2">
+              <p className="text-xs font-black text-slate-900">Rs. {(v.price_per_day || 0).toLocaleString()}</p>
+              <p className="text-[10px] text-slate-400">/day</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+
 function PartnerLeaderboard() {
   const [partners, setPartners] = useState<any[]>([]);
   const [tab, setTab] = useState<'bookings'|'rating'>('bookings');
