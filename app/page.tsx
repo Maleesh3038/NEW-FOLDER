@@ -301,172 +301,6 @@ function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { veh
 
 
 
-// ── Map Picker Component — OpenStreetMap iframe (crash-free)
-function MapPickerModal({ onSelect, onClose }: {
-  onSelect: (lat: number, lng: number, mapLink: string) => void;
-  onClose: () => void;
-}) {
-  const [lat, setLat] = useState('');
-  const [lng, setLng] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searching, setSearching] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const [locationName, setLocationName] = useState('');
-
-  // Search location by name using Nominatim (free, no API key)
-  const searchLocation = async () => {
-    if (!searchQuery.trim()) return;
-    setSearching(true);
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery + ', Sri Lanka')}&format=json&limit=1`,
-        { headers: { 'Accept-Language': 'en' } }
-      );
-      const data = await res.json();
-      if (data && data[0]) {
-        setLat(parseFloat(data[0].lat).toFixed(6));
-        setLng(parseFloat(data[0].lon).toFixed(6));
-        setLocationName(data[0].display_name?.split(',').slice(0, 2).join(',') || searchQuery);
-        setPinned(true);
-      } else {
-        alert('Location not found. Try a different name.');
-      }
-    } catch {
-      alert('Search failed. Please enter coordinates manually.');
-    }
-    setSearching(false);
-  };
-
-  // Get current GPS location
-  const useMyLocation = () => {
-    if (!navigator.geolocation) { alert('GPS not available'); return; }
-    setSearching(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const la = pos.coords.latitude.toFixed(6);
-        const ln = pos.coords.longitude.toFixed(6);
-        setLat(la);
-        setLng(ln);
-        setPinned(true);
-        // Reverse geocode
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${la}&lon=${ln}&format=json`);
-          const data = await res.json();
-          setLocationName(data.display_name?.split(',').slice(0, 2).join(',') || 'Current Location');
-        } catch { setLocationName('Current Location'); }
-        setSearching(false);
-      },
-      () => { alert('Could not get your location.'); setSearching(false); }
-    );
-  };
-
-  const handleConfirm = () => {
-    if (!lat || !lng) { alert('Please search or pin a location first!'); return; }
-    const mapLink = `https://www.google.com/maps?q=${lat},${lng}`;
-    onSelect(parseFloat(lat), parseFloat(lng), mapLink);
-    onClose();
-  };
-
-  const previewUrl = lat && lng
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${(parseFloat(lng)-0.01).toFixed(4)},${(parseFloat(lat)-0.01).toFixed(4)},${(parseFloat(lng)+0.01).toFixed(4)},${(parseFloat(lat)+0.01).toFixed(4)}&layer=mapnik&marker=${lat},${lng}`
-    : `https://www.openstreetmap.org/export/embed.html?bbox=79.5,5.9,81.9,9.8&layer=mapnik`;
-
-  return (
-    <div className="fixed inset-0 z-[300] bg-black/70 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="bg-slate-900 px-5 py-4 flex items-center gap-3 flex-shrink-0">
-          <button onClick={onClose} className="text-white hover:text-slate-300 text-xl font-black">×</button>
-          <div>
-            <p className="text-white font-black text-sm">📍 Set Pickup Location</p>
-            <p className="text-slate-400 text-[10px]">Search your area or use GPS</p>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Search bar */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="e.g. Galle Fort, Unawatuna, Hikkaduwa..."
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && searchLocation()}
-            />
-            <button onClick={searchLocation} disabled={searching}
-              className={`px-4 py-3 rounded-xl font-black text-sm text-white transition ${searching ? 'bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'}`}>
-              {searching ? '...' : '🔍'}
-            </button>
-          </div>
-
-          {/* GPS button */}
-          <button onClick={useMyLocation} disabled={searching}
-            className="w-full py-3 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-xl font-black text-sm transition flex items-center justify-center gap-2">
-            📡 Use My Current GPS Location
-          </button>
-
-          {/* Map preview */}
-          <div className="rounded-xl overflow-hidden border border-slate-200 relative">
-            <iframe
-              src={previewUrl}
-              width="100%"
-              height="240"
-              style={{ border: 'none', display: 'block' }}
-              title="Location preview"
-            />
-            {!pinned && (
-              <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                <p className="text-sm font-black text-slate-500">Search or use GPS to see location</p>
-              </div>
-            )}
-          </div>
-
-          {/* Pinned location info */}
-          {pinned && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-              <p className="text-xs font-black text-emerald-700">✅ Location found!</p>
-              <p className="text-[11px] text-emerald-600 mt-0.5">{locationName}</p>
-              <p className="text-[10px] text-emerald-500 mt-0.5">Coordinates: {lat}, {lng}</p>
-            </div>
-          )}
-
-          {/* Manual coordinates */}
-          <details className="text-xs text-slate-400 cursor-pointer">
-            <summary className="font-bold hover:text-slate-600">📌 Enter coordinates manually</summary>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Latitude</label>
-                <input type="number" step="0.000001" placeholder="6.0535"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-slate-900"
-                  value={lat} onChange={e => { setLat(e.target.value); setPinned(true); }}/>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Longitude</label>
-                <input type="number" step="0.000001" placeholder="80.2210"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-slate-900"
-                  value={lng} onChange={e => { setLng(e.target.value); setPinned(true); }}/>
-              </div>
-            </div>
-          </details>
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-slate-100 flex gap-2 flex-shrink-0">
-          <button onClick={onClose}
-            className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-sm transition">
-            Cancel
-          </button>
-          <button onClick={handleConfirm} disabled={!pinned}
-            className={`flex-1 py-3 rounded-xl font-black text-sm text-white transition ${pinned ? 'bg-slate-900 hover:bg-slate-800' : 'bg-slate-300 cursor-not-allowed'}`}>
-            ✅ Confirm Location
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 function NearbyVehiclesSection({ allVehicles, onVehicleClick }: {
   allVehicles: any[];
@@ -983,7 +817,6 @@ export default function Home() {
   const [newV, setNewV] = useState({ name: '', type: 'car', transmission: 'Automatic', fuel: 'Petrol', pricePerDay: 5000, weeklyPrice: 0, monthlyPrice: 0, kmPerDay: 200, extraKmCharge: 50, depositAmount: 0, description: '', mapLink: '', driverOption: 'self_drive', district: '', deliveryOption: 'both', revenueLicenceExpiry: '', insuranceExpiry: '' });
   const [photos, setPhotos] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [showMapPicker, setShowMapPicker] = useState(false);
   const [ownerEditOpen, setOwnerEditOpen] = useState(false);
   const [ownerEditData, setOwnerEditData] = useState({ shopName: '', ownerName: '', phone: '', whatsapp: '', city: 'Colombo', bio: '' });
   const [custEditOpen, setCustEditOpen] = useState(false);
@@ -1293,18 +1126,6 @@ export default function Home() {
           </div>
         )}
       </nav>
-
-      {/* MAP PICKER MODAL */}
-      {showMapPicker && (
-        <MapPickerModal
-          initialLat={(newV as any).lat || undefined}
-          initialLng={(newV as any).lng || undefined}
-          onSelect={(lat, lng, mapLink) => {
-            setNewV({ ...newV, mapLink, lat, lng } as any);
-          }}
-          onClose={() => setShowMapPicker(false)}
-        />
-      )}
 
       {/* AGREEMENT MODAL */}
       {showAgreementModal && (
@@ -1871,29 +1692,25 @@ export default function Home() {
                         })()}
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📍 Pickup Location <span className="text-red-400">*</span></label>
-                        {newV.mapLink ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 bg-emerald-50 border border-emerald-300 rounded-xl px-4 py-3 flex items-center gap-2">
-                              <span className="text-emerald-600 text-sm">✅</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-black text-emerald-700">Location pinned!</p>
-                                <p className="text-[10px] text-emerald-600 truncate">{newV.mapLink}</p>
-                              </div>
-                            </div>
-                            <button type="button" onClick={() => setShowMapPicker(true)}
-                              className="px-3 py-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-black text-slate-600 transition">
-                              ✏️ Edit
-                            </button>
-                          </div>
-                        ) : (
-                          <button type="button" onClick={() => setShowMapPicker(true)}
-                            className="w-full py-4 border-2 border-dashed border-red-300 hover:border-red-400 bg-red-50 hover:bg-red-50/80 rounded-xl transition flex flex-col items-center justify-center gap-1.5">
-                            <span className="text-2xl">🗺️</span>
-                            <p className="text-sm font-black text-red-600">Pick Location on Map</p>
-                            <p className="text-[10px] text-red-400">Tap to open map and pin your pickup spot</p>
-                          </button>
-                        )}
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📍 Pickup Location — Google Maps Link <span className="text-red-400">*</span></label>
+                        <input type="url" required
+                          placeholder="Paste your Google Maps link here..."
+                          className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:bg-white transition placeholder:text-slate-300 ${newV.mapLink ? 'border-emerald-400 focus:border-emerald-500' : 'border-red-300 focus:border-slate-900'}`}
+                          value={newV.mapLink}
+                          onChange={e => setNewV({ ...newV, mapLink: e.target.value })}
+                        />
+                        <div className="mt-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5 space-y-1">
+                          <p className="text-[10px] font-black text-blue-700 uppercase tracking-wide">How to get your Google Maps link:</p>
+                          <p className="text-[11px] text-blue-600">1. Open <strong>Google Maps</strong> on your phone or PC</p>
+                          <p className="text-[11px] text-blue-600">2. Search your pickup location (shop, road, landmark)</p>
+                          <p className="text-[11px] text-blue-600">3. Tap <strong>Share</strong> → Copy link → Paste above</p>
+                          {newV.mapLink && (
+                            <a href={newV.mapLink} target="_blank" rel="noopener noreferrer"
+                              className="inline-block mt-1 text-[11px] font-black text-emerald-600 hover:text-emerald-700 underline">
+                              ✅ Preview your location →
+                            </a>
+                          )}
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">📄 Revenue Licence Expiry</label><input type="date" className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white transition cursor-pointer ${(newV as any).revenueLicenceExpiry && new Date((newV as any).revenueLicenceExpiry) < new Date() ? 'border-red-400 bg-red-50 text-red-600' : (newV as any).revenueLicenceExpiry ? 'border-emerald-400 text-slate-800' : 'border-slate-200 text-slate-800'}`} value={(newV as any).revenueLicenceExpiry || ''} onChange={e => setNewV({ ...newV, revenueLicenceExpiry: e.target.value } as any)} style={{ colorScheme: 'light' }}/></div>
