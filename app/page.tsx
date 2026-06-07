@@ -301,278 +301,171 @@ function OwnerContactButtons({ vehicleId, ownerId, mapLink, vehicleName }: { veh
 
 
 
-// ── Map Picker Component (Leaflet.js — FREE, no API key)
-function MapPickerModal({ onSelect, onClose, initialLat, initialLng }: {
+// ── Map Picker Component — OpenStreetMap iframe (crash-free)
+function MapPickerModal({ onSelect, onClose }: {
   onSelect: (lat: number, lng: number, mapLink: string) => void;
   onClose: () => void;
-  initialLat?: number;
-  initialLng?: number;
 }) {
-  const mapRef = React.useRef<any>(null);
-  const markerRef = React.useRef<any>(null);
-  const mapInstanceRef = React.useRef<any>(null);
-  const [selectedPos, setSelectedPos] = useState<{ lat: number; lng: number } | null>(
-    initialLat && initialLng ? { lat: initialLat, lng: initialLng } : null
-  );
-  const [loading, setLoading] = useState(true);
+  const [lat, setLat] = useState('');
+  const [lng, setLng] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [locationName, setLocationName] = useState('');
 
-  useEffect(() => {
-    // Load Leaflet CSS
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
+  // Search location by name using Nominatim (free, no API key)
+  const searchLocation = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery + ', Sri Lanka')}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      const data = await res.json();
+      if (data && data[0]) {
+        setLat(parseFloat(data[0].lat).toFixed(6));
+        setLng(parseFloat(data[0].lon).toFixed(6));
+        setLocationName(data[0].display_name?.split(',').slice(0, 2).join(',') || searchQuery);
+        setPinned(true);
+      } else {
+        alert('Location not found. Try a different name.');
+      }
+    } catch {
+      alert('Search failed. Please enter coordinates manually.');
     }
+    setSearching(false);
+  };
 
-    // Load Leaflet JS
-    const loadLeaflet = () => {
-      if ((window as any).L) {
-        initMap();
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.onload = () => initMap();
-      document.head.appendChild(script);
-    };
-
-    const initMap = () => {
-      if (!mapRef.current || mapInstanceRef.current) return;
-      const L = (window as any).L;
-
-      // Center on Sri Lanka
-      const defaultLat = initialLat || 7.8731;
-      const defaultLng = initialLng || 80.7718;
-      const zoom = initialLat ? 15 : 8;
-
-      const map = L.map(mapRef.current).setView([defaultLat, defaultLng], zoom);
-      mapInstanceRef.current = map;
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 19,
-      }).addTo(map);
-
-      // Custom marker icon
-      const icon = L.divIcon({
-        html: `<div style="background:#ef4444;width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        className: '',
-      });
-
-      // If initial position, add marker
-      if (initialLat && initialLng) {
-        markerRef.current = L.marker([initialLat, initialLng], { icon, draggable: true }).addTo(map);
-        markerRef.current.on('dragend', (e: any) => {
-          const pos = e.target.getLatLng();
-          setSelectedPos({ lat: pos.lat, lng: pos.lng });
-        });
-      }
-
-      // Click to place/move marker
-      map.on('click', (e: any) => {
-        const { lat, lng } = e.latlng;
-        if (markerRef.current) {
-          markerRef.current.setLatLng([lat, lng]);
-        } else {
-          markerRef.current = L.marker([lat, lng], { icon, draggable: true }).addTo(map);
-          markerRef.current.on('dragend', (ev: any) => {
-            const pos = ev.target.getLatLng();
-            setSelectedPos({ lat: pos.lat, lng: pos.lng });
-          });
-        }
-        setSelectedPos({ lat, lng });
-      });
-
-      setLoading(false);
-    };
-
-    loadLeaflet();
-
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-    };
-  }, []);
+  // Get current GPS location
+  const useMyLocation = () => {
+    if (!navigator.geolocation) { alert('GPS not available'); return; }
+    setSearching(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const la = pos.coords.latitude.toFixed(6);
+        const ln = pos.coords.longitude.toFixed(6);
+        setLat(la);
+        setLng(ln);
+        setPinned(true);
+        // Reverse geocode
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${la}&lon=${ln}&format=json`);
+          const data = await res.json();
+          setLocationName(data.display_name?.split(',').slice(0, 2).join(',') || 'Current Location');
+        } catch { setLocationName('Current Location'); }
+        setSearching(false);
+      },
+      () => { alert('Could not get your location.'); setSearching(false); }
+    );
+  };
 
   const handleConfirm = () => {
-    if (!selectedPos) return;
-    const { lat, lng } = selectedPos;
-    const mapLink = `https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
-    onSelect(lat, lng, mapLink);
+    if (!lat || !lng) { alert('Please search or pin a location first!'); return; }
+    const mapLink = `https://www.google.com/maps?q=${lat},${lng}`;
+    onSelect(parseFloat(lat), parseFloat(lng), mapLink);
     onClose();
   };
 
+  const previewUrl = lat && lng
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${(parseFloat(lng)-0.01).toFixed(4)},${(parseFloat(lat)-0.01).toFixed(4)},${(parseFloat(lng)+0.01).toFixed(4)},${(parseFloat(lat)+0.01).toFixed(4)}&layer=mapnik&marker=${lat},${lng}`
+    : `https://www.openstreetmap.org/export/embed.html?bbox=79.5,5.9,81.9,9.8&layer=mapnik`;
+
   return (
-    <div className="fixed inset-0 z-[300] bg-black/70 flex flex-col">
-      {/* Header */}
-      <div className="bg-slate-900 px-4 py-3 flex items-center gap-3 flex-shrink-0">
-        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition">←</button>
-        <div className="flex-1">
-          <p className="text-white font-black text-sm">📍 Pick Pickup Location</p>
-          <p className="text-slate-400 text-[10px]">Tap on the map to pin your vehicle's pickup spot</p>
-        </div>
-        {selectedPos && (
-          <button onClick={handleConfirm}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase transition">
-            Confirm ✓
-          </button>
-        )}
-      </div>
-
-      {/* Map */}
-      <div className="flex-1 relative">
-        {loading && (
-          <div className="absolute inset-0 bg-slate-100 flex items-center justify-center z-10">
-            <div className="text-center">
-              <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin mx-auto mb-2"/>
-              <p className="text-xs font-bold text-slate-500">Loading map...</p>
-            </div>
+    <div className="fixed inset-0 z-[300] bg-black/70 flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="bg-slate-900 px-5 py-4 flex items-center gap-3 flex-shrink-0">
+          <button onClick={onClose} className="text-white hover:text-slate-300 text-xl font-black">×</button>
+          <div>
+            <p className="text-white font-black text-sm">📍 Set Pickup Location</p>
+            <p className="text-slate-400 text-[10px]">Search your area or use GPS</p>
           </div>
-        )}
-        <div ref={mapRef} style={{ width: '100%', height: '100%' }}/>
-      </div>
+        </div>
 
-      {/* Bottom info */}
-      <div className="bg-white border-t border-slate-200 px-4 py-3 flex-shrink-0">
-        {selectedPos ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-black text-slate-900">📍 Location pinned!</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                {selectedPos.lat.toFixed(5)}, {selectedPos.lng.toFixed(5)}
-              </p>
-            </div>
-            <button onClick={handleConfirm}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-black text-sm transition">
-              Use This Location →
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Search bar */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="e.g. Galle Fort, Unawatuna, Hikkaduwa..."
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-slate-900 transition"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && searchLocation()}
+            />
+            <button onClick={searchLocation} disabled={searching}
+              className={`px-4 py-3 rounded-xl font-black text-sm text-white transition ${searching ? 'bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'}`}>
+              {searching ? '...' : '🔍'}
             </button>
           </div>
-        ) : (
-          <p className="text-xs text-slate-500 text-center font-semibold">
-            🗺️ Tap anywhere on the map to set your pickup location
-          </p>
-        )}
+
+          {/* GPS button */}
+          <button onClick={useMyLocation} disabled={searching}
+            className="w-full py-3 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-xl font-black text-sm transition flex items-center justify-center gap-2">
+            📡 Use My Current GPS Location
+          </button>
+
+          {/* Map preview */}
+          <div className="rounded-xl overflow-hidden border border-slate-200 relative">
+            <iframe
+              src={previewUrl}
+              width="100%"
+              height="240"
+              style={{ border: 'none', display: 'block' }}
+              title="Location preview"
+            />
+            {!pinned && (
+              <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                <p className="text-sm font-black text-slate-500">Search or use GPS to see location</p>
+              </div>
+            )}
+          </div>
+
+          {/* Pinned location info */}
+          {pinned && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+              <p className="text-xs font-black text-emerald-700">✅ Location found!</p>
+              <p className="text-[11px] text-emerald-600 mt-0.5">{locationName}</p>
+              <p className="text-[10px] text-emerald-500 mt-0.5">Coordinates: {lat}, {lng}</p>
+            </div>
+          )}
+
+          {/* Manual coordinates */}
+          <details className="text-xs text-slate-400 cursor-pointer">
+            <summary className="font-bold hover:text-slate-600">📌 Enter coordinates manually</summary>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Latitude</label>
+                <input type="number" step="0.000001" placeholder="6.0535"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-slate-900"
+                  value={lat} onChange={e => { setLat(e.target.value); setPinned(true); }}/>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Longitude</label>
+                <input type="number" step="0.000001" placeholder="80.2210"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-slate-900"
+                  value={lng} onChange={e => { setLng(e.target.value); setPinned(true); }}/>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-slate-100 flex gap-2 flex-shrink-0">
+          <button onClick={onClose}
+            className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-black text-sm transition">
+            Cancel
+          </button>
+          <button onClick={handleConfirm} disabled={!pinned}
+            className={`flex-1 py-3 rounded-xl font-black text-sm text-white transition ${pinned ? 'bg-slate-900 hover:bg-slate-800' : 'bg-slate-300 cursor-not-allowed'}`}>
+            ✅ Confirm Location
+          </button>
+        </div>
       </div>
     </div>
   );
 }
-
-// ── Nearby Vehicles Section
-function NearbyVehiclesSection({ allVehicles, onVehicleClick }: {
-  allVehicles: any[];
-  onVehicleClick: (v: any) => void;
-}) {
-  const [nearbyCity, setNearbyCity] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [denied, setDenied] = useState(false);
-
-  // Sri Lanka district centers lat/lng
-  const districts: { name: string; lat: number; lng: number }[] = [
-    { name: 'Colombo', lat: 6.9271, lng: 79.8612 },
-    { name: 'Galle', lat: 6.0535, lng: 80.2210 },
-    { name: 'Kandy', lat: 7.2906, lng: 80.6337 },
-    { name: 'Gampaha', lat: 7.0840, lng: 80.0098 },
-    { name: 'Matara', lat: 5.9549, lng: 80.5550 },
-    { name: 'Negombo', lat: 7.2008, lng: 79.8380 },
-    { name: 'Jaffna', lat: 9.6615, lng: 80.0255 },
-    { name: 'Trincomalee', lat: 8.5874, lng: 81.2152 },
-    { name: 'Batticaloa', lat: 7.7102, lng: 81.6924 },
-    { name: 'Anuradhapura', lat: 8.3114, lng: 80.4037 },
-    { name: 'Badulla', lat: 6.9934, lng: 81.0550 },
-    { name: 'Nuwara Eliya', lat: 6.9497, lng: 80.7891 },
-    { name: 'Ratnapura', lat: 6.6828, lng: 80.3992 },
-    { name: 'Hambantota', lat: 6.1429, lng: 81.1212 },
-    { name: 'Kurunegala', lat: 7.4818, lng: 80.3609 },
-    { name: 'Puttalam', lat: 8.0408, lng: 79.8394 },
-    { name: 'Polonnaruwa', lat: 7.9403, lng: 81.0188 },
-    { name: 'Monaragala', lat: 6.8728, lng: 81.3507 },
-    { name: 'Kegalle', lat: 7.2513, lng: 80.3464 },
-    { name: 'Kalutara', lat: 6.5854, lng: 79.9607 },
-    { name: 'Matale', lat: 7.4675, lng: 80.6234 },
-    { name: 'Ampara', lat: 7.2978, lng: 81.6724 },
-    { name: 'Vavuniya', lat: 8.7514, lng: 80.4997 },
-    { name: 'Mannar', lat: 8.9810, lng: 79.9044 },
-    { name: 'Kilinochchi', lat: 9.3803, lng: 80.4036 },
-  ];
-
-  const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  };
-
-  useEffect(() => {
-    if (!navigator.geolocation) { setLoading(false); setDenied(true); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        let closest = districts[0];
-        let minDist = Infinity;
-        districts.forEach(d => {
-          const dist = getDistance(latitude, longitude, d.lat, d.lng);
-          if (dist < minDist) { minDist = dist; closest = d; }
-        });
-        setNearbyCity(closest.name);
-        setLoading(false);
-      },
-      () => { setLoading(false); setDenied(true); }
-    );
-  }, []);
-
-  if (loading || denied || !nearbyCity) return null;
-
-  const nearby = allVehicles.filter(v =>
-    v.location?.toLowerCase() === nearbyCity.toLowerCase() ||
-    v.location?.toLowerCase().includes(nearbyCity.toLowerCase())
-  ).slice(0, 6);
-
-  if (nearby.length === 0) return null;
-
-  return (
-    <section className="max-w-7xl mx-auto px-4 pt-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/>
-            </span>
-            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wide">Near You</span>
-          </div>
-          <p className="font-black text-slate-900 text-sm">Vehicles in {nearbyCity}</p>
-        </div>
-        <p className="text-xs text-slate-400">{nearby.length} found</p>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {nearby.map(v => (
-          <div key={v.id} onClick={() => onVehicleClick(v)}
-            className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer group">
-            <div className="aspect-video bg-slate-100 overflow-hidden relative">
-              <img src={v.image || v.vehicle_photos?.[0]?.storage_url || ''} alt={v.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"/>
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5">
-                <p className="text-white text-[10px] font-black truncate">{v.name}</p>
-              </div>
-            </div>
-            <div className="p-2">
-              <p className="text-xs font-black text-slate-900">Rs. {(v.price_per_day || 0).toLocaleString()}</p>
-              <p className="text-[10px] text-slate-400">/day</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 
 function PartnerLeaderboard() {
   const [partners, setPartners] = useState<any[]>([]);
