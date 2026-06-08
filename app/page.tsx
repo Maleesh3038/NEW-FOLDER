@@ -668,7 +668,7 @@ function FaqSection() {
       { q: 'Can I extend my rental period?', a: 'Yes — contact the shop directly via WhatsApp to discuss an extension. If the vehicle is available, they can approve it for additional days.' },
     ],
     price: [
-      { q: 'What is the Drivo booking fee?', a: 'Drivo charges a 10% booking fee on each rental. This fee is included in the displayed price — you do not pay extra. The shop receives 90% of the total, and Drivo earns 10%.' },
+      { q: 'What is the Booking fee?', a: 'Drivo charges a 10% booking fee on each rental. This fee is included in the displayed price — you do not pay extra. The shop receives 90% of the total, and Drivo earns 10%.' },
       { q: 'When do I pay?', a: 'Payment is made directly to the shop at pickup — cash or bank transfer. There is no online payment required through Drivo at this stage.' },
       { q: 'Is there a security deposit?', a: 'Most vehicles on Drivo do not require a deposit. However, some owners may request one. This will be mentioned in the vehicle description or confirmed via WhatsApp.' },
       { q: 'What does the delivery fee cover?', a: 'If you select delivery, the shop will bring the vehicle to your location for an additional Rs. 1,500. This covers the delivery cost for the owner.' },
@@ -2241,7 +2241,7 @@ export default function Home() {
                       {deliveryType === 'delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
                       <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Rental Total</span><span>{fmt(total)}</span></div>
                       <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 space-y-1">
-                        <div className="flex justify-between text-xs text-blue-600"><span>🔒 Drivo booking fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div>
+                        <div className="flex justify-between text-xs text-blue-600"><span>🔒 Booking fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div>
                         <div className="flex justify-between text-sm font-black text-blue-800 border-t border-blue-100 pt-1"><span>💳 Pay at pickup</span><span className="text-emerald-600">{fmt(total - platformFeeAmt)}</span></div>
                       </div>
                       {depositAmt > 0 && (<div className="flex justify-between text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2"><span>🔐 Security Deposit (refundable)</span><span className="font-black">{fmt(depositAmt)}</span></div>)}
