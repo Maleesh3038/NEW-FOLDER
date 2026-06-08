@@ -1173,6 +1173,35 @@ export default function Home() {
     await refreshVehicles(ownerAcc?.id);
     showToast('Booking declined.');
   };
+  const deleteAccount = async (role: 'owner'|'customer') => {
+    const name = role === 'owner' ? ownerAcc?.shop_name : `${custAcc?.first_name} ${custAcc?.last_name}`;
+    const confirm1 = confirm(`⚠️ Delete your account "${name}"?\n\nThis will permanently delete:\n• Your account & profile\n• All your bookings history\n\nThis cannot be undone!`);
+    if (!confirm1) return;
+    const confirm2 = confirm('Are you absolutely sure? Type OK to confirm deletion.');
+    if (!confirm2) return;
+
+    try {
+      const id = role === 'owner' ? ownerAcc?.id : custAcc?.id;
+      const table = role === 'owner' ? 'owners' : 'customers';
+
+      // Delete from Supabase
+      await supabase.from('bookings').update({
+        [role === 'owner' ? 'owner_id' : 'customer_id']: null
+      }).eq(role === 'owner' ? 'owner_id' : 'customer_id', id);
+
+      await supabase.from(table).delete().eq('id', id);
+
+      clearSession();
+      setSessionEmail(null); setSessionRole(null);
+      setOwnerAcc(null); setCustAcc(null);
+      setOwnerFleet([]); setOwnerBookings([]);
+      resetToHome();
+      showToast('Account deleted. Sorry to see you go 👋');
+    } catch {
+      showToast('Delete failed. Please contact support.', 'err');
+    }
+  };
+
   const cancelBooking = async (bookingId: string, role: 'owner'|'customer') => {
     const msg = role === 'owner' ? 'Cancel this booking? The customer will be notified.' : 'Cancel this booking? The shop will be notified.';
     if (!confirm(msg)) return;
@@ -1525,6 +1554,13 @@ export default function Home() {
                   <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2"><p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Verified Documents</p><div className="flex items-center justify-between text-xs"><span className="text-slate-600">NIC / Passport</span><span className="font-black text-slate-900">{custAcc?.nic || '—'}</span></div><div className="flex items-center justify-between text-xs"><span className="text-slate-600">Driving License</span><span className="font-black text-slate-900">{custAcc?.driving_license || '—'}</span></div><p className="text-[10px] text-slate-400 mt-1">Documents verified at registration · Contact support to update</p></div>
                   <ChangePasswordForm userId={custAcc?.id || ''} userType="customer" showToast={showToast} />
                   <button onClick={async () => { if (!custAcc?.id) return; await supabase.from('customers').update({ first_name: custEditData.firstName, last_name: custEditData.lastName, phone: custEditData.phone, city: custEditData.city, nic: (custEditData as any).nic || '', driving_license: (custEditData as any).drivingLicense || '' }).eq('id', custAcc.id); setCustAcc(prev => prev ? { ...prev, first_name: custEditData.firstName, last_name: custEditData.lastName, phone: custEditData.phone, city: custEditData.city, nic: (custEditData as any).nic || '', driving_license: (custEditData as any).drivingLicense || '' } : prev); setCustEditOpen(false); showToast(t.profileUpdated); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.saveProfile}</button>
+                  <div className="border-t border-slate-100 pt-3">
+                    <button onClick={() => { setCustEditOpen(false); deleteAccount('customer'); }}
+                      className="w-full py-2.5 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-xl font-black text-xs uppercase tracking-wide transition">
+                      🗑 Delete My Account
+                    </button>
+                    <p className="text-[10px] text-slate-400 text-center mt-1.5">Permanently deletes your account & data</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1627,6 +1663,13 @@ export default function Home() {
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">{t.city}</label><select className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold outline-none cursor-pointer" value={ownerEditData.city} onChange={e => setOwnerEditData({ ...ownerEditData, city: e.target.value })}>{SL_CITIES.slice(1).map(c => <option key={c}>{c}</option>)}</select></div>
                     <ChangePasswordForm userId={ownerAcc?.id || ''} userType="owner" showToast={showToast} />
                     <button onClick={async () => { if (!sessionEmail || !ownerAcc?.id) return; await supabase.from('owners').update({ shop_name: ownerEditData.shopName, owner_name: ownerEditData.ownerName, phone: ownerEditData.phone, whatsapp: ownerEditData.whatsapp, city: ownerEditData.city }).eq('id', ownerAcc.id); setOwnerAcc({ ...ownerAcc, shop_name: ownerEditData.shopName, owner_name: ownerEditData.ownerName, phone: ownerEditData.phone, whatsapp: ownerEditData.whatsapp, city: ownerEditData.city }); setOwnerEditOpen(false); showToast(t.profileUpdated); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.saveProfile}</button>
+                    <div className="border-t border-slate-100 pt-3">
+                      <button onClick={() => { setOwnerEditOpen(false); deleteAccount('owner'); }}
+                        className="w-full py-2.5 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-xl font-black text-xs uppercase tracking-wide transition">
+                        🗑 Delete My Account
+                      </button>
+                      <p className="text-[10px] text-slate-400 text-center mt-1.5">Permanently deletes your account & listings</p>
+                    </div>
                   </div>
                 </div>
               </div>

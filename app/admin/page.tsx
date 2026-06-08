@@ -212,6 +212,18 @@ export default function AdminPage() {
   const logout = ()=>{ sessionStorage.removeItem(ADMIN_SESSION); setAuthed(false); };
 
   // ── Actions
+  const deleteUser = async (id: string, type: 'owner'|'customer', name: string) => {
+    if (!confirm(`Permanently delete "${name}"?\n\nThis will delete their account, bookings history and all data.\n\nThis CANNOT be undone!`)) return;
+    const table = type === 'owner' ? 'owners' : 'customers';
+    // Nullify bookings first
+    await supabase.from('bookings').update({ [type === 'owner' ? 'owner_id' : 'customer_id']: null }).eq(type === 'owner' ? 'owner_id' : 'customer_id', id);
+    // Delete account
+    await supabase.from(table).delete().eq('id', id);
+    if (type === 'owner') setOwners(p => p.filter(o => o.id !== id));
+    else setCustomers(p => p.filter(c => c.id !== id));
+    showToast(`${name} deleted permanently`, 'err');
+  };
+
   const toggleBlockOwner = async(id:string,blocked:boolean)=>{
     await supabase.from('owners').update({blocked:!blocked}).eq('id',id);
     setOwners(p=>p.map(o=>o.id===id?{...o,blocked:!blocked}:o));
