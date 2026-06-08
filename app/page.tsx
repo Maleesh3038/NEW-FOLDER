@@ -748,6 +748,108 @@ function CustomerDetailCard({ customerId }: { customerId: string }) {
     </div>
   );
 }
+
+function WhatsAppWidget() {
+  const [open, setOpen] = useState(false);
+
+  const WA_NUMBER = '94767868513';
+  const questions = [
+    { icon: '🚗', text: 'How do I rent a vehicle on Drivo?', msg: 'Hi Drivo LK! I would like to know how to rent a vehicle on your platform.' },
+    { icon: '💰', text: 'What is the booking fee?', msg: 'Hi Drivo LK! Can you explain the booking fee and payment process?' },
+    { icon: '🏪', text: 'How do I list my vehicle as a partner?', msg: 'Hi Drivo LK! I want to list my vehicle on the platform. How do I become a partner?' },
+    { icon: '📋', text: 'I need help with my booking', msg: 'Hi Drivo LK! I need help with my existing booking.' },
+    { icon: '📍', text: 'How do I get the pickup location?', msg: 'Hi Drivo LK! How do I get the pickup location for my booked vehicle?' },
+    { icon: '✅', text: 'Is my vehicle verified?', msg: 'Hi Drivo LK! I want to check the verification status of my vehicle listing.' },
+  ];
+
+  const sendToWA = (msg: string) => {
+    window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
+    setOpen(false);
+  };
+
+  return (
+    <div className="fixed bottom-6 right-4 z-[100] flex flex-col items-end gap-2">
+
+      {/* Chat popup */}
+      {open && (
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-72 overflow-hidden mb-1">
+          {/* Header */}
+          <div className="bg-[#25D366] px-4 py-3 flex items-center gap-3">
+            <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/>
+                <path d="M12 0C5.373 0 0 5.373 0 12c0 2.098.546 4.07 1.5 5.787L0 24l6.396-1.676A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.487-5.187-1.34l-.371-.22-3.8.996 1.013-3.695-.241-.381A9.938 9.938 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-black text-sm">Drivo LK Support</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"/>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"/>
+                </span>
+                <p className="text-white/80 text-[10px]">Online · Replies instantly</p>
+              </div>
+            </div>
+            <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white text-xl font-black transition">×</button>
+          </div>
+
+          {/* Chat bubble */}
+          <div className="px-4 pt-4 pb-2">
+            <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 inline-block max-w-[90%]">
+              <p className="text-sm text-slate-700 font-medium leading-relaxed">👋 Hi! How can we help you today?</p>
+              <p className="text-[10px] text-slate-400 mt-1">Choose a question or type your own</p>
+            </div>
+          </div>
+
+          {/* Suggested questions */}
+          <div className="px-3 pb-3 space-y-1.5">
+            {questions.map((q, i) => (
+              <button key={i} onClick={() => sendToWA(q.msg)}
+                className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl transition group">
+                <span className="text-base flex-shrink-0">{q.icon}</span>
+                <span className="text-xs font-semibold text-slate-700 group-hover:text-emerald-700 leading-tight">{q.text}</span>
+                <span className="ml-auto text-slate-300 group-hover:text-emerald-400 text-xs flex-shrink-0">→</span>
+              </button>
+            ))}
+            {/* Custom message */}
+            <button onClick={() => sendToWA('Hi Drivo LK! I have a question.')}
+              className="w-full text-center py-2.5 text-xs font-black text-[#25D366] hover:text-[#1fbe5a] transition">
+              💬 Send a custom message →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating button */}
+      <div className="flex flex-col items-end gap-1.5">
+        {!open && (
+          <div className="bg-slate-900 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/>
+            </span>
+            Chat with us
+          </div>
+        )}
+        <button
+          onClick={() => setOpen(!open)}
+          className="w-14 h-14 hover:scale-110 active:scale-95 rounded-full shadow-2xl transition-all duration-200 overflow-hidden"
+          aria-label="Open WhatsApp support"
+        >
+          <img
+            src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
+            alt="WhatsApp"
+            width={56}
+            height={56}
+            style={{ display: 'block' }}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [lang, setLang] = useState<LangKey>('EN');
   const t = T[lang];
@@ -2019,35 +2121,7 @@ export default function Home() {
         </>
       )}
       {/* FLOATING WHATSAPP SUPPORT BUTTON */}
-      {view === 'home' && (
-        <div className="fixed bottom-6 right-4 z-[100] flex flex-col items-end gap-2">
-          {/* Label */}
-          <div className="bg-slate-900 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/>
-            </span>
-            Chat with us
-          </div>
-          {/* WhatsApp Button */}
-          <a
-            href="https://wa.me/94767868513?text=Hi%20Drivo%20LK!%20I%20need%20some%20help."
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-14 h-14 hover:scale-110 active:scale-95 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200"
-            aria-label="Chat on WhatsApp"
-            style={{ background: 'none', padding: 0 }}
-          >
-            <img
-              src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
-              alt="WhatsApp"
-              width={56}
-              height={56}
-              style={{ borderRadius: '50%', display: 'block' }}
-            />
-          </a>
-        </div>
-      )}
+      {view === 'home' && <WhatsAppWidget />}
     </main>
   );
 }
