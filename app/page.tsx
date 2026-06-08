@@ -850,6 +850,12 @@ function WhatsAppWidget() {
   );
 }
 
+
+// Loading spinner helper
+const Spinner = () => (
+  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin flex-shrink-0"/>
+);
+
 export default function Home() {
   const [lang, setLang] = useState<LangKey>('EN');
   const t = T[lang];
@@ -913,6 +919,8 @@ export default function Home() {
   const [showRegPw, setShowRegPw] = useState(false);
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [loadingBookingId, setLoadingBookingId] = useState<string | null>(null);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ imgs: string[], idx: number }|null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string|null>(null);
@@ -1138,9 +1146,50 @@ export default function Home() {
   const removePhoto = (idx: number) => setPhotos(prev => prev.filter((_, i) => i !== idx));
   const bookingAPI = async (action: string, params: Record<string, any>) => { const res = await fetch('/api/booking', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...params }) }); return res.json(); };
   const refreshOwnerBookings = async (ownerId: string) => { const { data } = await supabase.from('bookings').select('*').eq('owner_id', ownerId).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setOwnerBookings(data || []); setOwnerAcc(prev => prev ? { ...prev, bookings: data || [] } : prev); };
-  const updateBookingStatus = async (bookingId: string, status: 'confirmed'|'completed') => { if (status === 'confirmed') { const res = await bookingAPI('accept', { bookingId }); if (res.error) { showToast(res.error, 'err'); return; } if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); await refreshVehicles(ownerAcc?.id); showToast('Booking confirmed! Customer notified via SMS. ✓'); } else { const res = await bookingAPI('complete', { bookingId }); if (res.error) { showToast(res.error, 'err'); return; } if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); await refreshVehicles(ownerAcc?.id); showToast('Rental completed! Vehicle is available again. ✓'); } };
-  const declineBooking = async (bookingId: string) => { const res = await bookingAPI('decline', { bookingId }); if (res.error) { showToast(res.error, 'err'); return; } if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); await refreshVehicles(ownerAcc?.id); showToast('Booking declined. Vehicle is available again.'); };
-  const cancelBooking = async (bookingId: string, role: 'owner'|'customer') => { const msg = role === 'owner' ? 'Cancel this booking? The customer will be notified and the vehicle will become available again.' : 'Cancel this booking? The shop will be notified.'; if (!confirm(msg)) return; const res = await bookingAPI('cancel', { bookingId, ownerId: role === 'owner' ? ownerAcc?.id : null, customerId: role === 'customer' ? custAcc?.id : null }); if (res.error) { showToast(res.error, 'err'); return; } if (role === 'owner') { if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id); await refreshVehicles(ownerAcc?.id); } else if (custAcc?.id) { const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev); await refreshVehicles(); } showToast('Booking cancelled. Vehicle is available again.'); };
+  const updateBookingStatus = async (bookingId: string, status: 'confirmed'|'completed') => {
+    setLoadingBookingId(bookingId); setLoadingAction(status);
+    if (status === 'confirmed') {
+      const res = await bookingAPI('accept', { bookingId });
+      setLoadingBookingId(null); setLoadingAction(null);
+      if (res.error) { showToast(res.error, 'err'); return; }
+      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
+      await refreshVehicles(ownerAcc?.id);
+      showToast('Booking confirmed! Customer notified. ✓');
+    } else {
+      const res = await bookingAPI('complete', { bookingId });
+      setLoadingBookingId(null); setLoadingAction(null);
+      if (res.error) { showToast(res.error, 'err'); return; }
+      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
+      await refreshVehicles(ownerAcc?.id);
+      showToast('Rental completed! Vehicle is available again. ✓');
+    }
+  };
+  const declineBooking = async (bookingId: string) => {
+    setLoadingBookingId(bookingId); setLoadingAction('decline');
+    const res = await bookingAPI('decline', { bookingId });
+    setLoadingBookingId(null); setLoadingAction(null);
+    if (res.error) { showToast(res.error, 'err'); return; }
+    if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
+    await refreshVehicles(ownerAcc?.id);
+    showToast('Booking declined.');
+  };
+  const cancelBooking = async (bookingId: string, role: 'owner'|'customer') => {
+    const msg = role === 'owner' ? 'Cancel this booking? The customer will be notified.' : 'Cancel this booking? The shop will be notified.';
+    if (!confirm(msg)) return;
+    setLoadingBookingId(bookingId); setLoadingAction('cancel');
+    const res = await bookingAPI('cancel', { bookingId, ownerId: role === 'owner' ? ownerAcc?.id : null, customerId: role === 'customer' ? custAcc?.id : null });
+    setLoadingBookingId(null); setLoadingAction(null);
+    if (res.error) { showToast(res.error, 'err'); return; }
+    if (role === 'owner') {
+      if (ownerAcc?.id) await refreshOwnerBookings(ownerAcc.id);
+      await refreshVehicles(ownerAcc?.id);
+    } else if (custAcc?.id) {
+      const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false });
+      setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev);
+      await refreshVehicles();
+    }
+    showToast('Booking cancelled.');
+  };
   const toggleWishlist = async (vehicleId: string) => { if (sessionRole !== 'customer' || !custAcc?.id) { setLoginPromptOpen(true); return; } const isWishlisted = wishlist.includes(vehicleId); if (isWishlisted) { await supabase.from('wishlist').delete().eq('customer_id', custAcc.id).eq('vehicle_id', vehicleId); setWishlist(prev => prev.filter(id => id !== vehicleId)); showToast('Removed from favourites'); } else { await supabase.from('wishlist').insert({ customer_id: custAcc.id, vehicle_id: vehicleId }); setWishlist(prev => [...prev, vehicleId]); showToast('Saved to favourites ❤️'); } };
   const submitReview = async () => { if (!reviewModal || !custAcc?.id) return; if (reviewRating < 1 || reviewRating > 5) { showToast('Select a rating', 'err'); return; } const { error } = await supabase.from('reviews').insert({ vehicle_id: reviewModal.vehicleId, customer_id: custAcc.id, booking_id: reviewModal.bookingId, owner_id: allVehicles.find(v => v.id === reviewModal.vehicleId)?.owner_id, rating: reviewRating, comment: reviewComment.trim() }); if (error) { showToast('Review failed: ' + error.message, 'err'); return; } const { data: reviews } = await supabase.from('reviews').select('rating').eq('vehicle_id', reviewModal.vehicleId); if (reviews && reviews.length > 0) { const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length; await supabase.from('vehicles').update({ rating: Math.round(avg * 10) / 10 }).eq('id', reviewModal.vehicleId); } setReviewModal(null); setReviewRating(5); setReviewComment(''); showToast('Review submitted! Thank you 🌟'); };
 
@@ -1522,7 +1571,7 @@ export default function Home() {
                 {(custAcc.bookings || []).filter(b => ownerSubTab === 'all' ? true : ownerSubTab === 'upcoming' ? b.status !== 'completed' && b.status !== 'cancelled' : b.status === 'completed' || b.status === 'cancelled').map(b => (
                   <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden">
                     <div className="flex gap-4 p-4"><img src={b.vehicle_img || ''} className="w-24 h-16 rounded-xl object-cover flex-shrink-0" alt=""/><div className="flex-1 min-w-0"><div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-900 text-sm">{b.vehicle_name || ''}</p><p className="text-xs text-slate-400 mt-0.5">{b.shop_name || ''} · {b.location}</p></div><span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span></div><div className="flex items-center gap-4 mt-1.5 flex-wrap"><span className="text-xs text-slate-500">📅 {b.pickup_date || ''} → {b.return_date || ''}</span><span className="text-xs font-black text-slate-900">Rs. {b.total.toLocaleString()}</span><span className="text-xs text-slate-400">{b.days}d · {b.delivery_type || 'pickup'}</span></div></div></div>
-                    <div className="border-t border-slate-100 px-4 py-2.5 flex justify-between items-center gap-2"><span className="text-[10px] text-slate-400">{t.bookedOn}: {b.booked_at ? new Date(b.booked_at).toLocaleDateString() : ''}</span><div className="flex items-center gap-2">{(b.status === 'pending' || b.status === 'confirmed') && (<button onClick={() => cancelBooking(b.id, 'customer')} className="text-xs font-black text-red-500 hover:text-red-700 transition border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg">Cancel</button>)}{b.status === 'completed' && (<button onClick={() => { setReviewModal({ vehicleId: b.vehicle_id, bookingId: b.id, vehicleName: b.vehicle_name || '' }); setReviewRating(5); setReviewComment(''); }} className="text-xs font-black text-amber-600 hover:text-amber-700 transition border border-amber-200 bg-amber-50 hover:bg-amber-100 px-3 py-1 rounded-lg">⭐ Review</button>)}<button onClick={() => setSelectedBooking(b)} className="text-xs font-black text-slate-600 hover:text-slate-900 transition">{t.bookingDetails} →</button></div></div>
+                    <div className="border-t border-slate-100 px-4 py-2.5 flex justify-between items-center gap-2"><span className="text-[10px] text-slate-400">{t.bookedOn}: {b.booked_at ? new Date(b.booked_at).toLocaleDateString() : ''}</span><div className="flex items-center gap-2">{(b.status === 'pending' || b.status === 'confirmed') && (<button onClick={() => cancelBooking(b.id, 'customer')} disabled={loadingBookingId === b.id} className={`text-xs font-black transition border px-3 py-1 rounded-lg flex items-center gap-1 ${loadingBookingId === b.id ? 'text-red-300 border-red-100 bg-red-50 cursor-not-allowed' : 'text-red-500 hover:text-red-700 border-red-200 bg-red-50 hover:bg-red-100'}`}>{loadingBookingId === b.id ? <><Spinner/>...</> : 'Cancel'}</</button>)}{b.status === 'completed' && (<button onClick={() => { setReviewModal({ vehicleId: b.vehicle_id, bookingId: b.id, vehicleName: b.vehicle_name || '' }); setReviewRating(5); setReviewComment(''); }} className="text-xs font-black text-amber-600 hover:text-amber-700 transition border border-amber-200 bg-amber-50 hover:bg-amber-100 px-3 py-1 rounded-lg">⭐ Review</button>)}<button onClick={() => setSelectedBooking(b)} className="text-xs font-black text-slate-600 hover:text-slate-900 transition">{t.bookingDetails} →</button></div></div>
                   </div>
                 ))}
               </div>
@@ -1629,7 +1678,7 @@ export default function Home() {
                 ) : ownerBookings.map(b => (
                   <div key={b.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="flex gap-4 p-4"><img src={b.vehicle_img || ''} className="w-20 h-14 rounded-xl object-cover flex-shrink-0" alt=""/><div className="flex-1 min-w-0"><div className="flex items-start justify-between gap-2"><div><p className="font-black text-slate-900 text-sm">{b.vehicle_name || ''}</p><p className="text-xs text-slate-400 mt-0.5">📅 {b.pickup_date || ''} → {b.return_date || ''} · {b.days}d</p><p className="text-xs text-slate-400">{(b.delivery_type || 'pickup') === 'delivery' ? '🚚 ' + t.delivery : '📍 ' + t.selfPickup} · <span className="font-black text-slate-900">Rs. {b.total.toLocaleString()}</span> · <span className="text-emerald-600 font-black">You get Rs. {((b as any).owner_payout || Math.round(b.total * 0.90)).toLocaleString()}</span></p></div><span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border flex-shrink-0 ${statusColor(b.status)}`}>{statusLabel(b.status)}</span></div></div></div>
-                    {b.status === 'pending' && (<div className="border-t border-slate-100 px-4 py-3 space-y-2"><div className="flex gap-2"><button onClick={() => updateBookingStatus(b.id, 'confirmed')} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-black text-xs uppercase tracking-wide transition shadow-sm flex items-center justify-center gap-1.5">✓ {t.accept}</button><button onClick={async () => { if (!confirm('Decline this booking?')) return; await declineBooking(b.id); }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-black text-xs uppercase transition">✕ {t.decline}</button><button onClick={() => setOwnerSelectedBooking(b)} className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">Details</button></div><p className="text-[10px] text-slate-400 text-center">The customer will receive an SMS confirmation automatically when you accept</p></div>)}
+                    {b.status === 'pending' && (<div className="border-t border-slate-100 px-4 py-3 space-y-2"><div className="flex gap-2"><button onClick={() => updateBookingStatus(b.id, 'confirmed')} disabled={loadingBookingId === b.id} className={`flex-1 py-2.5 text-white rounded-xl font-black text-xs uppercase tracking-wide transition shadow-sm flex items-center justify-center gap-1.5 ${loadingBookingId === b.id && loadingAction === 'confirmed' ? 'bg-emerald-700 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-95'}`}>{loadingBookingId === b.id && loadingAction === 'confirmed' ? <><Spinner/>Processing...</> : <>✓ {t.accept}</>}</button><button onClick={async () => { if (!confirm('Decline this booking?')) return; await declineBooking(b.id); }} disabled={loadingBookingId === b.id} className={`px-5 py-2.5 border rounded-xl font-black text-xs uppercase transition flex items-center gap-1.5 ${loadingBookingId === b.id && loadingAction === 'decline' ? 'bg-red-100 border-red-200 text-red-400 cursor-not-allowed' : 'bg-red-50 hover:bg-red-100 border-red-200 text-red-600'}`}>{loadingBookingId === b.id && loadingAction === 'decline' ? <><Spinner className="border-red-400/30 border-t-red-500"/>...</> : <>✕ {t.decline}</>}</button><button onClick={() => setOwnerSelectedBooking(b)} className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl font-black text-xs uppercase transition">Details</button></div><p className="text-[10px] text-slate-400 text-center">The customer will receive an SMS confirmation automatically when you accept</p></div>)}
                     {b.status === 'confirmed' && (
                       <div className="border-t border-slate-100 px-4 py-3 space-y-2">
                         {/* Info banner */}
