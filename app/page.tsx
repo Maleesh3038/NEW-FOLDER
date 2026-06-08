@@ -2011,14 +2011,158 @@ export default function Home() {
             <section className="max-w-7xl mx-auto px-4 lg:px-8 pt-6 pb-24">
               <button onClick={() => { setView('home'); setSelectedVehicle(null); setBookingDone(false); }} className="text-sm font-bold text-slate-500 hover:text-red-500 mb-6 flex items-center gap-1.5 transition group"><span className="group-hover:-translate-x-1 transition-transform">←</span> {t.backToAll}</button>
               {bookingDone ? (
-                <div className="max-w-md mx-auto text-center py-16">
-                  <div className="text-6xl mb-4">🎉</div>
-                  <h2 className="text-2xl font-black text-slate-900 mb-2">{t.bookingSent}</h2>
-                  <p className="text-slate-500 text-sm mb-6">{vShop(selectedVehicle)} will contact you via WhatsApp within 30 minutes.</p>
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-sm space-y-2 mb-4">{([['Vehicle', selectedVehicle.name], ['Pickup Date', `${filterPickup} at ${pickupTime}`], ['Return Date', filterReturn], ['Days', `${days} day${days > 1 ? 's' : ''}`], ['Total to Pay', `Rs. ${total.toLocaleString()}`]] as [string, string][]).map(([k, v]) => (<div key={k} className={`flex justify-between ${k === 'Total to Pay' ? 'font-black text-slate-900 border-t border-slate-200 pt-2 mt-1' : ''}`}><span className="text-slate-500">{k}</span><span className={k === 'Total to Pay' ? 'text-red-500 font-black' : 'font-bold'}>{v}</span></div>))}</div>
-                  <div className="space-y-3 mb-4"><OwnerContactButtons vehicleId={selectedVehicle.id} ownerId={selectedVehicle.owner_id} mapLink={vMap(selectedVehicle)} vehicleName={selectedVehicle.name}/></div>
-                  {sessionRole === 'customer' && <p className="text-xs text-emerald-600 font-bold mb-4">✓ Saved to your booking history</p>}
-                  <div className="flex gap-3 justify-center flex-wrap">{sessionRole === 'customer' && <button onClick={() => setView('custDash')} className="bg-slate-700 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.myBookings}</button>}<button onClick={resetToHome} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm hover:bg-slate-800 transition">{t.backToHome}</button></div>
+                <div className="max-w-lg mx-auto py-10 relative">
+                  {/* Confetti canvas */}
+                  <canvas id="confetti-canvas" className="fixed inset-0 pointer-events-none z-[500]" style={{ width: '100vw', height: '100vh' }}/>
+
+                  {/* Celebration card */}
+                  <div className="relative bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
+                    {/* Top gradient banner */}
+                    <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-8 py-10 text-center relative overflow-hidden">
+                      {/* Background decorative circles */}
+                      <div className="absolute top-0 left-0 w-32 h-32 bg-white/5 rounded-full -translate-x-16 -translate-y-16"/>
+                      <div className="absolute bottom-0 right-0 w-40 h-40 bg-white/5 rounded-full translate-x-20 translate-y-20"/>
+                      <div className="absolute top-1/2 left-1/2 w-48 h-48 bg-white/3 rounded-full -translate-x-1/2 -translate-y-1/2"/>
+
+                      {/* Animated checkmark */}
+                      <div className="relative inline-flex items-center justify-center w-20 h-20 mb-4">
+                        <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-20"/>
+                        <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                          <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                          </svg>
+                        </div>
+                      </div>
+
+                      <h2 className="text-3xl font-black text-white mb-2">Booking Confirmed! 🎉</h2>
+                      <p className="text-slate-300 text-sm">Your ride is locked in. Get ready for the road!</p>
+
+                      {/* Vehicle name pill */}
+                      <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-2 mt-4">
+                        <span className="text-white font-black text-sm">{selectedVehicle.name}</span>
+                        <span className="text-slate-400 text-xs">· {vShop(selectedVehicle)}</span>
+                      </div>
+                    </div>
+
+                    {/* Booking details */}
+                    <div className="px-6 py-5 space-y-4">
+                      {/* Key info grid */}
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { icon: '📅', label: 'Pickup', value: filterPickup || '—' },
+                          { icon: '⏰', label: 'Time', value: pickupTime },
+                          { icon: '🗓️', label: 'Duration', value: `${days} day${days > 1 ? 's' : ''}` },
+                        ].map(item => (
+                          <div key={item.label} className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
+                            <p className="text-xl mb-1">{item.icon}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">{item.label}</p>
+                            <p className="text-xs font-black text-slate-900 mt-0.5">{item.value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Total amount */}
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-emerald-600 font-bold uppercase tracking-wide">Total to Pay at Pickup</p>
+                          <p className="text-2xl font-black text-emerald-700 mt-0.5">Rs. {total.toLocaleString()}</p>
+                        </div>
+                        <div className="text-3xl">💳</div>
+                      </div>
+
+                      {/* Steps */}
+                      <div className="bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 space-y-3">
+                        <p className="text-xs font-black text-blue-700 uppercase tracking-wide">What happens next?</p>
+                        {[
+                          { step: '1', text: `${vShop(selectedVehicle)} will confirm via WhatsApp within 30 mins`, icon: '💬' },
+                          { step: '2', text: 'Pay at pickup — cash or bank transfer', icon: '💰' },
+                          { step: '3', text: 'Show your booking & valid driving license', icon: '🪪' },
+                        ].map(s => (
+                          <div key={s.step} className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0">{s.icon}</span>
+                            <p className="text-xs text-blue-700 leading-relaxed">{s.text}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Contact buttons */}
+                      <OwnerContactButtons vehicleId={selectedVehicle.id} ownerId={selectedVehicle.owner_id} mapLink={vMap(selectedVehicle)} vehicleName={selectedVehicle.name}/>
+
+                      {sessionRole === 'customer' && (
+                        <div className="flex items-center gap-2 justify-center">
+                          <span className="text-emerald-500">✓</span>
+                          <p className="text-xs text-emerald-600 font-bold">Saved to your booking history</p>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        {sessionRole === 'customer' && (
+                          <button onClick={() => setView('custDash')}
+                            className="py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-black text-sm transition">
+                            📋 My Bookings
+                          </button>
+                        )}
+                        <button onClick={resetToHome}
+                          className={`py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm transition ${sessionRole !== 'customer' ? 'col-span-2' : ''}`}>
+                          🏠 Back to Home
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Confetti script */}
+                  <script dangerouslySetInnerHTML={{ __html: `
+                    (function() {
+                      const canvas = document.getElementById('confetti-canvas');
+                      if (!canvas) return;
+                      const ctx = canvas.getContext('2d');
+                      canvas.width = window.innerWidth;
+                      canvas.height = window.innerHeight;
+                      const pieces = [];
+                      const colors = ['#10b981','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316'];
+                      for (let i = 0; i < 150; i++) {
+                        pieces.push({
+                          x: Math.random() * canvas.width,
+                          y: Math.random() * canvas.height - canvas.height,
+                          w: Math.random() * 10 + 5,
+                          h: Math.random() * 6 + 3,
+                          color: colors[Math.floor(Math.random() * colors.length)],
+                          rotation: Math.random() * 360,
+                          speed: Math.random() * 3 + 2,
+                          spin: Math.random() * 6 - 3,
+                          swing: Math.random() * 3,
+                          swingSpeed: Math.random() * 0.05,
+                          swingAngle: Math.random() * Math.PI * 2,
+                          opacity: 1,
+                        });
+                      }
+                      let frame = 0;
+                      function draw() {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        frame++;
+                        let alive = false;
+                        pieces.forEach(p => {
+                          p.y += p.speed;
+                          p.rotation += p.spin;
+                          p.swingAngle += p.swingSpeed;
+                          p.x += Math.sin(p.swingAngle) * p.swing;
+                          if (frame > 120) p.opacity = Math.max(0, p.opacity - 0.008);
+                          if (p.y < canvas.height + 20 && p.opacity > 0) alive = true;
+                          ctx.save();
+                          ctx.globalAlpha = p.opacity;
+                          ctx.translate(p.x + p.w/2, p.y + p.h/2);
+                          ctx.rotate(p.rotation * Math.PI / 180);
+                          ctx.fillStyle = p.color;
+                          ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+                          ctx.restore();
+                        });
+                        if (alive) requestAnimationFrame(draw);
+                        else canvas.style.display = 'none';
+                      }
+                      draw();
+                    })();
+                  ` }}/>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
