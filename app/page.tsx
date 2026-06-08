@@ -2018,6 +2018,36 @@ export default function Home() {
           )}
         </>
       )}
+      {/* FLOATING WHATSAPP SUPPORT BUTTON */}
+      {view === 'home' && (
+        <div className="fixed bottom-6 right-4 z-[100] flex flex-col items-end gap-2">
+          {/* Label */}
+          <div className="bg-slate-900 text-white text-xs font-black px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"/>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/>
+            </span>
+            Chat with us
+          </div>
+          {/* WhatsApp Button */}
+          <a
+            href="https://wa.me/94767868513?text=Hi%20Drivo%20LK!%20I%20need%20some%20help."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-14 h-14 hover:scale-110 active:scale-95 rounded-full flex items-center justify-center shadow-2xl transition-all duration-200"
+            aria-label="Chat on WhatsApp"
+            style={{ background: 'none', padding: 0 }}
+          >
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"
+              alt="WhatsApp"
+              width={56}
+              height={56}
+              style={{ borderRadius: '50%', display: 'block' }}
+            />
+          </a>
+        </div>
+      )}
     </main>
   );
 }
