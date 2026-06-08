@@ -604,8 +604,9 @@ export default function AdminPage() {
           {/* ══ DASHBOARD ══ */}
           {tab==='dashboard'&&(
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div><h1 className="text-2xl font-black text-white">Dashboard</h1><p className="text-slate-500 text-sm mt-0.5">Real-time platform overview</p></div>
+              {/* Header */}
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div><h1 className="text-2xl font-black text-white">Analytics Dashboard</h1><p className="text-slate-500 text-sm mt-0.5">Real-time platform overview</p></div>
                 <div className="flex items-center gap-2 text-xs text-emerald-400 font-bold bg-emerald-900/20 border border-emerald-800/50 px-3 py-1.5 rounded-full"><div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"/>Live</div>
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -672,6 +673,231 @@ export default function AdminPage() {
                   {bookings.length===0&&<p className="text-slate-500 text-sm text-center py-6">No bookings yet</p>}
                 </div>
               </div>
+
+              {/* ── REVENUE ANALYTICS ── */}
+              {(() => {
+                const now = new Date();
+                const months = Array.from({length: 6}, (_, i) => {
+                  const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+                  return { month: d.toLocaleString('default', { month: 'short' }), year: d.getFullYear(), m: d.getMonth(), y: d.getFullYear() };
+                });
+                const monthlyData = months.map(({ month, m, y }) => {
+                  const mBookings = bookings.filter(b => {
+                    const d = new Date(b.booked_at || '');
+                    return d.getMonth() === m && d.getFullYear() === y;
+                  });
+                  const revenue = mBookings.filter(b => b.status === 'completed').reduce((s, b) => s + (b.total || 0), 0);
+                  const drivoFee = Math.round(revenue * 0.10);
+                  return { month, revenue, drivoFee, count: mBookings.length, completed: mBookings.filter(b => b.status === 'completed').length };
+                });
+                const maxRev = Math.max(...monthlyData.map(m => m.revenue), 1);
+                const totalRev6m = monthlyData.reduce((s, m) => s + m.revenue, 0);
+                const totalFee6m = monthlyData.reduce((s, m) => s + m.drivoFee, 0);
+                const totalBookings6m = monthlyData.reduce((s, m) => s + m.count, 0);
+
+                // Top vehicles by bookings
+                const vehicleBookings: Record<string, { name: string; count: number; revenue: number; img: string }> = {};
+                bookings.forEach(b => {
+                  if (!b.vehicle_id) return;
+                  if (!vehicleBookings[b.vehicle_id]) vehicleBookings[b.vehicle_id] = { name: b.vehicle_name || 'Unknown', count: 0, revenue: 0, img: b.vehicle_img || '' };
+                  vehicleBookings[b.vehicle_id].count++;
+                  vehicleBookings[b.vehicle_id].revenue += b.total || 0;
+                });
+                const topVehicles = Object.values(vehicleBookings).sort((a, b) => b.count - a.count).slice(0, 5);
+                const maxVCount = Math.max(...topVehicles.map(v => v.count), 1);
+
+                // Top partners by revenue
+                const partnerRevenue: Record<string, { name: string; revenue: number; count: number }> = {};
+                bookings.filter(b => b.status === 'completed').forEach(b => {
+                  const key = b.owner_id || b.shop_name || 'unknown';
+                  if (!partnerRevenue[key]) partnerRevenue[key] = { name: b.shop_name || 'Unknown', revenue: 0, count: 0 };
+                  partnerRevenue[key].revenue += b.total || 0;
+                  partnerRevenue[key].count++;
+                });
+                const topPartners = Object.values(partnerRevenue).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+                const maxPRev = Math.max(...topPartners.map(p => p.revenue), 1);
+
+                // Vehicle type breakdown
+                const typeBreakdown = { car: 0, bike: 0, van: 0, tuk: 0 };
+                vehicles.forEach((v: any) => { if (v.type in typeBreakdown) (typeBreakdown as any)[v.type]++; });
+                const typeTotal = Object.values(typeBreakdown).reduce((s, v) => s + v, 0) || 1;
+                const typeColors: Record<string, string> = { car: 'bg-blue-500', bike: 'bg-emerald-500', van: 'bg-purple-500', tuk: 'bg-amber-500' };
+                const typeLabels: Record<string, string> = { car: '🚙 Cars', bike: '🏍️ Bikes', van: '🚐 Vans', tuk: '🛺 Tuk-tuks' };
+
+                return (
+                  <>
+                    {/* Revenue Summary Cards */}
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { l: 'Total Revenue (6m)', v: `Rs. ${totalRev6m.toLocaleString()}`, i: '💰', c: 'border-teal-800/50 bg-teal-900/20', t: 'text-teal-400' },
+                        { l: 'Drivo Earnings (6m)', v: `Rs. ${totalFee6m.toLocaleString()}`, i: '📈', c: 'border-emerald-800/50 bg-emerald-900/20', t: 'text-emerald-400' },
+                        { l: 'Total Bookings (6m)', v: totalBookings6m, i: '📋', c: 'border-blue-800/50 bg-blue-900/20', t: 'text-blue-400' },
+                      ].map(s => (
+                        <div key={s.l} className={`border ${s.c} rounded-2xl p-4`}>
+                          <div className="text-xl mb-1">{s.i}</div>
+                          <div className={`text-lg font-black ${s.t}`}>{s.v}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">{s.l}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Monthly Revenue Chart */}
+                    <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-5">
+                        <h2 className="font-black text-white text-sm">📊 Monthly Revenue</h2>
+                        <span className="text-[10px] text-slate-500">Last 6 months</span>
+                      </div>
+                      <div className="flex items-end gap-2 h-32">
+                        {monthlyData.map((m, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <span className="text-[9px] text-slate-400">{m.revenue > 0 ? `${(m.revenue/1000).toFixed(0)}k` : ''}</span>
+                            <div className="w-full flex flex-col gap-0.5 justify-end" style={{ height: '80px' }}>
+                              <div
+                                className="w-full bg-teal-500 rounded-t-lg transition-all duration-500 relative group"
+                                style={{ height: `${Math.max((m.revenue / maxRev) * 80, m.revenue > 0 ? 4 : 0)}px` }}
+                              >
+                                {m.revenue > 0 && (
+                                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-700 text-white text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none z-10">
+                                    Rs. {m.revenue.toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-slate-500">{m.month}</span>
+                            <span className="text-[9px] text-slate-600">{m.count}b</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-800/50">
+                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-teal-500 rounded-sm"/><span className="text-[10px] text-slate-400">Total Revenue</span></div>
+                        <span className="text-[10px] text-slate-500">·  {monthlyData.filter(m => m.count > 0).length} active months</span>
+                      </div>
+                    </div>
+
+                    {/* Top Vehicles + Top Partners */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Top Vehicles */}
+                      <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+                        <h2 className="font-black text-white text-sm mb-4">🏆 Top Vehicles</h2>
+                        {topVehicles.length === 0 ? (
+                          <p className="text-slate-500 text-xs text-center py-6">No booking data yet</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {topVehicles.map((v, i) => (
+                              <div key={i} className="flex items-center gap-3">
+                                <span className={`text-sm font-black w-5 flex-shrink-0 ${i === 0 ? 'text-amber-400' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-amber-700' : 'text-slate-600'}`}>#{i+1}</span>
+                                {v.img && <img src={v.img} alt="" className="w-10 h-7 rounded-lg object-cover flex-shrink-0 bg-slate-700"/>}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-black text-white truncate">{v.name}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex-1 bg-slate-800 rounded-full h-1">
+                                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(v.count / maxVCount) * 100}%` }}/>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <p className="text-xs font-black text-white">{v.count} <span className="text-slate-500 font-normal">bookings</span></p>
+                                  <p className="text-[10px] text-emerald-400">Rs. {v.revenue.toLocaleString()}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Top Partners */}
+                      <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+                        <h2 className="font-black text-white text-sm mb-4">🏪 Top Partners</h2>
+                        {topPartners.length === 0 ? (
+                          <p className="text-slate-500 text-xs text-center py-6">No completed bookings yet</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {topPartners.map((p, i) => (
+                              <div key={i} className="flex items-center gap-3">
+                                <span className={`text-sm font-black w-5 flex-shrink-0 ${i === 0 ? 'text-amber-400' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-amber-700' : 'text-slate-600'}`}>#{i+1}</span>
+                                <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0">
+                                  {(p.name || 'P').charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-black text-white truncate">{p.name}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex-1 bg-slate-800 rounded-full h-1">
+                                      <div className="h-full bg-teal-500 rounded-full" style={{ width: `${(p.revenue / maxPRev) * 100}%` }}/>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <p className="text-xs font-black text-emerald-400">Rs. {p.revenue.toLocaleString()}</p>
+                                  <p className="text-[10px] text-slate-500">{p.count} completed</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Fleet Breakdown + Booking Status */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Vehicle Type Breakdown */}
+                      <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+                        <h2 className="font-black text-white text-sm mb-4">🚗 Fleet Breakdown</h2>
+                        <div className="space-y-3">
+                          {Object.entries(typeBreakdown).map(([type, count]) => (
+                            <div key={type} className="flex items-center gap-3">
+                              <span className="text-xs text-slate-400 w-20 flex-shrink-0">{typeLabels[type]}</span>
+                              <div className="flex-1 bg-slate-800 rounded-full h-2">
+                                <div className={`h-full rounded-full ${typeColors[type]}`} style={{ width: `${(count / typeTotal) * 100}%` }}/>
+                              </div>
+                              <span className="text-xs font-black text-white w-6 text-right">{count}</span>
+                              <span className="text-[10px] text-slate-500 w-8 text-right">{Math.round((count / typeTotal) * 100)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-slate-800/50 flex items-center justify-between">
+                          <span className="text-xs text-slate-400">Total vehicles</span>
+                          <span className="text-sm font-black text-white">{vehicles.length}</span>
+                        </div>
+                      </div>
+
+                      {/* Booking Status Breakdown */}
+                      <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+                        <h2 className="font-black text-white text-sm mb-4">📋 Booking Status</h2>
+                        {(() => {
+                          const statusData = [
+                            { label: 'Completed', count: bookings.filter(b => b.status === 'completed').length, color: 'bg-emerald-500', tc: 'text-emerald-400' },
+                            { label: 'Confirmed', count: bookings.filter(b => b.status === 'confirmed').length, color: 'bg-blue-500', tc: 'text-blue-400' },
+                            { label: 'Pending', count: bookings.filter(b => b.status === 'pending').length, color: 'bg-amber-500', tc: 'text-amber-400' },
+                            { label: 'Cancelled', count: bookings.filter(b => b.status === 'cancelled').length, color: 'bg-red-500', tc: 'text-red-400' },
+                          ];
+                          const maxS = Math.max(...statusData.map(s => s.count), 1);
+                          const convRate = bookings.length > 0 ? Math.round((statusData[0].count / bookings.length) * 100) : 0;
+                          return (
+                            <>
+                              <div className="space-y-3">
+                                {statusData.map(s => (
+                                  <div key={s.label} className="flex items-center gap-3">
+                                    <span className="text-xs text-slate-400 w-20 flex-shrink-0">{s.label}</span>
+                                    <div className="flex-1 bg-slate-800 rounded-full h-2">
+                                      <div className={`h-full rounded-full ${s.color}`} style={{ width: `${(s.count / maxS) * 100}%` }}/>
+                                    </div>
+                                    <span className={`text-xs font-black w-6 text-right ${s.tc}`}>{s.count}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="mt-4 pt-3 border-t border-slate-800/50 flex items-center justify-between">
+                                <span className="text-xs text-slate-400">Completion rate</span>
+                                <span className={`text-sm font-black ${convRate >= 50 ? 'text-emerald-400' : 'text-amber-400'}`}>{convRate}%</span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
             </div>
           )}
 
