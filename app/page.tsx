@@ -2065,7 +2065,7 @@ export default function Home() {
                       <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 flex items-center justify-between">
                         <div>
                           <p className="text-xs text-emerald-600 font-bold uppercase tracking-wide">Total to Pay at Pickup</p>
-                          <p className="text-2xl font-black text-emerald-700 mt-0.5">Rs. {total.toLocaleString()}</p>
+                          <p className="text-2xl font-black text-emerald-700 mt-0.5">Rs. {Math.round(total * 0.90).toLocaleString()}</p>
                         </div>
                         <div className="text-3xl">💳</div>
                       </div>
@@ -2239,8 +2239,7 @@ export default function Home() {
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
                       <div className="flex justify-between"><span>{fmt(periodInfo.price)} × {periodsCount} {periodInfo.unit}{periodsCount > 1 ? 's' : ''}</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
                       {deliveryType === 'delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
-                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Rental Total</span><span>{fmt(total)}</span></div>
-                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 space-y-1"><div className="flex justify-between text-blue-700"><span>🔒 Booking Fee (10%)</span><span className="font-black">{fmt(platformFeeAmt)}</span></div></div>
+                      <div className="flex justify-between font-black text-sm pt-2 border-t border-slate-200 text-slate-900"><span>Total to Pay at Pickup</span><span className="text-emerald-600">{fmt(total - platformFeeAmt)}</span></div>
                       {depositAmt > 0 && (<div className="flex justify-between text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2"><span>🔐 Security Deposit (refundable)</span><span className="font-black">{fmt(depositAmt)}</span></div>)}
                       {(selectedVehicle as any).km_per_day > 0 && (<div className="text-[10px] text-slate-500 bg-slate-100 rounded-lg px-3 py-2 space-y-0.5"><p>🛣️ <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included</p>{(selectedVehicle as any).extra_km_charge > 0 && <p>Extra km: <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span></p>}</div>)}
                     </div>
