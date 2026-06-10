@@ -463,14 +463,10 @@ function VehicleCalendar({ vehicleId, ownerId, isOwner = false, onBlockedDatesLo
     const rows = [...selectedDates].map(date => ({
       vehicle_id: vehicleId,
       date,
-      reason: mode === 'booked' ? 'booked' : 'blocked',
+      reason: 'blocked',
     }));
     await supabase.from('vehicle_blocked_dates').upsert(rows, { onConflict: 'vehicle_id,date' });
-    if (mode === 'booked') {
-      setBookedDates(prev => new Set([...prev, ...selectedDates]));
-    } else {
-      setBlockedDates(prev => new Set([...prev, ...selectedDates]));
-    }
+    setBlockedDates(prev => new Set([...prev, ...selectedDates]));
     if (onBlockedDatesLoad) {
       onBlockedDatesLoad([...blockedDates, ...bookedDates, ...selectedDates]);
     }
@@ -487,8 +483,7 @@ function VehicleCalendar({ vehicleId, ownerId, isOwner = false, onBlockedDatesLo
 
   const getDayStatus = (dateStr: string) => {
     if (selectedDates.has(dateStr)) return 'selected';
-    if (bookedDates.has(dateStr)) return 'booked';
-    if (blockedDates.has(dateStr)) return 'blocked';
+    if (bookedDates.has(dateStr) || blockedDates.has(dateStr)) return 'unavailable';
     if (dateStr < today) return 'past';
     if (dateStr === today) return 'today';
     return 'available';
@@ -498,9 +493,8 @@ function VehicleCalendar({ vehicleId, ownerId, isOwner = false, onBlockedDatesLo
     available: 'hover:bg-slate-100',
     today: 'border-2 border-slate-900 font-black',
     past: 'text-slate-300 cursor-not-allowed',
-    booked: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-    blocked: 'bg-red-50 text-red-600 border border-red-200',
-    selected: mode === 'booked' ? 'bg-emerald-200 text-emerald-800' : 'bg-red-200 text-red-800',
+    unavailable: 'bg-red-50 text-red-400 border border-red-100 cursor-not-allowed',
+    selected: 'bg-slate-900 text-white',
   };
 
   return (
@@ -546,49 +540,28 @@ function VehicleCalendar({ vehicleId, ownerId, isOwner = false, onBlockedDatesLo
       {/* Owner controls */}
       {isOwner && (
         <div className="space-y-2 pt-2 border-t border-slate-100">
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setMode(mode === 'block' ? null : 'block')}
-              className={`py-2 rounded-xl text-xs font-black border transition ${mode === 'block' ? 'bg-red-500 text-white border-red-500' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'}`}>
-              🚫 Block dates
-            </button>
-            <button onClick={() => setMode(mode === 'booked' ? null : 'booked')}
-              className={`py-2 rounded-xl text-xs font-black border transition ${mode === 'booked' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}>
-              📋 Mark booked
-            </button>
-          </div>
-          {mode && (
-            <p className="text-[10px] text-slate-400 text-center">
-              {mode === 'block' ? '🚫 Tap dates to block — vehicle hides from search' : '📋 Tap dates to mark as already booked'}
-            </p>
-          )}
+          <button onClick={() => setMode(mode === 'block' ? null : 'block')}
+            className={`w-full py-2.5 rounded-xl text-sm font-black border transition ${mode === 'block' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>
+            {mode === 'block' ? '✓ Tap dates to mark unavailable' : '📅 Mark dates as unavailable'}
+          </button>
           {selectedDates.size > 0 && (
             <button onClick={saveBlockedDates} disabled={saving}
-              className={`w-full py-2.5 rounded-xl font-black text-sm text-white transition ${saving ? 'bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'}`}>
-              {saving ? 'Saving...' : `Save ${selectedDates.size} date${selectedDates.size > 1 ? 's' : ''} →`}
+              className={`w-full py-2.5 rounded-xl font-black text-sm text-white transition ${saving ? 'bg-slate-400' : 'bg-red-500 hover:bg-red-600'}`}>
+              {saving ? 'Saving...' : `🚫 Block ${selectedDates.size} day${selectedDates.size > 1 ? 's' : ''}`}
             </button>
           )}
-          <div className="flex gap-4 justify-center">
-            {[['bg-emerald-50 border border-emerald-200', 'Booked'], ['bg-red-50 border border-red-200', 'Blocked']].map(([cls, label]) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <div className={`w-3 h-3 rounded ${cls}`}/>
-                <span className="text-[10px] text-slate-400">{label}</span>
-              </div>
-            ))}
+          <div className="flex items-center gap-1.5 justify-center">
+            <div className="w-3 h-3 rounded bg-red-50 border border-red-200"/>
+            <span className="text-[10px] text-slate-400">Unavailable — hidden from customers</span>
           </div>
         </div>
       )}
 
       {/* Customer view — legend only */}
       {!isOwner && (blockedDates.size > 0 || bookedDates.size > 0) && (
-        <div className="flex gap-4 justify-center pt-1 border-t border-slate-100">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-red-50 border border-red-200"/>
-            <span className="text-[10px] text-slate-400">Not available</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-emerald-50 border border-emerald-200"/>
-            <span className="text-[10px] text-slate-400">Booked</span>
-          </div>
+        <div className="flex items-center gap-1.5 justify-center pt-1 border-t border-slate-100">
+          <div className="w-3 h-3 rounded bg-red-50 border border-red-200"/>
+          <span className="text-[10px] text-slate-400">Unavailable dates</span>
         </div>
       )}
     </div>
