@@ -401,6 +401,201 @@ function NearbyVehiclesSection({ allVehicles, onVehicleClick }: {
 }
 
 
+
+// ── Vehicle Availability Calendar Component
+function VehicleCalendar({ vehicleId, ownerId, isOwner = false, onBlockedDatesLoad }: {
+  vehicleId: string;
+  ownerId?: string;
+  isOwner?: boolean;
+  onBlockedDatesLoad?: (dates: string[]) => void;
+}) {
+  const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+  const [mode, setMode] = useState<'block'|'booked'|null>(null);
+  const [saving, setSaving] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const today = fmt(new Date());
+
+  useEffect(() => {
+    if (!vehicleId) return;
+    // Load blocked dates
+    supabase.from('vehicle_blocked_dates')
+      .select('date, reason')
+      .eq('vehicle_id', vehicleId)
+      .then(({ data }) => {
+        if (!data) return;
+        const blocked = new Set<string>();
+        const booked = new Set<string>();
+        data.forEach(d => {
+          if (d.reason === 'booked') booked.add(d.date);
+          else blocked.add(d.date);
+        });
+        setBlockedDates(blocked);
+        setBookedDates(booked);
+        if (onBlockedDatesLoad) {
+          onBlockedDatesLoad([...blocked, ...booked]);
+        }
+      });
+  }, [vehicleId]);
+
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthName = currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const toggleDate = (dateStr: string) => {
+    if (!isOwner || !mode) return;
+    if (dateStr < today) return;
+    setSelectedDates(prev => {
+      const n = new Set(prev);
+      n.has(dateStr) ? n.delete(dateStr) : n.add(dateStr);
+      return n;
+    });
+  };
+
+  const saveBlockedDates = async () => {
+    if (!vehicleId || selectedDates.size === 0 || !mode) return;
+    setSaving(true);
+    const rows = [...selectedDates].map(date => ({
+      vehicle_id: vehicleId,
+      date,
+      reason: mode === 'booked' ? 'booked' : 'blocked',
+    }));
+    await supabase.from('vehicle_blocked_dates').upsert(rows, { onConflict: 'vehicle_id,date' });
+    if (mode === 'booked') {
+      setBookedDates(prev => new Set([...prev, ...selectedDates]));
+    } else {
+      setBlockedDates(prev => new Set([...prev, ...selectedDates]));
+    }
+    if (onBlockedDatesLoad) {
+      onBlockedDatesLoad([...blockedDates, ...bookedDates, ...selectedDates]);
+    }
+    setSelectedDates(new Set());
+    setMode(null);
+    setSaving(false);
+  };
+
+  const unblockDate = async (dateStr: string) => {
+    await supabase.from('vehicle_blocked_dates').delete().eq('vehicle_id', vehicleId).eq('date', dateStr);
+    setBlockedDates(prev => { const n = new Set(prev); n.delete(dateStr); return n; });
+    setBookedDates(prev => { const n = new Set(prev); n.delete(dateStr); return n; });
+  };
+
+  const getDayStatus = (dateStr: string) => {
+    if (selectedDates.has(dateStr)) return 'selected';
+    if (bookedDates.has(dateStr)) return 'booked';
+    if (blockedDates.has(dateStr)) return 'blocked';
+    if (dateStr < today) return 'past';
+    if (dateStr === today) return 'today';
+    return 'available';
+  };
+
+  const dayColors: Record<string, string> = {
+    available: 'hover:bg-slate-100',
+    today: 'border-2 border-slate-900 font-black',
+    past: 'text-slate-300 cursor-not-allowed',
+    booked: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    blocked: 'bg-red-50 text-red-600 border border-red-200',
+    selected: mode === 'booked' ? 'bg-emerald-200 text-emerald-800' : 'bg-red-200 text-red-800',
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Month navigation */}
+      <div className="flex items-center justify-between">
+        <button onClick={() => setCurrentMonth(new Date(year, month - 1, 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition text-slate-600 font-black">‹</button>
+        <p className="text-sm font-black text-slate-900">{monthName}</p>
+        <button onClick={() => setCurrentMonth(new Date(year, month + 1, 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition text-slate-600 font-black">›</button>
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-7 gap-1">
+        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+          <div key={d} className="text-center text-[10px] font-black text-slate-400 py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Days grid */}
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`}/>)}
+        {Array.from({ length: daysInMonth }, (_, i) => {
+          const d = i + 1;
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const status = getDayStatus(dateStr);
+          return (
+            <div key={d} onClick={() => toggleDate(dateStr)}
+              className={`h-9 flex items-center justify-center rounded-xl text-xs transition relative
+                ${isOwner && mode && status !== 'past' ? 'cursor-pointer' : ''}
+                ${dayColors[status] || ''}`}>
+              {d}
+              {isOwner && (status === 'blocked' || status === 'booked') && (
+                <button onClick={e => { e.stopPropagation(); unblockDate(dateStr); }}
+                  className="absolute -top-1 -right-1 w-4 h-4 bg-white border border-slate-200 rounded-full text-[9px] text-slate-400 hover:text-red-500 flex items-center justify-center shadow-sm">×</button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Owner controls */}
+      {isOwner && (
+        <div className="space-y-2 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setMode(mode === 'block' ? null : 'block')}
+              className={`py-2 rounded-xl text-xs font-black border transition ${mode === 'block' ? 'bg-red-500 text-white border-red-500' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'}`}>
+              🚫 Block dates
+            </button>
+            <button onClick={() => setMode(mode === 'booked' ? null : 'booked')}
+              className={`py-2 rounded-xl text-xs font-black border transition ${mode === 'booked' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}>
+              📋 Mark booked
+            </button>
+          </div>
+          {mode && (
+            <p className="text-[10px] text-slate-400 text-center">
+              {mode === 'block' ? '🚫 Tap dates to block — vehicle hides from search' : '📋 Tap dates to mark as already booked'}
+            </p>
+          )}
+          {selectedDates.size > 0 && (
+            <button onClick={saveBlockedDates} disabled={saving}
+              className={`w-full py-2.5 rounded-xl font-black text-sm text-white transition ${saving ? 'bg-slate-400' : 'bg-slate-900 hover:bg-slate-800'}`}>
+              {saving ? 'Saving...' : `Save ${selectedDates.size} date${selectedDates.size > 1 ? 's' : ''} →`}
+            </button>
+          )}
+          <div className="flex gap-4 justify-center">
+            {[['bg-emerald-50 border border-emerald-200', 'Booked'], ['bg-red-50 border border-red-200', 'Blocked']].map(([cls, label]) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <div className={`w-3 h-3 rounded ${cls}`}/>
+                <span className="text-[10px] text-slate-400">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Customer view — legend only */}
+      {!isOwner && (blockedDates.size > 0 || bookedDates.size > 0) && (
+        <div className="flex gap-4 justify-center pt-1 border-t border-slate-100">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-red-50 border border-red-200"/>
+            <span className="text-[10px] text-slate-400">Not available</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-emerald-50 border border-emerald-200"/>
+            <span className="text-[10px] text-slate-400">Booked</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function PartnerLeaderboard() {
   const [partners, setPartners] = useState<any[]>([]);
   const [tab, setTab] = useState<'bookings'|'rating'>('bookings');
@@ -1249,7 +1444,26 @@ export default function Home() {
   const platformFeeAmt = Math.round(total * 0.10);
   const ownerPayoutAmt = total - platformFeeAmt;
 
-  const confirmBooking = async () => { if (!selectedVehicle || bookingLoading) return; if (sessionRole !== 'customer') { setLoginPromptOpen(true); return; } setBookingLoading(true); const today = new Date().toISOString().split('T')[0]; const bookingData = { vehicle_id: selectedVehicle.id, owner_id: selectedVehicle.owner_id, customer_id: sessionRole === 'customer' ? custAcc?.id : undefined, vehicle_name: selectedVehicle.name || '', vehicle_img: selectedVehicle.image || '', shop_name: vShop(selectedVehicle) || '', location: selectedVehicle.location || '', pickup_date: filterPickup || today, return_date: filterReturn || today, pickup_time: pickupTime, days, delivery_type: deliveryType, price_per_day: vPrice(selectedVehicle) || 0, total, status: 'pending' }; const res = await bookingAPI('create', { booking: bookingData, vehicleId: selectedVehicle.id, customerId: sessionRole === 'customer' ? custAcc?.id : null, ownerId: selectedVehicle.owner_id }); if (res.error) { showToast(res.error === 'Vehicle no longer available' ? 'Sorry, this vehicle was just booked by someone else!' : 'Booking failed. Please try again.', 'err'); setBookingLoading(false); setView('home'); setSelectedVehicle(null); await refreshVehicles(); return; } if (sessionRole === 'customer' && custAcc?.id) { const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev); } await refreshVehicles(); await trackBookingInDB().catch(() => {}); setBookingLoading(false); setBookingDone(true); };
+  const confirmBooking = async () => {
+    if (!selectedVehicle || bookingLoading) return;
+    if (sessionRole !== 'customer') { setLoginPromptOpen(true); return; }
+
+    // Check if pickup/return dates overlap with blocked dates
+    if (filterPickup && filterReturn) {
+      const { data: blocked } = await supabase
+        .from('vehicle_blocked_dates')
+        .select('date')
+        .eq('vehicle_id', selectedVehicle.id)
+        .gte('date', filterPickup)
+        .lte('date', filterReturn);
+
+      if (blocked && blocked.length > 0) {
+        showToast('Selected dates include unavailable days. Please choose different dates.', 'err');
+        return;
+      }
+    }
+
+    setBookingLoading(true); const today = new Date().toISOString().split('T')[0]; const bookingData = { vehicle_id: selectedVehicle.id, owner_id: selectedVehicle.owner_id, customer_id: sessionRole === 'customer' ? custAcc?.id : undefined, vehicle_name: selectedVehicle.name || '', vehicle_img: selectedVehicle.image || '', shop_name: vShop(selectedVehicle) || '', location: selectedVehicle.location || '', pickup_date: filterPickup || today, return_date: filterReturn || today, pickup_time: pickupTime, days, delivery_type: deliveryType, price_per_day: vPrice(selectedVehicle) || 0, total, status: 'pending' }; const res = await bookingAPI('create', { booking: bookingData, vehicleId: selectedVehicle.id, customerId: sessionRole === 'customer' ? custAcc?.id : null, ownerId: selectedVehicle.owner_id }); if (res.error) { showToast(res.error === 'Vehicle no longer available' ? 'Sorry, this vehicle was just booked by someone else!' : 'Booking failed. Please try again.', 'err'); setBookingLoading(false); setView('home'); setSelectedVehicle(null); await refreshVehicles(); return; } if (sessionRole === 'customer' && custAcc?.id) { const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev); } await refreshVehicles(); await trackBookingInDB().catch(() => {}); setBookingLoading(false); setBookingDone(true); };
 
   return (
     <main dir={t.dir} className={`min-h-screen bg-slate-50 text-slate-800 antialiased font-sans ${t.dir === 'rtl' ? 'text-right' : ''}`}>
@@ -1931,7 +2145,17 @@ export default function Home() {
                   {ownerFleet.length === 0 ? (
                     <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center py-20"><p className="text-5xl mb-3">🚗</p><p className="font-black text-slate-700">{t.noVehicles}</p><button onClick={() => setShowAddForm(true)} className="mt-5 bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-sm uppercase hover:bg-slate-800 transition">{t.addFirst}</button></div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">{ownerFleet.map(v => (<div key={v.id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition ${vAvail(v) ? 'border-slate-200' : 'border-slate-200 opacity-70'}`}><div className="relative aspect-[16/9] bg-slate-100 overflow-hidden"><img src={v.image} alt={v.name} className="w-full h-full object-cover"/><div className={`absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shadow-sm ${vAvail(v) ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-white'}`}>{vAvail(v) ? t.liveLabel : t.hiddenLabel}</div><div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-black">{typeIcon(v.type)}</div></div><div className="p-4"><div className="flex items-start justify-between gap-2 mb-1"><h4 className="font-black text-slate-900 text-sm leading-tight">{v.name}</h4><div className="text-right flex-shrink-0"><p className="font-black text-slate-900 text-sm">Rs.{vPrice(v).toLocaleString()}</p><p className="text-[10px] text-emerald-600 font-bold">You get Rs.{Math.round(vPrice(v) * 0.90).toLocaleString()}/day</p></div></div><p className="text-xs text-slate-400 mb-1">{v.transmission} · {v.fuel} · {v.location}</p><div className="flex gap-2 pt-3 border-t border-slate-100"><button onClick={() => toggleAvail(v.id)} className={`flex-1 py-2 rounded-xl font-black text-[11px] uppercase tracking-wide border transition ${vAvail(v) ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600' : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>{vAvail(v) ? t.hide : t.goLive}</button><button onClick={() => { setEditingId(v.id); setShowAddForm(false); setNewV({ name: v.name, type: v.type, transmission: v.transmission, fuel: v.fuel, pricePerDay: vPrice(v), description: v.description || '', mapLink: (v as any).mapLink || '', weeklyPrice: (v as any).weekly_price || 0, monthlyPrice: (v as any).monthly_price || 0, kmPerDay: (v as any).km_per_day || 200, extraKmCharge: (v as any).extra_km_charge || 50, depositAmount: (v as any).deposit_amount || 0, driverOption: (v as any).driver_option || 'self_drive', district: v.location || '', deliveryOption: (v as any).delivery_option || 'both', revenueLicenceExpiry: (v as any).revenue_licence_expiry || '', insuranceExpiry: (v as any).insurance_expiry || '' }); setPhotos(v.images && v.images.length > 0 ? [...v.images] : [v.image]); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex-1 py-2 rounded-xl font-black text-[11px] uppercase border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition">Edit</button><button onClick={() => deleteVehicle(v.id)} className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition">🗑</button></div></div></div>))}</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">{ownerFleet.map(v => (<div key={v.id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition ${vAvail(v) ? 'border-slate-200' : 'border-slate-200 opacity-70'}`}><div className="relative aspect-[16/9] bg-slate-100 overflow-hidden"><img src={v.image} alt={v.name} className="w-full h-full object-cover"/><div className={`absolute top-3 left-3 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shadow-sm ${vAvail(v) ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-white'}`}>{vAvail(v) ? t.liveLabel : t.hiddenLabel}</div><div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-xs font-black">{typeIcon(v.type)}</div></div><div className="p-4"><div className="flex items-start justify-between gap-2 mb-1"><h4 className="font-black text-slate-900 text-sm leading-tight">{v.name}</h4><div className="text-right flex-shrink-0"><p className="font-black text-slate-900 text-sm">Rs.{vPrice(v).toLocaleString()}</p><p className="text-[10px] text-emerald-600 font-bold">You get Rs.{Math.round(vPrice(v) * 0.90).toLocaleString()}/day</p></div></div><p className="text-xs text-slate-400 mb-1">{v.transmission} · {v.fuel} · {v.location}</p><div className="flex gap-2 pt-3 border-t border-slate-100"><button onClick={() => toggleAvail(v.id)} className={`flex-1 py-2 rounded-xl font-black text-[11px] uppercase tracking-wide border transition ${vAvail(v) ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600' : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}>{vAvail(v) ? t.hide : t.goLive}</button><button onClick={() => { setEditingId(v.id); setShowAddForm(false); setNewV({ name: v.name, type: v.type, transmission: v.transmission, fuel: v.fuel, pricePerDay: vPrice(v), description: v.description || '', mapLink: (v as any).mapLink || '', weeklyPrice: (v as any).weekly_price || 0, monthlyPrice: (v as any).monthly_price || 0, kmPerDay: (v as any).km_per_day || 200, extraKmCharge: (v as any).extra_km_charge || 50, depositAmount: (v as any).deposit_amount || 0, driverOption: (v as any).driver_option || 'self_drive', district: v.location || '', deliveryOption: (v as any).delivery_option || 'both', revenueLicenceExpiry: (v as any).revenue_licence_expiry || '', insuranceExpiry: (v as any).insurance_expiry || '' }); setPhotos(v.images && v.images.length > 0 ? [...v.images] : [v.image]); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="flex-1 py-2 rounded-xl font-black text-[11px] uppercase border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition">Edit</button><button onClick={() => deleteVehicle(v.id)} className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition">🗑</button></div>
+                          {/* Calendar toggle */}
+                          <details className="border-t border-slate-100 pt-3 mt-1">
+                            <summary className="text-[10px] font-black text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-600 transition list-none flex items-center gap-1.5">
+                              <span>📅 Availability Calendar</span>
+                            </summary>
+                            <div className="mt-3">
+                              <VehicleCalendar vehicleId={v.id} ownerId={ownerAcc?.id} isOwner={true} />
+                            </div>
+                          </details>
+                        </div></div>))}</div>
                   )}
                 </div>
               </>
@@ -2279,7 +2503,11 @@ export default function Home() {
                     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                       <div className="flex border-b border-slate-200 bg-slate-50">{([['details', t.details], ['docs', t.documents], ['faq', t.faq]] as [string, string][]).map(([k, l]) => (<button key={k} onClick={() => setDetailTab(k as any)} className={`flex-1 py-3.5 text-xs font-black uppercase tracking-wider transition ${detailTab === k ? 'bg-white text-slate-900 border-b-2 border-red-500' : 'text-slate-400 hover:text-slate-700'}`}>{l}</button>))}</div>
                       <div className="p-5">
-                        {detailTab === 'details' && (<div className="space-y-4"><div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">{([[t.transmission, selectedVehicle.transmission], [t.fuel, selectedVehicle.fuel], ['KM/Day', (selectedVehicle as any).km_per_day > 0 ? `${(selectedVehicle as any).km_per_day} km` : 'Unlimited'], ['Deposit', (selectedVehicle as any).deposit_amount > 0 ? `Rs. ${(selectedVehicle as any).deposit_amount.toLocaleString()}` : 'No deposit']] as [string, string][]).map(([l, v]) => (<div key={l} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="text-[10px] text-slate-400 font-bold uppercase">{l}</p><p className="font-bold text-sm text-slate-800 mt-0.5">{v}</p></div>))}</div>{(selectedVehicle as any).extra_km_charge > 0 && (selectedVehicle as any).km_per_day > 0 && (<p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-4 py-2.5 border border-slate-200">🛣️ First <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included · Extra km charged at <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span></p>)}{((selectedVehicle as any).weekly_price > 0 || (selectedVehicle as any).monthly_price > 0) && (<div className="grid grid-cols-2 gap-3">{(selectedVehicle as any).weekly_price > 0 && (<div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center"><p className="text-[10px] text-blue-400 font-black uppercase">Weekly Rate</p><p className="font-black text-blue-700 text-lg">Rs. {(selectedVehicle as any).weekly_price.toLocaleString()}</p><p className="text-[10px] text-blue-400">per week (7 days)</p></div>)}{(selectedVehicle as any).monthly_price > 0 && (<div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center"><p className="text-[10px] text-emerald-400 font-black uppercase">Monthly Rate</p><p className="font-black text-emerald-700 text-lg">Rs. {(selectedVehicle as any).monthly_price.toLocaleString()}</p><p className="text-[10px] text-emerald-400">per month (28 days)</p></div>)}</div>)}<p className="text-sm text-slate-600 leading-relaxed">{selectedVehicle.description}</p><VehicleReviews vehicleId={selectedVehicle.id}/></div>)}
+                        {detailTab === 'details' && (<div className="space-y-4">
+                          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                            <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">📅 Availability Calendar</p>
+                            <VehicleCalendar vehicleId={selectedVehicle.id} isOwner={false} />
+                          </div><div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">{([[t.transmission, selectedVehicle.transmission], [t.fuel, selectedVehicle.fuel], ['KM/Day', (selectedVehicle as any).km_per_day > 0 ? `${(selectedVehicle as any).km_per_day} km` : 'Unlimited'], ['Deposit', (selectedVehicle as any).deposit_amount > 0 ? `Rs. ${(selectedVehicle as any).deposit_amount.toLocaleString()}` : 'No deposit']] as [string, string][]).map(([l, v]) => (<div key={l} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="text-[10px] text-slate-400 font-bold uppercase">{l}</p><p className="font-bold text-sm text-slate-800 mt-0.5">{v}</p></div>))}</div>{(selectedVehicle as any).extra_km_charge > 0 && (selectedVehicle as any).km_per_day > 0 && (<p className="text-xs text-slate-500 bg-slate-50 rounded-xl px-4 py-2.5 border border-slate-200">🛣️ First <span className="font-bold">{(selectedVehicle as any).km_per_day} km/day</span> included · Extra km charged at <span className="font-bold">Rs. {(selectedVehicle as any).extra_km_charge}/km</span></p>)}{((selectedVehicle as any).weekly_price > 0 || (selectedVehicle as any).monthly_price > 0) && (<div className="grid grid-cols-2 gap-3">{(selectedVehicle as any).weekly_price > 0 && (<div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center"><p className="text-[10px] text-blue-400 font-black uppercase">Weekly Rate</p><p className="font-black text-blue-700 text-lg">Rs. {(selectedVehicle as any).weekly_price.toLocaleString()}</p><p className="text-[10px] text-blue-400">per week (7 days)</p></div>)}{(selectedVehicle as any).monthly_price > 0 && (<div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center"><p className="text-[10px] text-emerald-400 font-black uppercase">Monthly Rate</p><p className="font-black text-emerald-700 text-lg">Rs. {(selectedVehicle as any).monthly_price.toLocaleString()}</p><p className="text-[10px] text-emerald-400">per month (28 days)</p></div>)}</div>)}<p className="text-sm text-slate-600 leading-relaxed">{selectedVehicle.description}</p><VehicleReviews vehicleId={selectedVehicle.id}/></div>)}
                         {detailTab === 'docs' && (<div className="space-y-2 text-sm"><p className="font-bold text-slate-900 mb-3">Required at pickup:</p>{['National ID (NIC)', 'Valid Driving License', 'Phone for WhatsApp'].map(i => (<div key={i} className="flex items-center gap-2 text-slate-700"><span className="text-emerald-500 font-bold">✓</span>{i}</div>))}</div>)}
                         {detailTab === 'faq' && (<div className="space-y-3">{[['Is fuel included?', 'No — return with same level.'], ['Can I extend?', 'Yes — WhatsApp the shop.'], ['Security deposit?', 'Most vehicles: no deposit.']].map(([q, a]) => (<div key={q} className="bg-slate-50 p-3 rounded-xl border border-slate-200"><p className="font-bold text-slate-900 text-sm">{q}</p><p className="text-slate-500 mt-0.5 text-xs">{a}</p></div>))}</div>)}
                       </div>
