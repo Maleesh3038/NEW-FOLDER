@@ -1343,21 +1343,36 @@ export default function Home() {
   };
   const deleteAccount = async (role: 'owner'|'customer') => {
     const name = role === 'owner' ? ownerAcc?.shop_name : `${custAcc?.first_name} ${custAcc?.last_name}`;
-    const confirm1 = confirm(`⚠️ Delete your account "${name}"?\n\nThis will permanently delete:\n• Your account & profile\n• All your bookings history\n\nThis cannot be undone!`);
+    const confirm1 = confirm(`⚠️ Delete your account "${name}"?\n\nThis will permanently delete your account and all data.\n\nThis cannot be undone!`);
     if (!confirm1) return;
-    const confirm2 = confirm('Are you absolutely sure? Type OK to confirm deletion.');
+    const confirm2 = confirm('Final confirmation — are you absolutely sure?');
     if (!confirm2) return;
 
     try {
       const id = role === 'owner' ? ownerAcc?.id : custAcc?.id;
       const table = role === 'owner' ? 'owners' : 'customers';
 
-      // Delete from Supabase
-      await supabase.from('bookings').update({
-        [role === 'owner' ? 'owner_id' : 'customer_id']: null
-      }).eq(role === 'owner' ? 'owner_id' : 'customer_id', id);
+      // 1. Nullify bookings (keep booking records but remove user link)
+      await supabase.from('bookings')
+        .update({ [role === 'owner' ? 'owner_id' : 'customer_id']: null })
+        .eq(role === 'owner' ? 'owner_id' : 'customer_id', id);
 
-      await supabase.from(table).delete().eq('id', id);
+      // 2. If owner — delete their vehicles
+      if (role === 'owner') {
+        const { data: vehicles } = await supabase.from('vehicles').select('id').eq('owner_id', id);
+        if (vehicles) {
+          for (const v of vehicles) {
+            await supabase.from('vehicle_photos').delete().eq('vehicle_id', v.id);
+            await supabase.from('vehicle_blocked_dates').delete().eq('vehicle_id', v.id);
+          }
+          await supabase.from('vehicles').delete().eq('owner_id', id);
+        }
+      }
+
+      // 3. Soft delete — set deleted_at (allows email re-use)
+      await supabase.from(table)
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
 
       clearSession();
       setSessionEmail(null); setSessionRole(null);

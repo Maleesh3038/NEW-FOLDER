@@ -164,7 +164,7 @@ export default function AdminPage() {
     setLoading(true);
     const [ow,cu,vh,bk,tr] = await Promise.all([
       supabase.from('owners').select('*').order('created_at',{ascending:false}).limit(500),
-      supabase.from('customers').select('*').order('created_at',{ascending:false}).limit(1000),
+      supabase.from('customers').select('*').is('deleted_at', null).order('created_at',{ascending:false}).limit(1000),
       supabase.from('vehicles').select('*,vehicle_photos(storage_url,sort_order)').order('created_at',{ascending:false}).limit(500),
       supabase.from('bookings').select('*').order('booked_at',{ascending:false}).limit(1000),
       supabase.from('traffic').select('*').order('date',{ascending:false}).limit(60),
@@ -190,7 +190,7 @@ export default function AdminPage() {
           .then(({data})=>{ if(data) setOwners(data); });
       })
       .on('postgres_changes',{event:'*',schema:'public',table:'customers'},()=>{
-        supabase.from('customers').select('*').order('created_at',{ascending:false}).limit(1000)
+        supabase.from('customers').select('*').is('deleted_at', null).order('created_at',{ascending:false}).limit(1000)
           .then(({data})=>{ if(data) setCustomers(data); });
       })
       .on('postgres_changes',{event:'*',schema:'public',table:'vehicles'},()=>{
@@ -213,15 +213,33 @@ export default function AdminPage() {
 
   // ── Actions
   const deleteUser = async (id: string, type: 'owner'|'customer', name: string) => {
-    if (!confirm(`Permanently delete "${name}"?\n\nThis will delete their account, bookings history and all data.\n\nThis CANNOT be undone!`)) return;
+    if (!confirm(`Delete "${name}"?\n\nThis will remove their account. They can re-register with the same email if needed.`)) return;
     const table = type === 'owner' ? 'owners' : 'customers';
-    // Nullify bookings first
-    await supabase.from('bookings').update({ [type === 'owner' ? 'owner_id' : 'customer_id']: null }).eq(type === 'owner' ? 'owner_id' : 'customer_id', id);
-    // Delete account
-    await supabase.from(table).delete().eq('id', id);
+
+    // 1. Nullify bookings
+    await supabase.from('bookings')
+      .update({ [type === 'owner' ? 'owner_id' : 'customer_id']: null })
+      .eq(type === 'owner' ? 'owner_id' : 'customer_id', id);
+
+    // 2. If owner — remove vehicles
+    if (type === 'owner') {
+      const { data: vehicles } = await supabase.from('vehicles').select('id').eq('owner_id', id);
+      if (vehicles) {
+        for (const v of vehicles) {
+          await supabase.from('vehicle_photos').delete().eq('vehicle_id', v.id);
+          await supabase.from('vehicle_blocked_dates').delete().eq('vehicle_id', v.id);
+        }
+        await supabase.from('vehicles').delete().eq('owner_id', id);
+      }
+    }
+
+    // 3. Soft delete — allows email re-use
+    await supabase.from(table).update({ deleted_at: new Date().toISOString() }).eq('id', id);
+
+    // Remove from UI
     if (type === 'owner') setOwners(p => p.filter(o => o.id !== id));
     else setCustomers(p => p.filter(c => c.id !== id));
-    showToast(`${name} deleted permanently`, 'err');
+    showToast(`${name} deleted`, 'err');
   };
 
   const toggleBlockOwner = async(id:string,blocked:boolean)=>{
