@@ -1024,6 +1024,7 @@ const Spinner = () => (
   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin flex-shrink-0"/>
 );
 
+
 export default function Home() {
   const [lang, setLang] = useState<LangKey>('EN');
   const t = T[lang];
@@ -2193,7 +2194,16 @@ export default function Home() {
             <>
               <header className="relative bg-slate-900 text-white pt-14 pb-12 px-4 text-center overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none select-none"><img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1600" className="w-full h-full object-cover opacity-20" alt=""/><div className="absolute inset-0 bg-gradient-to-b from-slate-900/10 to-slate-900/80"/></div>
-                <div className="relative max-w-3xl mx-auto space-y-3 pointer-events-none"><span className="inline-block text-xs bg-white/10 border border-white/20 text-white/80 font-bold px-3 py-1 rounded-full">🇱🇰 Sri Lanka's #1 Vehicle Rental Platform</span><h1 className="text-3xl md:text-6xl font-black tracking-tight leading-tight">Rent cars, bikes &<br className="hidden sm:block"/> tuk-tuks in<br className="hidden sm:block"/> Sri Lanka</h1><p className="text-slate-300 text-sm md:text-base font-medium">Verified hubs · No hidden fees · Book in 60 seconds</p></div>
+                <div className="relative max-w-7xl mx-auto flex items-center gap-8">
+                  {/* Left — text */}
+                  <div className="flex-1 space-y-3 pointer-events-none">
+                    <span className="inline-block text-xs bg-white/10 border border-white/20 text-white/80 font-bold px-3 py-1 rounded-full">🇱🇰 Sri Lanka's #1 Vehicle Rental Platform</span>
+                    <h1 className="text-3xl md:text-6xl font-black tracking-tight leading-tight">Rent cars, bikes &<br className="hidden sm:block"/> tuk-tuks in<br className="hidden sm:block"/> Sri Lanka</h1>
+                    <p className="text-slate-300 text-sm md:text-base font-medium">Verified hubs · No hidden fees · Book in 60 seconds</p>
+                  </div>
+
+
+                </div>
               </header>
               <div className="bg-white border-b border-slate-200 shadow-md">
                 <div className="max-w-6xl mx-auto px-4 py-4">
