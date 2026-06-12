@@ -1076,11 +1076,11 @@ function HeroStats() {
 // ── Hero Background Slideshow
 function HeroBgSlider() {
   const photos = [
-    'https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1600',
-    'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=1600',
-    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1600',
-    'https://images.unsplash.com/photo-1516738901171-8eb4fc13bd20?q=80&w=1600',
-    'https://images.unsplash.com/photo-1555215695-3004980ad54e?q=80&w=1600',
+    '/hero-1.jpg',
+    '/hero-2.jpg',
+    '/hero-3.jpg',
+    '/hero-4.jpg',
+    '/hero-5.jpg',
   ];
   const [current, setCurrent] = useState(0);
 
