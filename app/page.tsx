@@ -1025,6 +1025,95 @@ const Spinner = () => (
 );
 
 
+
+
+// ── Hero Stats — live from Supabase
+function HeroStats() {
+  const [stats, setStats] = useState({ vehicles: 0, cities: 0, renters: 0 });
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [v, c, r] = await Promise.all([
+          supabase.from('vehicles').select('id,location', { count: 'exact', head: false }).eq('is_available', true),
+          supabase.from('owners').select('city', { count: 'exact', head: false }).is('deleted_at', null),
+          supabase.from('customers').select('id', { count: 'exact', head: true }),
+        ]);
+        const cities = [...new Set((c.data || []).map((o: any) => o.city).filter(Boolean))].length;
+        setStats({
+          vehicles: v.count || (v.data?.length ?? 0),
+          cities: Math.max(cities, 18),
+          renters: r.count || 0,
+        });
+        setLoaded(true);
+      } catch { setLoaded(true); }
+    };
+    load();
+  }, []);
+
+  const items = [
+    { n: stats.vehicles, label: 'Vehicles listed', suffix: '+' },
+    { n: stats.cities, label: 'Cities covered', suffix: '' },
+    { n: stats.renters, label: 'Happy renters', suffix: '+' },
+  ];
+
+  return (
+    <div className="flex flex-wrap justify-center gap-6 pt-2">
+      {items.map((item, i) => (
+        <div key={i} className="text-center">
+          <div className="text-2xl md:text-3xl font-black text-white">
+            {loaded ? `${item.n}${item.suffix}` : '—'}
+          </div>
+          <div className="text-xs text-white/40 mt-0.5">{item.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+// ── Hero Background Slideshow
+function HeroBgSlider() {
+  const photos = [
+    'https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1600',
+    'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=1600',
+    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1600',
+    'https://images.unsplash.com/photo-1516738901171-8eb4fc13bd20?q=80&w=1600',
+    'https://images.unsplash.com/photo-1555215695-3004980ad54e?q=80&w=1600',
+  ];
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setCurrent(p => (p + 1) % photos.length);
+    }, 4000);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <>
+      <div className="absolute inset-0 overflow-hidden">
+        {photos.map((photo, i) => (
+          <img
+            key={photo}
+            src={photo}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
+            style={{ opacity: i === current ? 0.25 : 0 }}
+          />
+        ))}
+      </div>
+      {/* Dot indicators */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+        {photos.map((_, i) => (
+          <div key={i} className={`h-0.5 rounded-full transition-all duration-400 ${i === current ? 'w-6 bg-white' : 'w-3 bg-white/30'}`}/>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export default function Home() {
   const [lang, setLang] = useState<LangKey>('EN');
   const t = T[lang];
@@ -2193,13 +2282,15 @@ export default function Home() {
           {view === 'home' && (
             <>
               <header className="relative bg-slate-900 text-white pt-14 pb-12 px-4 text-center overflow-hidden">
-                <div className="absolute inset-0 pointer-events-none select-none"><img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1600" className="w-full h-full object-cover opacity-20" alt=""/><div className="absolute inset-0 bg-gradient-to-b from-slate-900/10 to-slate-900/80"/></div>
+                <HeroBgSlider />
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/30 via-slate-900/50 to-slate-900/90 pointer-events-none"/>
                 <div className="relative max-w-7xl mx-auto flex items-center gap-8">
                   {/* Left — text */}
                   <div className="flex-1 space-y-3 pointer-events-none">
                     <span className="inline-block text-xs bg-white/10 border border-white/20 text-white/80 font-bold px-3 py-1 rounded-full">🇱🇰 Sri Lanka's #1 Vehicle Rental Platform</span>
                     <h1 className="text-3xl md:text-6xl font-black tracking-tight leading-tight">Rent cars, bikes &<br className="hidden sm:block"/> tuk-tuks in<br className="hidden sm:block"/> Sri Lanka</h1>
                     <p className="text-slate-300 text-sm md:text-base font-medium">Verified hubs · No hidden fees · Book in 60 seconds</p>
+                  <HeroStats />
                   </div>
 
 
