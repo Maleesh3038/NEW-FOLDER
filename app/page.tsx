@@ -1077,10 +1077,6 @@ function HeroStats() {
 function HeroBgSlider() {
   const photos = [
     '/hero-1.jpg',
-    '/hero-2.jpg',
-    '/hero-3.jpg',
-    '/hero-4.jpg',
-    '/hero-5.jpg',
   ];
   const [current, setCurrent] = useState(0);
 
@@ -1100,7 +1096,7 @@ function HeroBgSlider() {
             src={photo}
             alt=""
             className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-            style={{ opacity: i === current ? 0.25 : 0 }}
+            style={{ opacity: i === current ? 0.45 : 0 }}
           />
         ))}
       </div>
