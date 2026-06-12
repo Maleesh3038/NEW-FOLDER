@@ -1076,7 +1076,7 @@ function HeroStats() {
 // ── Hero Background Slideshow
 function HeroBgSlider() {
   const photos = [
-    '/hero-1.png',
+    '/hero-1.jpg',
   ];
   const [current, setCurrent] = useState(0);
 
