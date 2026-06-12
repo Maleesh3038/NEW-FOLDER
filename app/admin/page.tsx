@@ -58,7 +58,7 @@ function AdminResetPasswordModal({ user, userType, onClose, showToast }: {
       const res = await fetch('/api/auth/admin-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, userType, newPassword }),
+        body: JSON.stringify({ userId: user.id, userType, newPassword, adminSecret: 'drivo-admin-2026' }),
       });
       const data = await res.json();
       if (data.error) { showToast(data.error, 'err'); setLoading(false); return; }
