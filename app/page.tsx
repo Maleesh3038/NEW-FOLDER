@@ -652,8 +652,8 @@ function PartnerLeaderboard() {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div>
-            <h2 className="font-black text-slate-900 text-base">🏆 Top Partners</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">Ranked by real customer data · Updated daily</p>
+            <h2 className="font-black text-slate-900 text-base">🏆 {t.topPartners}</h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">{lang === 'SI' ? 'සැබෑ දත්ත ලා rank කෙරේ' : lang === 'RU' ? 'По реальным данным' : lang === 'AR' ? 'مرتبة حسب البيانات الحقيقية' : 'Ranked by real customer data · Updated daily'}</p>
           </div>
           <div className="flex gap-1.5 bg-slate-100 rounded-xl p-1">
             {(['bookings', 'rating'] as const).map(t => (
@@ -695,14 +695,14 @@ function PartnerLeaderboard() {
                   <p className="font-black text-slate-900 text-sm truncate">{p.shop_name}</p>
                   {p.verified && <span className="text-[9px] bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded-full font-black flex-shrink-0">✅</span>}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">📍 {p.city || 'Sri Lanka'} · 🚗 {p.vehicleCount} vehicle{p.vehicleCount !== 1 ? 's' : ''}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">📍 {p.city || 'Sri Lanka'} · 🚗 {p.vehicleCount} {lang === 'SI' ? `වාහන ${p.vehicleCount}` : `${p.vehicleCount} vehicle${p.vehicleCount !== 1 ? 's' : ''}`}</p>
               </div>
               {/* Score */}
               <div className="text-right flex-shrink-0">
                 {tab === 'bookings' ? (
                   <>
                     <p className="font-black text-slate-900 text-sm">{p.bookingCount}</p>
-                    <p className="text-[10px] text-slate-400">bookings</p>
+                    <p className="text-[10px] text-slate-400">{lang === 'SI' ? 'වෙන්කිරීම්' : lang === 'RU' ? 'брони' : lang === 'AR' ? 'حجوزات' : 'bookings'}</p>
                   </>
                 ) : (
                   <>
@@ -720,7 +720,7 @@ function PartnerLeaderboard() {
         {/* Footer */}
         {loaded && sorted.length > 0 && (
           <div className="px-5 py-3 border-t border-slate-50 bg-slate-50">
-            <p className="text-[10px] text-slate-400 text-center">Rankings update automatically as bookings & reviews come in 🔄</p>
+            <p className="text-[10px] text-slate-400 text-center">{lang === 'SI' ? 'ස්වයංක්‍රීයව යාවත්කාලීන වේ 🔄' : lang === 'RU' ? 'Обновляется автоматически 🔄' : lang === 'AR' ? 'يتحدث تلقائياً 🔄' : 'Rankings update automatically as bookings & reviews come in 🔄'}</p>
           </div>
         )}
       </div>
