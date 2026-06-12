@@ -1467,8 +1467,8 @@ export default function Home() {
           </button>
           <div className="hidden md:flex items-center gap-5 text-sm font-semibold text-slate-500">
             <button onClick={() => { resetToHome(); setRentalPeriod('daily'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod === 'daily' ? 'text-slate-900 border-b-2 border-slate-900' : ''}`}>{t.dailyRentals}</button>
-            <button onClick={() => { resetToHome(); setRentalPeriod('weekly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod === 'weekly' ? 'text-slate-900 border-b-2 border-slate-900' : ''}`}>{t.monthly}</button>
-            <button onClick={() => { resetToHome(); setRentalPeriod('monthly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod === 'monthly' ? 'text-slate-900 border-b-2 border-slate-900' : ''}`}>{t.longterm}</button>
+            <button onClick={() => { resetToHome(); setRentalPeriod('weekly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod === 'weekly' ? 'text-slate-900 border-b-2 border-slate-900' : ''}`}>Weekly</button>
+            <button onClick={() => { resetToHome(); setRentalPeriod('monthly'); }} className={`py-2 hover:text-slate-900 transition ${rentalPeriod === 'monthly' ? 'text-slate-900 border-b-2 border-slate-900' : ''}`}>Monthly</button>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <select value={lang} onChange={e => setLang(e.target.value as LangKey)} className="bg-slate-100 text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 outline-none cursor-pointer">
