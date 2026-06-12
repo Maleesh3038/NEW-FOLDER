@@ -1482,18 +1482,37 @@ export default function Home() {
             </button>
             <div className="hidden md:flex items-center gap-2">
               {sessionRole === 'owner' ? (
-                <><button onClick={() => setView('ownerDash')} className={`text-xs font-black px-3 py-2 rounded-xl border transition ${view === 'ownerDash' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{t.ownerDashboard}</button><button onClick={logout} className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-red-500 transition">{t.logOut}</button></>
+                <><button onClick={() => setView('ownerDash')} className={`flex items-center gap-2 text-xs font-black px-3 py-2 rounded-xl border transition ${view === 'ownerDash' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>
+                    <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 bg-slate-600 flex items-center justify-center text-[9px] font-black text-white">
+                      {ownerAcc?.avatar_url ? <img src={ownerAcc.avatar_url} alt="" className="w-full h-full object-cover"/> : (ownerAcc?.shop_name || 'O').charAt(0).toUpperCase()}
+                    </div>
+                    {t.ownerDashboard}
+                  </button><button onClick={logout} className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-red-500 transition">{t.logOut}</button></>
               ) : sessionRole === 'customer' ? (
-                <><button onClick={() => setView('custDash')} className={`text-xs font-black px-3 py-2 rounded-xl border transition ${view === 'custDash' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>{t.myDashboard}</button><button onClick={logout} className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-red-500 transition">{t.logOut}</button></>
+                <><button onClick={() => setView('custDash')} className={`flex items-center gap-2 text-xs font-black px-3 py-2 rounded-xl border transition ${view === 'custDash' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900'}`}>
+                    <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 bg-blue-600 flex items-center justify-center text-[9px] font-black text-white">
+                      {(custAcc as any)?.avatar_url ? <img src={(custAcc as any).avatar_url} alt="" className="w-full h-full object-cover"/> : (custAcc?.first_name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    {t.myDashboard}
+                  </button><button onClick={logout} className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 hover:text-red-500 transition">{t.logOut}</button></>
               ) : (
                 <><button onClick={() => openAuth('customer')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition">🚗 Rent a Vehicle</button><button onClick={() => openAuth('owner')} className="text-xs font-black px-3 py-2 rounded-xl bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 transition">{t.partnerLogin}</button></>
               )}
             </div>
             {/* Mobile logged in indicator */}
             {sessionRole && (
-              <button className="md:hidden flex items-center justify-center w-9 h-9 bg-slate-900 text-white rounded-xl text-xs font-black flex-shrink-0"
+              <button
+                className="md:hidden flex items-center justify-center w-9 h-9 bg-slate-900 text-white rounded-xl text-xs font-black flex-shrink-0 overflow-hidden border-2 border-slate-700 hover:border-slate-500 transition"
                 onClick={() => setView(sessionRole === 'owner' ? 'ownerDash' : 'custDash')}>
-                {sessionRole === 'owner' ? '🔑' : '👤'}
+                {(sessionRole === 'owner' && ownerAcc?.avatar_url) ? (
+                  <img src={ownerAcc.avatar_url} alt="" className="w-full h-full object-cover"/>
+                ) : (sessionRole === 'customer' && (custAcc as any)?.avatar_url) ? (
+                  <img src={(custAcc as any).avatar_url} alt="" className="w-full h-full object-cover"/>
+                ) : sessionRole === 'owner' ? (
+                  <span>{(ownerAcc?.shop_name || 'O').charAt(0).toUpperCase()}</span>
+                ) : (
+                  <span>{(custAcc?.first_name || 'U').charAt(0).toUpperCase()}</span>
+                )}
               </button>
             )}
           </div>
