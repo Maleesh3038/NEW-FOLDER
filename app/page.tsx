@@ -1096,7 +1096,7 @@ function HeroBgSlider() {
             src={photo}
             alt=""
             className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-            style={{ opacity: i === current ? 0.3 : 0 }}
+            style={{ opacity: i === current ? 0.3 : 0, objectPosition: 'center 60%' }}
           />
         ))}
       </div>
