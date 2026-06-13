@@ -163,7 +163,7 @@ export default function AdminPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     const [ow,cu,vh,bk,tr] = await Promise.all([
-      supabase.from('owners').select('*').order('created_at',{ascending:false}).limit(500),
+      supabase.from('owners').select('*').is('deleted_at',null).order('created_at',{ascending:false}).limit(500),
       supabase.from('customers').select('*').is('deleted_at', null).order('created_at',{ascending:false}).limit(1000),
       supabase.from('vehicles').select('*,vehicle_photos(storage_url,sort_order)').order('created_at',{ascending:false}).limit(500),
       supabase.from('bookings').select('*').order('booked_at',{ascending:false}).limit(1000),
@@ -186,7 +186,7 @@ export default function AdminPage() {
           .then(({data})=>{ if(data) setBookings(data); });
       })
       .on('postgres_changes',{event:'*',schema:'public',table:'owners'},()=>{
-        supabase.from('owners').select('*').order('created_at',{ascending:false}).limit(500)
+        supabase.from('owners').select('*').is('deleted_at',null).order('created_at',{ascending:false}).limit(500)
           .then(({data})=>{ if(data) setOwners(data); });
       })
       .on('postgres_changes',{event:'*',schema:'public',table:'customers'},()=>{
