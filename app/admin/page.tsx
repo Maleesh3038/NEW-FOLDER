@@ -998,6 +998,7 @@ export default function AdminPage() {
                                 🔑 PW
                               </button>
                               <button onClick={()=>toggleBlockOwner(o.id,o.blocked)} className={`text-[11px] font-black px-2.5 py-1 rounded-lg transition ${o.blocked?'bg-emerald-900/50 hover:bg-emerald-600 text-emerald-400':'bg-red-900/50 hover:bg-red-600 text-red-400'}`}>{o.blocked?'Unblock':'Block'}</button>
+                                <button onClick={()=>deleteUser(o.id,'owner',o.shop_name||o.email)} className="text-[11px] font-black px-2.5 py-1 rounded-lg transition bg-slate-800 hover:bg-red-900 text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-700">🗑 Delete</button>
                             </td>
                           </tr>
                         );
@@ -1061,6 +1062,7 @@ export default function AdminPage() {
                               🔑 PW
                             </button>
                             <button onClick={()=>toggleBlockCustomer(c.id,c.blocked)} className={`text-[11px] font-black px-2.5 py-1 rounded-lg transition ${c.blocked?'bg-emerald-900/50 hover:bg-emerald-600 text-emerald-400':'bg-red-900/50 hover:bg-red-600 text-red-400'}`}>{c.blocked?'Unblock':'Block'}</button>
+                                <button onClick={()=>deleteUser(c.id,'customer',`${c.first_name} ${c.last_name}`||c.email)} className="text-[11px] font-black px-2.5 py-1 rounded-lg transition bg-slate-800 hover:bg-red-900 text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-700">🗑 Delete</button>
                           </td>
                         </tr>
                       ))}
