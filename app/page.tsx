@@ -34,7 +34,9 @@ function DrivoLogo({ className = 'w-9 h-9' }: { className?: string }) {
 function mapVehicle(v: any): RawVehicle {
   return {
     ...v,
-    image: v.vehicle_photos?.[0]?.storage_url || '',
+    image: v.vehicle_photos
+      ?.sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+      ?.[0]?.storage_url || '',
     images: v.vehicle_photos
       ?.sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
       .map((p: any) => p.storage_url) || [],
@@ -384,7 +386,7 @@ function NearbyVehiclesSection({ allVehicles, onVehicleClick }: {
           <div key={v.id} onClick={() => onVehicleClick(v)}
             className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer group">
             <div className="aspect-video bg-slate-100 overflow-hidden relative">
-              <img src={v.image || ''} alt={v.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"/>
+              <img src={v.images?.[0] || v.image || ''} alt={v.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"/>
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5">
                 <p className="text-white text-[10px] font-black truncate">{v.name}</p>
               </div>

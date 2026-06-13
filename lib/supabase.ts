@@ -247,7 +247,7 @@ export async function loginCustomer(
 export async function getAvailableVehicles(): Promise<DbVehicle[]> {
   const { data, error } = await supabase
     .from('vehicles')
-    .select('*, vehicle_photos(storage_url, sort_order), owners(verified)')
+    .select('*, vehicle_photos(storage_url, sort_order), owners(verified, avatar_url)')
     .eq('is_available', true)
     .order('created_at', { ascending: false });
   if (error) return [];
