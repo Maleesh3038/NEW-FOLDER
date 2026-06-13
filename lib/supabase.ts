@@ -20,6 +20,7 @@ export type DbOwner = {
   avatar_url?: string;
   agreement_accepted?: boolean;
   agreement_accepted_at?: string;
+  deleted_at?: string;
   created_at?: string;
 };
 
@@ -35,6 +36,7 @@ export type DbCustomer = {
   driving_license?: string;
   blocked?: boolean;
   avatar_url?: string;
+  deleted_at?: string;
   created_at?: string;
 };
 
@@ -46,11 +48,11 @@ export type DbVehicle = {
   transmission: string;
   fuel: string;
   price_per_day: number;
-  weekly_price?: number;
-  monthly_price?: number;
-  km_per_day?: number;
-  extra_km_charge?: number;
-  deposit_amount?: number;
+  weekly_price?: number | null;
+  monthly_price?: number | null;
+  km_per_day?: number | null;
+  extra_km_charge?: number | null;
+  deposit_amount?: number | null;
   location: string;
   shop_name: string;
   rating?: number;
@@ -113,7 +115,7 @@ export async function uploadPhoto(file: File | string, vehicleId: string, index:
 }
 
 // ══════════════════════════════
-//  AUTH — uses /api/auth/login
+//  AUTH
 // ══════════════════════════════
 
 export async function registerOwner(
@@ -131,10 +133,9 @@ export async function registerOwner(
 ): Promise<{ data: DbOwner | null; error: string | null }> {
   try {
     const { data: existing } = await supabase
-      .from('owners').select('id').eq('email', email.toLowerCase().trim()).single();
-    if (existing) return { data: null, error: 'Email already registered.' };
+      .from('owners').select('id, deleted_at').eq('email', email.toLowerCase().trim()).single();
+    if (existing && !existing.deleted_at) return { data: null, error: 'Email already registered.' };
 
-    // Hash password via API
     const hashRes = await fetch('/api/auth/hash-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -193,8 +194,8 @@ export async function registerCustomer(
 ): Promise<{ data: DbCustomer | null; error: string | null }> {
   try {
     const { data: existing } = await supabase
-      .from('customers').select('id').eq('email', email.toLowerCase().trim()).single();
-    if (existing) return { data: null, error: 'Email already registered.' };
+      .from('customers').select('id, deleted_at').eq('email', email.toLowerCase().trim()).single();
+    if (existing && !existing.deleted_at) return { data: null, error: 'Email already registered.' };
 
     const hashRes = await fetch('/api/auth/hash-password', {
       method: 'POST',
@@ -276,9 +277,20 @@ export async function addVehicle(
     price_per_day: vehicle.price_per_day,
     location: vehicle.location,
     shop_name: vehicle.shop_name,
-    description: vehicle.description,
-    map_link: vehicle.map_link,
+    description: vehicle.description || null,
+    map_link: vehicle.map_link || null,
     is_available: true,
+    rating: 0,
+    // ✅ Only save if partner entered — otherwise NULL
+    weekly_price: vehicle.weekly_price || null,
+    monthly_price: vehicle.monthly_price || null,
+    km_per_day: vehicle.km_per_day || null,
+    extra_km_charge: vehicle.extra_km_charge || null,
+    deposit_amount: vehicle.deposit_amount || 0,
+    driver_option: vehicle.driver_option || 'self_drive',
+    delivery_option: vehicle.delivery_option || 'both',
+    revenue_licence_expiry: vehicle.revenue_licence_expiry || null,
+    insurance_expiry: vehicle.insurance_expiry || null,
   }).select().single();
 
   if (error || !data) return { id: null, error: error?.message || 'Failed' };
@@ -304,18 +316,19 @@ export async function updateVehicle(
     fuel: updates.fuel,
     price_per_day: updates.price_per_day,
     location: updates.location,
-    description: updates.description,
-    map_link: updates.map_link,
+    description: updates.description || null,
+    map_link: updates.map_link || null,
     is_available: updates.is_available,
     driver_option: updates.driver_option,
     delivery_option: updates.delivery_option,
-    revenue_licence_expiry: updates.revenue_licence_expiry,
-    insurance_expiry: updates.insurance_expiry,
-    weekly_price: updates.weekly_price,
-    monthly_price: updates.monthly_price,
-    km_per_day: updates.km_per_day,
-    extra_km_charge: updates.extra_km_charge,
-    deposit_amount: updates.deposit_amount,
+    revenue_licence_expiry: updates.revenue_licence_expiry || null,
+    insurance_expiry: updates.insurance_expiry || null,
+    // ✅ Only save if entered — otherwise NULL
+    weekly_price: updates.weekly_price || null,
+    monthly_price: updates.monthly_price || null,
+    km_per_day: updates.km_per_day || null,
+    extra_km_charge: updates.extra_km_charge || null,
+    deposit_amount: updates.deposit_amount || 0,
   }).eq('id', vehicleId);
 
   if (error) return { error: error.message };
@@ -408,12 +421,12 @@ export async function getTrafficData(): Promise<{ date: string; visits: number; 
 // ══════════════════════════
 
 export async function getAllOwners(): Promise<DbOwner[]> {
-  const { data } = await supabase.from('owners').select('*').order('created_at', { ascending: false });
+  const { data } = await supabase.from('owners').select('*').is('deleted_at', null).order('created_at', { ascending: false });
   return data || [];
 }
 
 export async function getAllCustomers(): Promise<DbCustomer[]> {
-  const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+  const { data } = await supabase.from('customers').select('*').is('deleted_at', null).order('created_at', { ascending: false });
   return data || [];
 }
 
