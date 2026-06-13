@@ -213,33 +213,51 @@ export default function AdminPage() {
 
   // ── Actions
   const deleteUser = async (id: string, type: 'owner'|'customer', name: string) => {
-    if (!confirm(`Delete "${name}"?\n\nThis will remove their account. They can re-register with the same email if needed.`)) return;
+    const confirmed = confirm(`⚠️ PERMANENTLY DELETE "${name}"?\n\nThis will completely remove:\n• Their account\n• All vehicles (if partner)\n• All bookings history\n• All photos\n\n❌ This CANNOT be undone!`);
+    if (!confirmed) return;
+    const confirmed2 = confirm(`Final confirmation — permanently delete "${name}" from the database?`);
+    if (!confirmed2) return;
+
     const table = type === 'owner' ? 'owners' : 'customers';
 
-    // 1. Nullify bookings
-    await supabase.from('bookings')
-      .update({ [type === 'owner' ? 'owner_id' : 'customer_id']: null })
-      .eq(type === 'owner' ? 'owner_id' : 'customer_id', id);
+    try {
+      // 1. Nullify bookings foreign keys
+      await supabase.from('bookings')
+        .update({ [type === 'owner' ? 'owner_id' : 'customer_id']: null })
+        .eq(type === 'owner' ? 'owner_id' : 'customer_id', id);
 
-    // 2. If owner — remove vehicles
-    if (type === 'owner') {
-      const { data: vehicles } = await supabase.from('vehicles').select('id').eq('owner_id', id);
-      if (vehicles) {
-        for (const v of vehicles) {
-          await supabase.from('vehicle_photos').delete().eq('vehicle_id', v.id);
-          await supabase.from('vehicle_blocked_dates').delete().eq('vehicle_id', v.id);
+      // 2. If owner — delete vehicles + photos
+      if (type === 'owner') {
+        const { data: vehicles } = await supabase.from('vehicles').select('id').eq('owner_id', id);
+        if (vehicles) {
+          for (const v of vehicles) {
+            await supabase.from('vehicle_photos').delete().eq('vehicle_id', v.id);
+            await supabase.from('vehicle_blocked_dates').delete().eq('vehicle_id', v.id);
+            await supabase.storage.from('vehicle-photos').list(v.id).then(({ data: files }) => {
+              if (files?.length) supabase.storage.from('vehicle-photos').remove(files.map((f: any) => `${v.id}/${f.name}`));
+            });
+          }
+          await supabase.from('vehicles').delete().eq('owner_id', id);
         }
-        await supabase.from('vehicles').delete().eq('owner_id', id);
       }
+
+      // 3. Delete wishlist, reviews
+      await supabase.from('wishlist').delete().eq(type === 'owner' ? 'owner_id' : 'customer_id', id).catch(() => {});
+      if (type === 'customer') {
+        await supabase.from('reviews').delete().eq('customer_id', id).catch(() => {});
+      }
+
+      // 4. Hard delete — completely remove from DB
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
+
+      // Remove from UI
+      if (type === 'owner') setOwners(p => p.filter(o => o.id !== id));
+      else setCustomers(p => p.filter(c => c.id !== id));
+      showToast(`✅ ${name} permanently deleted from database`);
+    } catch (err: any) {
+      showToast(`Delete failed: ${err.message}`, 'err');
     }
-
-    // 3. Soft delete — allows email re-use
-    await supabase.from(table).update({ deleted_at: new Date().toISOString() }).eq('id', id);
-
-    // Remove from UI
-    if (type === 'owner') setOwners(p => p.filter(o => o.id !== id));
-    else setCustomers(p => p.filter(c => c.id !== id));
-    showToast(`${name} deleted`, 'err');
   };
 
   const toggleBlockOwner = async(id:string,blocked:boolean)=>{
