@@ -1056,7 +1056,6 @@ function HeroStats() {
 
   const items = [
     { n: stats.vehicles, label: 'Vehicles listed', suffix: '+' },
-    { n: stats.cities, label: 'Cities covered', suffix: '' },
     { n: stats.renters, label: 'Happy renters', suffix: '+' },
   ];
 
