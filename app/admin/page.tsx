@@ -242,9 +242,9 @@ export default function AdminPage() {
       }
 
       // 3. Delete wishlist, reviews
-      await supabase.from('wishlist').delete().eq(type === 'owner' ? 'owner_id' : 'customer_id', id).catch(() => {});
+      try { await supabase.from('wishlist').delete().eq(type === 'owner' ? 'owner_id' : 'customer_id', id); } catch {}
       if (type === 'customer') {
-        await supabase.from('reviews').delete().eq('customer_id', id).catch(() => {});
+        try { await supabase.from('reviews').delete().eq('customer_id', id); } catch {}
       }
 
       // 4. Hard delete — completely remove from DB
