@@ -53,6 +53,7 @@ export type DbVehicle = {
   km_per_day?: number | null;
   extra_km_charge?: number | null;
   deposit_amount?: number | null;
+  delivery_charge?: number | null;
   location: string;
   shop_name: string;
   rating?: number;
@@ -287,6 +288,7 @@ export async function addVehicle(
     km_per_day: vehicle.km_per_day || null,
     extra_km_charge: vehicle.extra_km_charge || null,
     deposit_amount: vehicle.deposit_amount || 0,
+    delivery_charge: vehicle.delivery_charge || null,
     driver_option: vehicle.driver_option || 'self_drive',
     delivery_option: vehicle.delivery_option || 'both',
     revenue_licence_expiry: vehicle.revenue_licence_expiry || null,
@@ -329,6 +331,7 @@ export async function updateVehicle(
     km_per_day: updates.km_per_day || null,
     extra_km_charge: updates.extra_km_charge || null,
     deposit_amount: updates.deposit_amount || 0,
+    delivery_charge: updates.delivery_charge || null,
   }).eq('id', vehicleId);
 
   if (error) return { error: error.message };
