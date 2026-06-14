@@ -1143,7 +1143,9 @@ export default function Home() {
   const [earningsPeriod, setEarningsPeriod] = useState<'weekly'|'monthly'|'yearly'>('monthly');
   const [days, setDays] = useState(1);
   const [deliveryType, setDeliveryType] = useState<'pickup'|'delivery'>('pickup');
+  const [driverWithOption, setDriverWithOption] = useState<'self_drive'|'with_driver'>('self_drive');
   const [bookingDone, setBookingDone] = useState(false);
+  const [withDriver, setWithDriver] = useState(false);
   const [pickupTime, setPickupTime] = useState('09:00');
   const [rentalPeriod, setRentalPeriod] = useState<'daily'|'weekly'|'monthly'>('daily');
   const [currency, setCurrency] = useState('LKR');
@@ -1351,7 +1353,7 @@ export default function Home() {
     }
   }, [days, filterPickup]);
 
-  const resetToHome = () => { setView('home'); setSelectedVehicle(null); setBookingDone(false); setMobileMenuOpen(false); setFilterCity('All Sri Lanka'); setFilterType('all'); setFilterPickup(''); setFilterReturn(''); setSelectedBooking(null); };
+  const resetToHome = () => { setView('home'); setSelectedVehicle(null); setBookingDone(false); setWithDriver(false); setMobileMenuOpen(false); setFilterCity('All Sri Lanka'); setFilterType('all'); setFilterPickup(''); setFilterReturn(''); setSelectedBooking(null); };
   const logout = () => { clearSession(); setSessionEmail(null); setSessionRole(null); setOwnerAcc(null); setCustAcc(null); setOwnerFleet([]); setOwnerBookings([]); resetToHome(); showToast('Logged out'); };
   const openAuth = (mode: 'owner'|'customer', tab: 'login'|'register' = 'login') => { setAuthMode(mode); setAuthTab(tab); setLoginEmail(''); setLoginPassword(''); setLoginError(''); setRegEmail(''); setRegPassword(''); setRegConfirm(''); setRegFirst(''); setRegLast(''); setRegShop(''); setRegPhone(''); setRegNic(''); setRegLicense(''); setRegIsForeign(false); setRegError(''); setView('auth'); setMobileMenuOpen(false); };
 
@@ -1545,8 +1547,9 @@ export default function Home() {
   const periodsCount = rentalPeriod === 'daily' ? days : rentalPeriod === 'weekly' ? Math.ceil(days / 7) : Math.ceil(days / 28);
   const base = periodInfo.price * periodsCount;
   const delFee = deliveryType === 'delivery' ? (selectedVehicle?.delivery_charge || 1500) : 0;
+  const driverFee = withDriver && selectedVehicle?.driver_charge ? selectedVehicle.driver_charge * days : 0;
   const depositAmt = selectedVehicle ? ((selectedVehicle as any).deposit_amount || 0) : 0;
-  const total = base + delFee;
+  const total = base + delFee + driverFee;
   const platformFeeAmt = Math.round(total * 0.10);
   const ownerPayoutAmt = total - platformFeeAmt;
 
@@ -1569,7 +1572,8 @@ export default function Home() {
       }
     }
 
-    setBookingLoading(true); const today = new Date().toISOString().split('T')[0]; const bookingData = { vehicle_id: selectedVehicle.id, owner_id: selectedVehicle.owner_id, customer_id: sessionRole === 'customer' ? custAcc?.id : undefined, vehicle_name: selectedVehicle.name || '', vehicle_img: selectedVehicle.image || '', shop_name: vShop(selectedVehicle) || '', location: selectedVehicle.location || '', pickup_date: filterPickup || today, return_date: filterReturn || today, pickup_time: pickupTime, days, delivery_type: deliveryType, price_per_day: vPrice(selectedVehicle) || 0, total, status: 'pending' }; const res = await bookingAPI('create', { booking: bookingData, vehicleId: selectedVehicle.id, customerId: sessionRole === 'customer' ? custAcc?.id : null, ownerId: selectedVehicle.owner_id }); if (res.error) { showToast(res.error === 'Vehicle no longer available' ? 'Sorry, this vehicle was just booked by someone else!' : 'Booking failed. Please try again.', 'err'); setBookingLoading(false); setView('home'); setSelectedVehicle(null); await refreshVehicles(); return; } if (sessionRole === 'customer' && custAcc?.id) { const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev); } await refreshVehicles(); await trackBookingInDB().catch(() => {}); setBookingLoading(false); setBookingDone(true); };
+    setBookingLoading(true); const today = new Date().toISOString().split('T')[0]; const bookingData = { vehicle_id: selectedVehicle.id, owner_id: selectedVehicle.owner_id, customer_id: sessionRole === 'customer' ? custAcc?.id : undefined, vehicle_name: selectedVehicle.name || '', vehicle_img: selectedVehicle.image || '', shop_name: vShop(selectedVehicle) || '', location: selectedVehicle.location || '', pickup_date: filterPickup || today, return_date: filterReturn || today, pickup_time: pickupTime, days, delivery_type: deliveryType,
+          driver_option: driverWithOption, price_per_day: vPrice(selectedVehicle) || 0, total, status: 'pending' }; const res = await bookingAPI('create', { booking: bookingData, vehicleId: selectedVehicle.id, customerId: sessionRole === 'customer' ? custAcc?.id : null, ownerId: selectedVehicle.owner_id }); if (res.error) { showToast(res.error === 'Vehicle no longer available' ? 'Sorry, this vehicle was just booked by someone else!' : 'Booking failed. Please try again.', 'err'); setBookingLoading(false); setView('home'); setSelectedVehicle(null); await refreshVehicles(); return; } if (sessionRole === 'customer' && custAcc?.id) { const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev); } await refreshVehicles(); await trackBookingInDB().catch(() => {}); setBookingLoading(false); setBookingDone(true); };
 
   return (
     <main dir={t.dir} className={`min-h-screen bg-slate-50 text-slate-800 antialiased font-sans ${t.dir === 'rtl' ? 'text-right' : ''}`}>
@@ -2735,6 +2739,46 @@ export default function Home() {
                         }} className="px-4 py-2.5 font-black hover:bg-slate-200 transition text-lg">+</button></div></div>
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">⏰ Pickup Time</label><div className="grid grid-cols-4 gap-1.5">{['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map(ti => (<button key={ti} onClick={() => setPickupTime(ti)} className={`py-2 rounded-xl text-[11px] font-black border transition ${pickupTime === ti ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'}`}>{ti}</button>))}</div><p className="text-[10px] text-slate-400 mt-1.5">Selected: <span className="font-black text-slate-700">{pickupTime}</span></p></div>
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase mb-2">{t.pickupMethod}</label>{(() => { const dOpt = (selectedVehicle as any).delivery_option || 'both'; if (dOpt === 'pickup_only') return (<div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center"><p className="text-sm font-black text-slate-900">📍 {t.selfPickup}</p><p className="text-xs text-slate-400 mt-1">This vehicle is pickup only</p></div>); if (dOpt === 'delivery_only') return (<div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center"><p className="text-sm font-black text-slate-900">🚚 {t.delivery}</p><p className="text-xs text-emerald-600 font-bold mt-1">{selectedVehicle.delivery_charge ? `+Rs. ${Number(selectedVehicle.delivery_charge).toLocaleString()}` : '+Rs. 1,500'} delivery fee</p></div>); return (<div className="grid grid-cols-2 gap-2">{([['pickup', '📍 ' + t.selfPickup, 'Free'], ['delivery', '🚚 ' + t.delivery, '+Rs.' + ((selectedVehicle?.delivery_charge || 1500)).toLocaleString()]] as [string, string, string][]).map(([val, label, note]) => (<button key={val} onClick={() => setDeliveryType(val as any)} className={`py-2.5 text-xs font-bold rounded-xl border transition ${deliveryType === val ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>{label}<br/><span className="text-[10px] font-medium opacity-70">{note}</span></button>))}</div>); })()}</div>
+
+                  {/* Driver Option */}
+                  {((selectedVehicle as any).driver_option === 'with_driver' || (selectedVehicle as any).driver_option === 'both') && (
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">🧑‍✈️ Driver Option</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setDriverWithOption('self_drive')}
+                          className={`py-2.5 text-xs font-bold rounded-xl border transition ${driverWithOption === 'self_drive' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>
+                          🚗 Self Drive<br/><span className="text-[10px] font-medium opacity-70">I'll drive myself</span>
+                        </button>
+                        <button onClick={() => setDriverWithOption('with_driver')}
+                          className={`py-2.5 text-xs font-bold rounded-xl border transition ${driverWithOption === 'with_driver' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}>
+                          🧑‍✈️ With Driver<br/>
+                          <span className="text-[10px] font-medium opacity-70">
+                            {(selectedVehicle as any).driver_charge ? `+Rs.${Number((selectedVehicle as any).driver_charge).toLocaleString()}/day` : 'Driver included'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                    {/* Driver option — show only if vehicle offers driver */}
+                    {(selectedVehicle.driver_option === 'with_driver' || selectedVehicle.driver_option === 'both') && (
+                      <div>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">🧑‍✈️ Driver</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button onClick={() => setWithDriver(false)}
+                            className={`py-2.5 text-xs font-bold rounded-xl border transition ${!withDriver ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+                            <p className="font-black">🚗 Self Drive</p>
+                            <p className="opacity-60 text-[10px]">Free</p>
+                          </button>
+                          <button onClick={() => setWithDriver(true)}
+                            className={`py-2.5 text-xs font-bold rounded-xl border transition ${withDriver ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+                            <p className="font-black">🧑‍✈️ With Driver</p>
+                            <p className="opacity-60 text-[10px]">+Rs. {Number(selectedVehicle.driver_charge || 2000).toLocaleString()}/day</p>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
                       <div className="flex justify-between"><span>{fmt(periodInfo.price)} × {periodsCount} {periodInfo.unit}{periodsCount > 1 ? 's' : ''}</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
                       {deliveryType === 'delivery' && <div className="flex justify-between"><span>🚚 {t.delivery}</span><span className="font-bold">{fmt(delFee)}</span></div>}
