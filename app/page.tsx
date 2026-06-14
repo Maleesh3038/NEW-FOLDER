@@ -2760,24 +2760,7 @@ export default function Home() {
                     </div>
                   )}
 
-                    {/* Driver option — show only if vehicle offers driver */}
-                    {(selectedVehicle.driver_option === 'with_driver' || selectedVehicle.driver_option === 'both') && (
-                      <div>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">🧑‍✈️ Driver</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button onClick={() => setWithDriver(false)}
-                            className={`py-2.5 text-xs font-bold rounded-xl border transition ${!withDriver ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
-                            <p className="font-black">🚗 Self Drive</p>
-                            <p className="opacity-60 text-[10px]">Free</p>
-                          </button>
-                          <button onClick={() => setWithDriver(true)}
-                            className={`py-2.5 text-xs font-bold rounded-xl border transition ${withDriver ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400'}`}>
-                            <p className="font-black">🧑‍✈️ With Driver</p>
-                            <p className="opacity-60 text-[10px]">+Rs. {Number(selectedVehicle.driver_charge || 2000).toLocaleString()}/day</p>
-                          </button>
-                        </div>
-                      </div>
-                    )}
+
 
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2 font-semibold text-slate-600">
                       <div className="flex justify-between"><span>{fmt(periodInfo.price)} × {periodsCount} {periodInfo.unit}{periodsCount > 1 ? 's' : ''}</span><span className="font-bold text-slate-900">{fmt(base)}</span></div>
