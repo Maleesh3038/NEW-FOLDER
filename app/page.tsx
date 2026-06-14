@@ -1418,6 +1418,7 @@ export default function Home() {
           deposit_amount: (newV as any).depositAmount !== '' ? Number((newV as any).depositAmount) || 0 : 0,
           driver_option: (newV as any).driverOption || 'self_drive',
           delivery_option: (newV as any).deliveryOption || 'both',
+          delivery_charge: (newV as any).deliveryCharge !== '' ? Number((newV as any).deliveryCharge) || null : null,
           revenue_licence_expiry: (newV as any).revenueLicenceExpiry || undefined,
           insurance_expiry: (newV as any).insuranceExpiry || undefined,
         }, photos); if (error || !id) { showToast(error || 'Failed', 'err'); return; } showToast('Vehicle published! 🚀'); } await refreshVehicles(ownerId); setNewV({ name: '', type: 'car', transmission: 'Automatic', fuel: 'Petrol', pricePerDay: '' as any, weeklyPrice: '' as any, monthlyPrice: '' as any, kmPerDay: '' as any, extraKmCharge: '' as any, depositAmount: '' as any, description: '', mapLink: '', driverOption: 'self_drive', district: '', deliveryOption: 'both', revenueLicenceExpiry: '', insuranceExpiry: '' }); setPhotos([]); setShowAddForm(false); setEditingId(null); };
