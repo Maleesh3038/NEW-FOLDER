@@ -65,7 +65,6 @@ export async function POST(req: NextRequest) {
 
     // ══ CREATE ══
     if (action === 'create') {
-      // 1. Check vehicle available
       const { data: v, error: vErr } = await supabase
         .from('vehicles').select('is_available').eq('id', vehicleId).single();
       if (vErr || !v) {
@@ -75,28 +74,27 @@ export async function POST(req: NextRequest) {
       if (!v.is_available)
         return NextResponse.json({ error: 'Vehicle no longer available' }, { status: 409 });
 
-      // 2. Check no active bookings
       const { data: activeBookings } = await supabase
         .from('bookings').select('id').eq('vehicle_id', vehicleId)
         .in('status', ['pending', 'confirmed']).limit(1);
       if (activeBookings && activeBookings.length > 0)
         return NextResponse.json({ error: 'Vehicle no longer available' }, { status: 409 });
 
-      // 3. Lock vehicle
       const { error: updateErr } = await supabase
         .from('vehicles').update({ is_available: false })
         .eq('id', vehicleId).eq('is_available', true);
       if (updateErr)
         return NextResponse.json({ error: 'Vehicle no longer available' }, { status: 409 });
 
-      // 4. Calculate fees
       const customerTotal = Number(booking.total) || 0;
       const platformFee   = Math.round(customerTotal * 0.10);
       const ownerPayout   = customerTotal - platformFee;
 
-      // 5. Insert booking
+      // driver_option ලා bookings table ලා නැති නිසා remove
+      const { driver_option, ...bookingWithoutDriverOption } = booking;
+
       const insertData = {
-        ...booking,
+        ...bookingWithoutDriverOption,
         status: 'pending',
         total: customerTotal,
         platform_fee: platformFee,
@@ -116,42 +114,38 @@ export async function POST(req: NextRequest) {
 
       console.log('[BOOKING] Created:', nb?.id);
 
-      // 6. Notify admin via WhatsApp
+      // Admin ට WhatsApp — booking submit වෙලාම
       const adminPhone = process.env.DRIVO_ADMIN_WHATSAPP;
       if (adminPhone) {
         await sendWhatsApp(adminPhone,
-          `🚗 *නව Booking!*\n\n🚙 ${booking.vehicle_name}\n📅 ${booking.pickup_date} → ${booking.return_date}\n💰 Rs. ${customerTotal.toLocaleString()}\n\n🔗 https://thedrivo.com/admin\nID: ${nb?.id?.slice(0,8)}`
+          `🚗 *නව Booking!*\n\n🚙 ${booking.vehicle_name}\n📅 ${booking.pickup_date} → ${booking.return_date}\n💰 Rs. ${customerTotal.toLocaleString()}\n\nAdmin approve කරන්න:\n🔗 https://thedrivo.com/admin\nID: ${nb?.id?.slice(0,8)}`
         );
       }
 
-      // 7. Notify owner
-      const { data: ow } = await supabase
-        .from('owners').select('phone,whatsapp,shop_name').eq('id', ownerId).single();
-      if (ow) {
-        const owPhone = ow.whatsapp || ow.phone;
-        if (owPhone) {
-          await sendSMS(owPhone, `DRIVO - New Booking!\nVehicle: ${booking.vehicle_name}\nDates: ${booking.pickup_date} to ${booking.return_date} (${booking.days}d)\nAmount: Rs.${customerTotal.toLocaleString()}\nLogin: thedrivo.com`);
-          await sendWhatsApp(owPhone, `DRIVO - New Booking!\nVehicle: ${booking.vehicle_name}\nDates: ${booking.pickup_date} to ${booking.return_date} (${booking.days}d)\nAmount: Rs.${customerTotal.toLocaleString()}\nLogin: thedrivo.com`);
-        }
-      }
-
-      // 8. Notify customer
+      // Customer ට WhatsApp — booking received
       if (customerId) {
         const { data: cu } = await supabase.from('customers').select('phone').eq('id', customerId).single();
         if (cu?.phone) {
-          await sendSMS(cu.phone, `DRIVO - Booking Received!\nVehicle: ${booking.vehicle_name}\nShop: ${ow?.shop_name || ''}\nDates: ${booking.pickup_date} to ${booking.return_date}\nAmount: Rs.${customerTotal.toLocaleString()}\nAwaiting confirmation.`);
-          await sendWhatsApp(cu.phone, `DRIVO - Booking Received!\nVehicle: ${booking.vehicle_name}\nShop: ${ow?.shop_name || ''}\nDates: ${booking.pickup_date} to ${booking.return_date}\nAmount: Rs.${customerTotal.toLocaleString()}\nAwaiting confirmation.`);
+          await sendSMS(cu.phone,
+            `DRIVO - Booking Received!\nVehicle: ${booking.vehicle_name}\nDates: ${booking.pickup_date} to ${booking.return_date}\nAmount: Rs.${customerTotal.toLocaleString()}\nAwaiting admin approval.`
+          );
+          await sendWhatsApp(cu.phone,
+            `✅ *Booking Received!*\n\n🚙 ${booking.vehicle_name}\n📅 ${booking.pickup_date} → ${booking.return_date}\n💰 Rs. ${customerTotal.toLocaleString()}\n\nDrivo admin review කරලා partner ට forward කරනවා.\n🌐 thedrivo.com`
+          );
         }
       }
+
+      // Partner ට notify නොකරනවා — admin approve කළාට පස්සේ යනවා
 
       return NextResponse.json({ success: true, booking: nb });
     }
 
-    // ══ ACCEPT ══
+    // ══ ACCEPT (partner confirms) ══
     if (action === 'accept') {
       const { data: b } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
       if (!b) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-      if (b.status !== 'pending') return NextResponse.json({ error: 'Already processed' }, { status: 400 });
+      if (b.status !== 'pending' && b.status !== 'admin_approved')
+        return NextResponse.json({ error: 'Already processed' }, { status: 400 });
 
       await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', bookingId);
       await supabase.from('bookings').update({ status: 'declined' })
@@ -161,8 +155,12 @@ export async function POST(req: NextRequest) {
         const { data: cu } = await supabase.from('customers').select('phone').eq('id', b.customer_id).single();
         const { data: ow } = await supabase.from('owners').select('shop_name,whatsapp,phone').eq('id', b.owner_id).single();
         if (cu?.phone) {
-          await sendSMS(cu.phone, `DRIVO - Booking CONFIRMED! ✓\nVehicle: ${b.vehicle_name}\nShop: ${ow?.shop_name || ''}\nDates: ${b.pickup_date} to ${b.return_date}\nTotal: Rs.${Number(b.total).toLocaleString()}\nContact: ${ow?.whatsapp || ow?.phone || ''}`);
-          await sendWhatsApp(cu.phone, `DRIVO - Booking CONFIRMED! ✓\nVehicle: ${b.vehicle_name}\nShop: ${ow?.shop_name || ''}\nDates: ${b.pickup_date} to ${b.return_date}\nTotal: Rs.${Number(b.total).toLocaleString()}\nContact: ${ow?.whatsapp || ow?.phone || ''}`);
+          await sendSMS(cu.phone,
+            `DRIVO - Booking CONFIRMED! ✓\nVehicle: ${b.vehicle_name}\nShop: ${ow?.shop_name || ''}\nDates: ${b.pickup_date} to ${b.return_date}\nTotal: Rs.${Number(b.total).toLocaleString()}\nContact: ${ow?.whatsapp || ow?.phone || ''}`
+          );
+          await sendWhatsApp(cu.phone,
+            `🎉 *Booking Confirmed!*\n\n🚙 ${b.vehicle_name}\n🏪 ${ow?.shop_name || ''}\n📅 ${b.pickup_date} → ${b.return_date}\n💰 Rs. ${Number(b.total).toLocaleString()}\n📞 Partner: ${ow?.whatsapp || ow?.phone || ''}\n\nස්තූතියි Drivo LK! 🌐 thedrivo.com`
+          );
         }
       }
       return NextResponse.json({ success: true });
@@ -183,8 +181,12 @@ export async function POST(req: NextRequest) {
       if (b.customer_id) {
         const { data: cu } = await supabase.from('customers').select('phone').eq('id', b.customer_id).single();
         if (cu?.phone) {
-          await sendSMS(cu.phone, `DRIVO - Booking Declined\nSorry, your booking for ${b.vehicle_name} was not confirmed.\nVisit thedrivo.com to find another vehicle.`);
-          await sendWhatsApp(cu.phone, `DRIVO - Booking Declined\nSorry, your booking for ${b.vehicle_name} was not confirmed.\nVisit thedrivo.com to find another vehicle.`);
+          await sendSMS(cu.phone,
+            `DRIVO - Booking Declined\nSorry, your booking for ${b.vehicle_name} was not confirmed.\nVisit thedrivo.com to find another vehicle.`
+          );
+          await sendWhatsApp(cu.phone,
+            `😔 *Booking Update*\n\nඅවාසනාවකට ඔබේ booking decline කළා.\n\n🚙 ${b.vehicle_name}\n📅 ${b.pickup_date} → ${b.return_date}\n\nවෙනත් vehicle select කරන්න:\n🌐 thedrivo.com`
+          );
         }
       }
       return NextResponse.json({ success: true });
@@ -205,13 +207,21 @@ export async function POST(req: NextRequest) {
 
       if (ownerId) {
         if ((cu as any)?.phone) {
-          await sendSMS((cu as any).phone, `DRIVO - Booking Cancelled\nYour booking for ${b.vehicle_name} (${b.pickup_date} to ${b.return_date}) was cancelled by the shop.\nVisit thedrivo.com to find another vehicle.`);
-          await sendWhatsApp((cu as any).phone, `DRIVO - Booking Cancelled\nYour booking for ${b.vehicle_name} (${b.pickup_date} to ${b.return_date}) was cancelled by the shop.\nVisit thedrivo.com to find another vehicle.`);
+          await sendSMS((cu as any).phone,
+            `DRIVO - Booking Cancelled\nYour booking for ${b.vehicle_name} (${b.pickup_date} to ${b.return_date}) was cancelled by the shop.\nVisit thedrivo.com to find another vehicle.`
+          );
+          await sendWhatsApp((cu as any).phone,
+            `🚫 *Booking Cancelled*\n\nShop ලා ඔබේ booking cancel කළා.\n\n🚙 ${b.vehicle_name}\n📅 ${b.pickup_date} → ${b.return_date}\n\nවෙනත් vehicle select කරන්න:\n🌐 thedrivo.com`
+          );
         }
       } else {
         if (ow?.whatsapp || ow?.phone) {
-          await sendSMS(ow.whatsapp || ow.phone, `DRIVO - Customer Cancelled\nVehicle: ${b.vehicle_name}\nDates: ${b.pickup_date} to ${b.return_date}\nVehicle is now available again.`);
-          await sendWhatsApp(ow.whatsapp || ow.phone, `DRIVO - Customer Cancelled\nVehicle: ${b.vehicle_name}\nDates: ${b.pickup_date} to ${b.return_date}\nVehicle is now available again.`);
+          await sendSMS(ow.whatsapp || ow.phone,
+            `DRIVO - Customer Cancelled\nVehicle: ${b.vehicle_name}\nDates: ${b.pickup_date} to ${b.return_date}\nVehicle is now available again.`
+          );
+          await sendWhatsApp(ow.whatsapp || ow.phone,
+            `🚫 *Customer Cancelled*\n\n🚙 ${b.vehicle_name}\n📅 ${b.pickup_date} → ${b.return_date}\n\nVehicle now available again.`
+          );
         }
       }
       return NextResponse.json({ success: true });
@@ -229,8 +239,12 @@ export async function POST(req: NextRequest) {
       if (b.customer_id) {
         const { data: cu } = await supabase.from('customers').select('phone').eq('id', b.customer_id).single();
         if (cu?.phone) {
-          await sendSMS(cu.phone, `DRIVO - Rental Completed!\nThank you for renting ${b.vehicle_name}.\nWe hope you enjoyed it! Visit thedrivo.com to rent again.`);
-          await sendWhatsApp(cu.phone, `DRIVO - Rental Completed!\nThank you for renting ${b.vehicle_name}.\nWe hope you enjoyed it! Visit thedrivo.com to rent again.`);
+          await sendSMS(cu.phone,
+            `DRIVO - Rental Completed!\nThank you for renting ${b.vehicle_name}.\nWe hope you enjoyed it! Visit thedrivo.com to rent again.`
+          );
+          await sendWhatsApp(cu.phone,
+            `🏁 *Rental Completed!*\n\nThank you for renting *${b.vehicle_name}*!\nWe hope you enjoyed it! 🌴\n\n🌐 thedrivo.com`
+          );
         }
       }
       return NextResponse.json({ success: true });
