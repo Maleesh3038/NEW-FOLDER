@@ -1556,6 +1556,11 @@ export default function Home() {
   const confirmBooking = async () => {
     if (!selectedVehicle || bookingLoading) return;
     if (sessionRole !== 'customer') { setLoginPromptOpen(true); return; }
+    if (!filterPickup) { showToast('Please select a pickup date', 'err'); return; }
+    if (!filterReturn) { showToast('Please select a return date', 'err'); return; }
+    if (days < 1) { showToast('Minimum 1 day rental', 'err'); return; }
+
+    // Check if pickup/return dates overlap
 
     // Check if pickup/return dates overlap with blocked dates
     if (filterPickup && filterReturn) {
