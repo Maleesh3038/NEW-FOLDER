@@ -1577,26 +1577,7 @@ export default function Home() {
       }
     }
 
-    setBookingLoading(true); const today = new Date().toISOString().split('T')[0]; const bookingData = { vehicle_id: selectedVehicle.id, owner_id: selectedVehicle.owner_id, customer_id: sessionRole === 'customer' ? custAcc?.id : undefined, vehicle_name: selectedVehicle.name || '', vehicle_img: selectedVehicle.image || '', shop_name: vShop(selectedVehicle) || '', location: selectedVehicle.location || '', pickup_date: filterPickup || today, return_date: filterReturn || today, pickup_time: pickupTime, days, delivery_type: deliveryType,
-// Stripe checkout
-const platformFeeAmount = Math.round(total * 0.10);
-const stripeRes = await fetch('/api/stripe/checkout', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    amount: platformFeeAmount,
-    bookingId: res.booking.id,
-    vehicleName: selectedVehicle.name,
-    customerEmail: custAcc?.email || '',
-  }),
-});
-const stripeData = await stripeRes.json();
-setBookingLoading(false);
-if (stripeData.url) {
-  window.location.href = stripeData.url;
-} else {
-  showToast('Payment setup failed. Try again.', 'err');
-};
+    setBookingLoading(true); const today = new Date().toISOString().split('T')[0]; const bookingData = { vehicle_id: selectedVehicle.id, owner_id: selectedVehicle.owner_id, customer_id: sessionRole === 'customer' ? custAcc?.id : undefined, vehicle_name: selectedVehicle.name || '', vehicle_img: selectedVehicle.image || '', shop_name: vShop(selectedVehicle) || '', location: selectedVehicle.location || '', pickup_date: filterPickup || today, return_date: filterReturn || today, pickup_time: pickupTime, days, delivery_type: deliveryType, driver_option: driverWithOption, price_per_day: vPrice(selectedVehicle) || 0, total, status: 'pending' }; const res = await bookingAPI('create', { booking: bookingData, vehicleId: selectedVehicle.id, customerId: sessionRole === 'customer' ? custAcc?.id : null, ownerId: selectedVehicle.owner_id }); if (res.error) { showToast(res.error === 'Vehicle no longer available' ? 'Sorry, this vehicle was just booked by someone else!' : 'Booking failed. Please try again.', 'err'); setBookingLoading(false); setView('home'); setSelectedVehicle(null); await refreshVehicles(); return; } if (sessionRole === 'customer' && custAcc?.id) { const { data: bdata } = await supabase.from('bookings').select('*').eq('customer_id', custAcc.id).not('status', 'eq', 'declined').order('booked_at', { ascending: false }); setCustAcc(prev => prev ? { ...prev, bookings: bdata || [] } : prev); } await refreshVehicles(); await trackBookingInDB().catch(() => {}); const platformFeeAmount = Math.round(total * 0.10); const stripeRes = await fetch('/api/stripe/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: platformFeeAmount, bookingId: res.booking.id, vehicleName: selectedVehicle.name, customerEmail: custAcc?.email || '', }), }); const stripeData = await stripeRes.json(); setBookingLoading(false); if (stripeData.url) { window.location.href = stripeData.url; } else { showToast('Payment setup failed. Try again.', 'err'); } };
 
   return (
     <main dir={t.dir} className={`min-h-screen bg-slate-50 text-slate-800 antialiased font-sans ${t.dir === 'rtl' ? 'text-right' : ''}`}>
