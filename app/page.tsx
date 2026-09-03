@@ -1596,7 +1596,7 @@ if (stripeData.url) {
   window.location.href = stripeData.url;
 } else {
   showToast('Payment setup failed. Try again.', 'err');
-}
+};
 
   return (
     <main dir={t.dir} className={`min-h-screen bg-slate-50 text-slate-800 antialiased font-sans ${t.dir === 'rtl' ? 'text-right' : ''}`}>
