@@ -16,14 +16,14 @@ export async function POST(req: NextRequest) {
             name: `Drivo Booking — ${vehicleName}`,
             description: `Booking fee (10%) for ${vehicleName}`,
           },
-          unit_amount: Math.round(amount * 100), // cents
+          unit_amount: Math.round(amount * 100),
         },
         quantity: 1,
       }],
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/booking/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${bookingId}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/booking/cancel?booking_id=${bookingId}`,
+      success_url: `https://thedrivo.com/booking/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${bookingId}`,
+      cancel_url: `https://thedrivo.com/?cancelled=true`,
       metadata: { bookingId },
     });
 
