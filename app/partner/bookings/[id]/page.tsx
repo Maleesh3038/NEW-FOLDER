@@ -1,183 +1,177 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { partnerConfirmBooking, partnerDeclineBooking } from '@/lib/bookingService'
+'use client';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 
-type Booking = {
-  id: string
-  status: string
-  start_date: string
-  end_date: string
-  total_price: number
-  with_driver: boolean
-  delivery_address?: string
-  decline_reason?: string
-  customers: { name: string; phone: string }
-  vehicles: { name: string }
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function PartnerBookingPage() {
-  const { id } = useParams<{ id: string }>()
-  const router  = useRouter()
-
-  const [booking, setBooking]   = useState<Booking | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [acting, setActing]     = useState(false)
-  const [declined, setDeclined] = useState(false)
+  const { id } = useParams<{ id: string }>();
+  const [booking, setBooking] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState(false);
+  const [done, setDone] = useState<'confirmed' | 'declined' | null>(null);
 
   useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase
-        .from('bookings')
-        .select(`
-          id, status, start_date, end_date, total_price,
-          with_driver, delivery_address, decline_reason,
-          customers(name, phone),
-          vehicles(name)
-        `)
-        .eq('id', id)
-        .single()
-
-      if (data) setBooking(data as any)
-      setLoading(false)
-    }
-    fetch()
-  }, [id])
+    if (!id) return;
+    supabase.from('bookings')
+      .select('*, customers(first_name, last_name, phone, email, nic, driving_license)')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => { if (data) setBooking(data); setLoading(false); });
+  }, [id]);
 
   const handleConfirm = async () => {
-    if (!confirm('Booking confirm කරන්නද?')) return
-    setActing(true)
+    if (!confirm('Confirm this booking? Customer & admin will be notified immediately.')) return;
+    setActing(true);
     try {
-      await partnerConfirmBooking(id)
+      // Update status
+      await supabase.from('bookings').update({ status: 'confirmed', partner_action_at: new Date().toISOString() }).eq('id', id);
+
+      // Notify admin + customer
       await fetch('/api/bookings/notify-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId: id, type: 'confirmed' }),
-      })
-      setBooking(prev => prev ? { ...prev, status: 'confirmed' } : prev)
-    } catch {
-      alert('Error confirming booking')
-    } finally {
-      setActing(false)
-    }
-  }
+      });
+
+      setDone('confirmed');
+    } catch { alert('Error confirming booking'); }
+    setActing(false);
+  };
 
   const handleDecline = async () => {
-    const reason = prompt('Decline reason:')
-    if (reason === null) return
-    setActing(true)
+    const reason = prompt('Decline reason (optional):') ?? '';
+    setActing(true);
     try {
-      await partnerDeclineBooking(id, reason)
+      await supabase.from('bookings').update({
+        status: 'declined',
+        decline_reason: reason,
+        partner_action_at: new Date().toISOString()
+      }).eq('id', id);
+
       await fetch('/api/bookings/notify-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId: id, type: 'declined' }),
-      })
-      setBooking(prev => prev ? { ...prev, status: 'declined' } : prev)
-      setDeclined(true)
-    } catch {
-      alert('Error declining booking')
-    } finally {
-      setActing(false)
-    }
-  }
+      });
+
+      setDone('declined');
+    } catch { alert('Error declining booking'); }
+    setActing(false);
+  };
 
   if (loading) return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900"/>
     </div>
-  )
+  );
 
   if (!booking) return (
-    <div className="flex items-center justify-center h-screen">
-      <p className="text-gray-400">Booking හොයාගන්න බැරි වුණා</p>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <p className="text-slate-400">Booking not found</p>
     </div>
-  )
+  );
 
-  const isActionable = booking.status === 'admin_approved'
+  const customer = booking.customers;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 w-full max-w-md p-6">
-
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-8">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
         {/* Header */}
-        <div className="text-center mb-6">
+        <div className={`px-6 py-6 text-center ${done === 'confirmed' ? 'bg-emerald-500' : done === 'declined' ? 'bg-red-500' : 'bg-slate-900'}`}>
           <div className="text-4xl mb-2">
-            {booking.status === 'confirmed' ? '✅' :
-             booking.status === 'declined'  ? '❌' : '🚗'}
+            {done === 'confirmed' ? '✅' : done === 'declined' ? '❌' : '📋'}
           </div>
-          <h1 className="text-xl font-semibold text-gray-900">
-            {booking.status === 'confirmed' ? 'Booking Confirmed!' :
-             booking.status === 'declined'  ? 'Booking Declined'  :
-             'Booking Confirmation'}
+          <h1 className="text-xl font-black text-white">
+            {done === 'confirmed' ? 'Booking Confirmed!' : done === 'declined' ? 'Booking Declined' : 'New Booking Request'}
           </h1>
-          <p className="text-sm text-gray-400 mt-1">Booking #{id.slice(0, 8)}</p>
+          <p className="text-white/70 text-xs mt-1">Drivo LK · Booking #{id?.slice(0, 8)}</p>
         </div>
 
-        {/* Details */}
-        <div className="space-y-3 mb-6">
-          <Row label="Vehicle"   value={booking.vehicles?.name} />
-          <Row label="Customer"  value={booking.customers?.name} />
-          <Row label="Phone"     value={booking.customers?.phone} />
-          <Row label="From"      value={booking.start_date} />
-          <Row label="To"        value={booking.end_date} />
-          <Row label="Total"     value={`Rs. ${booking.total_price?.toLocaleString()}`} highlight />
-          {booking.with_driver && (
-            <Row label="Driver" value="ඔව් — Driver included" />
+        <div className="p-6 space-y-4">
+          {/* Booking details */}
+          <div className="bg-slate-50 rounded-2xl border border-slate-200 divide-y divide-slate-100">
+            {[
+              ['Vehicle', booking.vehicle_name],
+              ['Pickup Date', booking.pickup_date],
+              ['Return Date', booking.return_date],
+              ['Duration', `${booking.days} day${booking.days > 1 ? 's' : ''}`],
+              ['Pickup Time', booking.pickup_time || '09:00'],
+              ['Driver', booking.driver_option === 'with_driver' ? '✅ With Driver' : 'Self Drive'],
+              ['Delivery', booking.delivery_type === 'delivery' ? `📍 ${booking.delivery_address || 'Delivery'}` : '🏢 Self Pickup'],
+              ['Total', `Rs. ${Number(booking.total || 0).toLocaleString()}`],
+              ['Your Payout (90%)', `Rs. ${Math.round(Number(booking.total || 0) * 0.90).toLocaleString()}`],
+            ].map(([k, v]) => (
+              <div key={k} className="flex justify-between items-center px-4 py-2.5 text-xs">
+                <span className="text-slate-400 font-semibold">{k}</span>
+                <span className="font-black text-slate-900 text-right max-w-[55%]">{v}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Customer details */}
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+            <p className="text-[10px] font-black text-blue-700 uppercase tracking-wider mb-3">Customer Details</p>
+            <div className="space-y-2">
+              {[
+                ['Name', `${customer?.first_name || ''} ${customer?.last_name || ''}`],
+                ['Phone', customer?.phone || '—'],
+                ['Email', customer?.email || '—'],
+                ['NIC', customer?.nic || '—'],
+                ['License', customer?.driving_license || '—'],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between text-xs">
+                  <span className="text-blue-400">{k}</span>
+                  <span className="font-black text-blue-900">{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions */}
+          {!done && booking.status === 'admin_approved' && (
+            <div className="space-y-2">
+              <button
+                onClick={handleConfirm}
+                disabled={acting}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm uppercase tracking-wide transition disabled:opacity-50"
+              >
+                {acting ? 'Processing...' : '✅ Confirm Booking'}
+              </button>
+              <button
+                onClick={handleDecline}
+                disabled={acting}
+                className="w-full py-3.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-black text-sm uppercase tracking-wide transition disabled:opacity-50"
+              >
+                ❌ Decline
+              </button>
+            </div>
           )}
-          {booking.delivery_address && (
-            <Row label="Delivery" value={booking.delivery_address} />
+
+          {done === 'confirmed' && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+              <p className="text-emerald-700 font-black text-sm">Customer & admin have been notified! 🎉</p>
+              <p className="text-emerald-600 text-xs mt-1">Customer will receive your contact details via WhatsApp</p>
+            </div>
+          )}
+
+          {done === 'declined' && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+              <p className="text-red-700 font-black text-sm">Booking has been declined</p>
+            </div>
+          )}
+
+          {booking.status === 'pending' && !done && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+              <p className="text-amber-700 text-xs font-bold">⏳ Waiting for admin approval before you can act</p>
+            </div>
           )}
         </div>
-
-        {/* Action buttons */}
-        {isActionable && (
-          <div className="flex gap-3">
-            <button
-              onClick={handleConfirm}
-              disabled={acting}
-              className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-medium text-sm disabled:opacity-50 transition"
-            >
-              {acting ? 'Processing...' : 'Confirm Booking'}
-            </button>
-            <button
-              onClick={handleDecline}
-              disabled={acting}
-              className="flex-1 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl font-medium text-sm disabled:opacity-50 transition"
-            >
-              Decline
-            </button>
-          </div>
-        )}
-
-        {booking.status === 'confirmed' && (
-          <div className="bg-green-50 rounded-2xl p-4 text-center text-green-700 text-sm font-medium">
-            Customer ට WhatsApp message යැව්වා ✅
-          </div>
-        )}
-
-        {booking.status === 'declined' && (
-          <div className="bg-red-50 rounded-2xl p-4 text-center text-red-600 text-sm font-medium">
-            Booking declined කළා
-          </div>
-        )}
       </div>
     </div>
-  )
-}
-
-function Row({
-  label, value, highlight
-}: {
-  label: string; value?: string; highlight?: boolean
-}) {
-  return (
-    <div className="flex justify-between items-center py-2 border-b border-gray-50">
-      <span className="text-sm text-gray-400">{label}</span>
-      <span className={`text-sm font-medium ${highlight ? 'text-green-700' : 'text-gray-800'}`}>
-        {value ?? '—'}
-      </span>
-    </div>
-  )
+  );
 }
