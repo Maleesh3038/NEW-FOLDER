@@ -28,10 +28,11 @@ export default function PartnerBookingPage() {
     if (!confirm('Confirm this booking? Customer & admin will be notified immediately.')) return;
     setActing(true);
     try {
-      // Update status
-      await supabase.from('bookings').update({ status: 'confirmed', partner_action_at: new Date().toISOString() }).eq('id', id);
+      await supabase.from('bookings').update({
+        status: 'confirmed',
+        partner_action_at: new Date().toISOString()
+      }).eq('id', id);
 
-      // Notify admin + customer
       await fetch('/api/bookings/notify-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,7 +82,6 @@ export default function PartnerBookingPage() {
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-8">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden">
-        {/* Header */}
         <div className={`px-6 py-6 text-center ${done === 'confirmed' ? 'bg-emerald-500' : done === 'declined' ? 'bg-red-500' : 'bg-slate-900'}`}>
           <div className="text-4xl mb-2">
             {done === 'confirmed' ? '✅' : done === 'declined' ? '❌' : '📋'}
@@ -93,7 +93,6 @@ export default function PartnerBookingPage() {
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Booking details */}
           <div className="bg-slate-50 rounded-2xl border border-slate-200 divide-y divide-slate-100">
             {[
               ['Vehicle', booking.vehicle_name],
@@ -113,7 +112,6 @@ export default function PartnerBookingPage() {
             ))}
           </div>
 
-          {/* Customer details */}
           <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
             <p className="text-[10px] font-black text-blue-700 uppercase tracking-wider mb-3">Customer Details</p>
             <div className="space-y-2">
@@ -132,42 +130,35 @@ export default function PartnerBookingPage() {
             </div>
           </div>
 
-          {/* Actions */}
           {!done && booking.status === 'admin_approved' && (
             <div className="space-y-2">
-              <button
-                onClick={handleConfirm}
-                disabled={acting}
-                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm uppercase tracking-wide transition disabled:opacity-50"
-              >
+              <button onClick={handleConfirm} disabled={acting}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-sm uppercase tracking-wide transition disabled:opacity-50">
                 {acting ? 'Processing...' : '✅ Confirm Booking'}
               </button>
-              <button
-                onClick={handleDecline}
-                disabled={acting}
-                className="w-full py-3.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-black text-sm uppercase tracking-wide transition disabled:opacity-50"
-              >
+              <button onClick={handleDecline} disabled={acting}
+                className="w-full py-3.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-black text-sm uppercase tracking-wide transition disabled:opacity-50">
                 ❌ Decline
               </button>
             </div>
           )}
 
+          {!done && booking.status === 'pending' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+              <p className="text-amber-700 text-xs font-bold">⏳ Waiting for admin approval</p>
+            </div>
+          )}
+
           {done === 'confirmed' && (
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
-              <p className="text-emerald-700 font-black text-sm">Customer & admin have been notified! 🎉</p>
+              <p className="text-emerald-700 font-black text-sm">Customer & admin notified! 🎉</p>
               <p className="text-emerald-600 text-xs mt-1">Customer will receive your contact details via WhatsApp</p>
             </div>
           )}
 
           {done === 'declined' && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
-              <p className="text-red-700 font-black text-sm">Booking has been declined</p>
-            </div>
-          )}
-
-          {booking.status === 'pending' && !done && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
-              <p className="text-amber-700 text-xs font-bold">⏳ Waiting for admin approval before you can act</p>
+              <p className="text-red-700 font-black text-sm">Booking declined</p>
             </div>
           )}
         </div>
