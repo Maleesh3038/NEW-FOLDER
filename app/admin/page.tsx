@@ -12,7 +12,6 @@ const ADMIN_PASSWORD = 'Drivo@Admin2026!';
 const ADMIN_SESSION  = 'drivo_admin_v2';
 
 type AdminTab = 'dashboard'|'partners'|'customers'|'vehicles'|'bookings';
-type BookingStatus = 'pending'|'admin_approved'|'confirmed'|'declined'|'completed'|'cancelled';
 
 function DrivoLogo({ className='w-8 h-8' }:{className?:string}) {
   return (
@@ -40,7 +39,6 @@ const statusLabel = (s:string) =>
   s==='completed'      ? '🏁 Completed' :
   s==='cancelled'      ? '🚫 Cancelled' : s;
 
-// ── Admin Reset Password Modal
 function AdminResetPasswordModal({ user, userType, onClose, showToast }: {
   user: any; userType: 'owner'|'customer'; onClose: ()=>void; showToast:(msg:string,type?:'ok'|'err')=>void;
 }) {
@@ -54,9 +52,9 @@ function AdminResetPasswordModal({ user, userType, onClose, showToast }: {
     : `${user.first_name||''} ${user.last_name||''}`.trim()||user.email;
 
   const handleReset = async () => {
-    if (!newPassword)               { showToast('Password required','err'); return; }
-    if (newPassword.length < 6)     { showToast('Min 6 characters','err'); return; }
-    if (newPassword !== confirm)    { showToast('Passwords do not match','err'); return; }
+    if (!newPassword)            { showToast('Password required','err'); return; }
+    if (newPassword.length < 6)  { showToast('Min 6 characters','err'); return; }
+    if (newPassword !== confirm)  { showToast('Passwords do not match','err'); return; }
     setLoading(true);
     try {
       const res  = await fetch('/api/auth/admin-reset', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -107,39 +105,35 @@ function AdminResetPasswordModal({ user, userType, onClose, showToast }: {
   );
 }
 
-// ── Booking Action Modal (new)
-function BookingActionModal({ booking, onClose, onStatusChange, showToast }: {
-  booking: any; onClose: ()=>void; onStatusChange:(id:string,status:string)=>void; showToast:(msg:string,type?:'ok'|'err')=>void;
+function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate, showToast }: {
+  booking: any; onClose: ()=>void; onStatusChange:(id:string,status:string)=>void; onBookingUpdate:(id:string,data:any)=>void; showToast:(msg:string,type?:'ok'|'err')=>void;
 }) {
   const [acting, setActing] = useState(false);
-
-  const notifyPartner = async (bookingId: string) => {
-    try {
-      await fetch('/api/bookings/notify-partner', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ bookingId }),
-      });
-    } catch { showToast('WhatsApp send failed — check UltraMsg','err'); }
-  };
-
-  const notifyCustomer = async (bookingId: string, type: 'confirmed'|'declined') => {
-    try {
-      await fetch('/api/bookings/notify-customer', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ bookingId, type }),
-      });
-    } catch {}
-  };
+  const [localBooking, setLocalBooking] = useState(booking);
 
   const handleApprove = async () => {
     if (!confirm('Approve this booking and notify the partner via WhatsApp?')) return;
     setActing(true);
     try {
-      await supabase.rpc('update_booking_status', { booking_id: booking.id, new_status: 'admin_approved' });
-      await notifyPartner(booking.id);
+      // Update status
+      await supabase.from('bookings').update({ status: 'admin_approved' }).eq('id', booking.id);
+
+      // Notify partner via WhatsApp
+      const waRes = await fetch('/api/bookings/notify-partner', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ bookingId: booking.id }),
+      });
+
+      const now = new Date().toISOString();
+      const updates = { status: 'admin_approved', wa_partner_sent_at: now };
+
+      // Update wa_partner_sent_at in DB
+      await supabase.from('bookings').update({ wa_partner_sent_at: now }).eq('id', booking.id);
+
+      setLocalBooking((p:any) => ({...p, ...updates}));
       onStatusChange(booking.id, 'admin_approved');
+      onBookingUpdate(booking.id, updates);
       showToast('✅ Approved! Partner WhatsApp sent.');
-      onClose();
     } catch { showToast('Approve failed','err'); }
     setActing(false);
   };
@@ -148,9 +142,21 @@ function BookingActionModal({ booking, onClose, onStatusChange, showToast }: {
     const reason = window.prompt('Decline reason (optional):') ?? '';
     setActing(true);
     try {
-      await supabase.rpc('update_booking_status', { booking_id: booking.id, new_status: 'declined', reason });
-      await notifyCustomer(booking.id, 'declined');
+      await supabase.from('bookings').update({ status: 'declined', decline_reason: reason }).eq('id', booking.id);
+
+      // Notify customer
+      await fetch('/api/bookings/notify-customer', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ bookingId: booking.id, type: 'declined' }),
+      });
+
+      const now = new Date().toISOString();
+      const updates = { status: 'declined', wa_customer_sent_at: now };
+      await supabase.from('bookings').update({ wa_customer_sent_at: now }).eq('id', booking.id);
+
+      setLocalBooking((p:any) => ({...p, ...updates}));
       onStatusChange(booking.id, 'declined');
+      onBookingUpdate(booking.id, updates);
       showToast('Booking declined. Customer notified.');
       onClose();
     } catch { showToast('Decline failed','err'); }
@@ -161,12 +167,15 @@ function BookingActionModal({ booking, onClose, onStatusChange, showToast }: {
     if (!confirm('Mark as completed?')) return;
     await supabase.from('bookings').update({ status: 'completed' }).eq('id', booking.id);
     if (booking.vehicle_id) await supabase.from('vehicles').update({ is_available: true }).eq('id', booking.vehicle_id);
+    const updates = { status: 'completed' };
+    setLocalBooking((p:any) => ({...p, ...updates}));
     onStatusChange(booking.id, 'completed');
+    onBookingUpdate(booking.id, updates);
     showToast('🏁 Marked as completed');
     onClose();
   };
 
-  const b = booking;
+  const b = localBooking;
   return (
     <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center px-4">
       <div className="bg-[#111118] border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -181,7 +190,6 @@ function BookingActionModal({ booking, onClose, onStatusChange, showToast }: {
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Vehicle info */}
           <div className="flex gap-4">
             <img src={b.vehicle_img||''} className="w-28 h-20 rounded-xl object-cover flex-shrink-0 bg-slate-800" alt=""/>
             <div>
@@ -190,7 +198,6 @@ function BookingActionModal({ booking, onClose, onStatusChange, showToast }: {
             </div>
           </div>
 
-          {/* Booking details */}
           <div className="bg-slate-800/50 rounded-xl divide-y divide-slate-700/50 border border-slate-700">
             {[
               ['Booking ID',     b.id?.slice(0,8)+'...'],
@@ -231,7 +238,6 @@ function BookingActionModal({ booking, onClose, onStatusChange, showToast }: {
             </div>
           </div>
 
-          {/* Action buttons based on status */}
           {b.status === 'pending' && (
             <div className="space-y-2">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Admin Action</p>
@@ -268,15 +274,11 @@ function BookingActionModal({ booking, onClose, onStatusChange, showToast }: {
           )}
 
           {(b.status === 'completed' || b.status === 'declined' || b.status === 'cancelled') && (
-            <div className={`rounded-xl p-4 text-center text-xs font-bold
-              ${b.status==='completed' ? 'bg-indigo-900/20 border border-indigo-800/50 text-indigo-300' :
-                'bg-red-900/20 border border-red-800/50 text-red-300'}`}>
-              {b.status==='completed' ? '🏁 Booking completed' :
-               b.status==='declined'  ? '❌ Booking declined' : '🚫 Booking cancelled'}
+            <div className={`rounded-xl p-4 text-center text-xs font-bold ${b.status==='completed' ? 'bg-indigo-900/20 border border-indigo-800/50 text-indigo-300' : 'bg-red-900/20 border border-red-800/50 text-red-300'}`}>
+              {b.status==='completed' ? '🏁 Booking completed' : b.status==='declined' ? '❌ Booking declined' : '🚫 Booking cancelled'}
             </div>
           )}
 
-          {/* Customer info card */}
           {b.customer_id && <CustomerInfoCard customerId={b.customer_id}/>}
         </div>
       </div>
@@ -336,9 +338,14 @@ export default function AdminPage() {
     if(!authed) return;
     loadData();
     const ch = supabase.channel('admin-rt')
-      .on('postgres_changes',{event:'*',schema:'public',table:'bookings'},()=>{
-        supabase.from('bookings').select('*').order('booked_at',{ascending:false}).limit(1000)
-          .then(({data})=>{ if(data) setBookings(data); });
+      .on('postgres_changes',{event:'*',schema:'public',table:'bookings'}, payload => {
+        if (payload.eventType === 'DELETE') {
+          setBookings(p => p.filter(b => b.id !== (payload.old as any).id));
+        } else if (payload.eventType === 'INSERT') {
+          setBookings(p => [payload.new as any, ...p]);
+        } else if (payload.eventType === 'UPDATE') {
+          setBookings(p => p.map(b => b.id === (payload.new as any).id ? {...b, ...payload.new} : b));
+        }
       })
       .on('postgres_changes',{event:'*',schema:'public',table:'owners'},()=>{
         supabase.from('owners').select('*').is('deleted_at',null).order('created_at',{ascending:false}).limit(500)
@@ -366,11 +373,16 @@ export default function AdminPage() {
   };
   const logout = ()=>{ sessionStorage.removeItem(ADMIN_SESSION); setAuthed(false); };
 
+  // Update booking status locally — no refresh needed
   const onStatusChange = (id:string, status:string) => {
     setBookings(p=>p.map(b=>b.id===id?{...b,status}:b));
   };
 
-  // ── Actions
+  // Update any booking fields locally
+  const onBookingUpdate = (id:string, data:any) => {
+    setBookings(p=>p.map(b=>b.id===id?{...b,...data}:b));
+  };
+
   const deleteUser = async (id:string, type:'owner'|'customer', name:string) => {
     if(!confirm(`⚠️ PERMANENTLY DELETE "${name}"?\n\nCannot be undone!`)) return;
     if(!confirm(`Final confirmation — permanently delete "${name}"?`)) return;
@@ -404,11 +416,9 @@ export default function AdminPage() {
   const deleteVehicle       = async(id:string)=>{ if(!confirm('Delete this vehicle?')) return; await supabase.from('vehicle_photos').delete().eq('vehicle_id',id); await supabase.from('vehicles').delete().eq('id',id); setVehicles(p=>p.filter(v=>v.id!==id)); showToast('Vehicle deleted','err'); };
   const deleteBooking       = async(id:string)=>{ if(!confirm('Delete this booking from history?')) return; await supabase.from('bookings').delete().eq('id',id); setBookings(p=>p.filter(b=>b.id!==id)); setSelectedBooking(null); showToast('Booking deleted','err'); };
 
-  // ── Stats
   const completedBookings = bookings.filter(b=>b.status==='completed');
   const pendingBookings   = bookings.filter(b=>b.status==='pending');
   const activeBookings    = bookings.filter(b=>!['cancelled','declined'].includes(b.status));
-  const totalRevenue      = completedBookings.reduce((s,b)=>s+(b.total||b.total_price||0),0);
   const platformEarnings  = completedBookings.reduce((s,b)=>s+(b.platform_fee||Math.round((b.total||b.total_price||0)*0.10)),0);
   const liveVehicles      = vehicles.filter(v=>v.is_available);
   const totalVisits       = traffic.reduce((s,e:any)=>s+(e.visits||0),0);
@@ -425,7 +435,6 @@ export default function AdminPage() {
   const filteredPartners  = owners.filter(o=>partnerSearch===''?true:(o.shop_name||'').toLowerCase().includes(partnerSearch.toLowerCase())||(o.email||'').toLowerCase().includes(partnerSearch.toLowerCase()));
   const filteredCustomers = customers.filter(c=>{ if(custSearch==='') return true; const q=custSearch.toLowerCase(); return (`${c.first_name||''} ${c.last_name||''}`).toLowerCase().includes(q)||(c.email||'').toLowerCase().includes(q)||(c.nic||'').toLowerCase().includes(q)||(c.driving_license||'').toLowerCase().includes(q)||(c.phone||'').toLowerCase().includes(q)||(c.id||'').toLowerCase().includes(q); });
 
-  // LOGIN
   if(!authed) return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
@@ -455,17 +464,16 @@ export default function AdminPage() {
 
       {resetModal&&<AdminResetPasswordModal user={resetModal.user} userType={resetModal.userType} onClose={()=>setResetModal(null)} showToast={showToast}/>}
 
-      {/* ── BOOKING DETAIL MODAL (NEW) ── */}
       {selectedBooking&&(
         <BookingActionModal
           booking={selectedBooking}
           onClose={()=>setSelectedBooking(null)}
           onStatusChange={onStatusChange}
+          onBookingUpdate={onBookingUpdate}
           showToast={showToast}
         />
       )}
 
-      {/* ── PARTNER DETAIL MODAL ── */}
       {selectedPartner&&(
         <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center px-4">
           <div className="bg-[#111118] border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -524,7 +532,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── CUSTOMER DETAIL MODAL ── */}
       {selectedCustomer&&(
         <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center px-4">
           <div className="bg-[#111118] border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -571,7 +578,6 @@ export default function AdminPage() {
       )}
 
       <div className="flex min-h-screen">
-        {/* ── SIDEBAR ── */}
         <aside className="w-56 bg-[#0d0d14] border-r border-slate-800/60 flex flex-col fixed h-full z-40">
           <div className="px-5 py-5 border-b border-slate-800/60">
             <div className="flex items-center gap-2.5">
@@ -595,11 +601,9 @@ export default function AdminPage() {
           </div>
         </aside>
 
-        {/* ── MAIN ── */}
         <main className="flex-1 ml-56 p-6 min-h-screen">
           {loading&&<div className="flex items-center gap-2 text-slate-400 text-sm mb-4"><div className="w-4 h-4 border-2 border-slate-600 border-t-white rounded-full animate-spin"/>Loading...</div>}
 
-          {/* ══ DASHBOARD ══ */}
           {tab==='dashboard'&&(
             <div className="space-y-6">
               <div className="flex items-center justify-between flex-wrap gap-3">
@@ -624,30 +628,6 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-
-              {/* Traffic */}
-              <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
-                <h2 className="font-black text-white text-sm mb-4">Traffic — last 14 days</h2>
-                {traffic.length===0?<p className="text-slate-500 text-sm text-center py-8">No traffic data yet</p>:(
-                  <div className="space-y-2.5">
-                    {traffic.slice(-14).map((e:any)=>{
-                      const maxV=Math.max(...traffic.slice(-14).map((x:any)=>x.visits||0),1);
-                      const maxB=Math.max(...traffic.slice(-14).map((x:any)=>x.bookings||x.booking_count||0),1);
-                      return (
-                        <div key={e.date} className="flex items-center gap-3">
-                          <span className="text-[10px] text-slate-500 w-16 flex-shrink-0">{e.date?.slice(5)}</span>
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center gap-2"><span className="w-12 text-[9px] text-slate-600">Visits</span><div className="flex-1 bg-slate-800 rounded-full h-1.5"><div className="h-full bg-indigo-500 rounded-full" style={{width:`${((e.visits||0)/maxV)*100}%`}}/></div><span className="text-[10px] text-white w-5 text-right">{e.visits||0}</span></div>
-                            <div className="flex items-center gap-2"><span className="w-12 text-[9px] text-slate-600">Bookings</span><div className="flex-1 bg-slate-800 rounded-full h-1.5"><div className="h-full bg-emerald-500 rounded-full" style={{width:`${((e.bookings||e.booking_count||0)/maxB)*100}%`}}/></div><span className="text-[10px] text-white w-5 text-right">{e.bookings||e.booking_count||0}</span></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Recent Bookings */}
               <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-black text-white text-sm">Recent Bookings</h2>
@@ -666,99 +646,9 @@ export default function AdminPage() {
                   {bookings.length===0&&<p className="text-slate-500 text-sm text-center py-6">No bookings yet</p>}
                 </div>
               </div>
-
-              {/* Revenue Analytics */}
-              {(()=>{
-                const now=new Date();
-                const months=Array.from({length:6},(_,i)=>{ const d=new Date(now.getFullYear(),now.getMonth()-(5-i),1); return {month:d.toLocaleString('default',{month:'short'}),m:d.getMonth(),y:d.getFullYear()}; });
-                const monthlyData=months.map(({month,m,y})=>{ const mb=bookings.filter(b=>{ const d=new Date(b.booked_at||b.created_at||''); return d.getMonth()===m&&d.getFullYear()===y; }); const revenue=mb.filter(b=>b.status==='completed').reduce((s,b)=>s+(b.total||b.total_price||0),0); return {month,revenue,count:mb.length}; });
-                const maxRev=Math.max(...monthlyData.map(m=>m.revenue),1);
-                const totalRev6m=monthlyData.reduce((s,m)=>s+m.revenue,0);
-                const totalFee6m=Math.round(totalRev6m*0.10);
-                const totalBookings6m=monthlyData.reduce((s,m)=>s+m.count,0);
-                const vehicleBookings:Record<string,{name:string;count:number;revenue:number;img:string}>={};
-                bookings.forEach(b=>{ if(!b.vehicle_id) return; if(!vehicleBookings[b.vehicle_id]) vehicleBookings[b.vehicle_id]={name:b.vehicle_name||'Unknown',count:0,revenue:0,img:b.vehicle_img||''}; vehicleBookings[b.vehicle_id].count++; vehicleBookings[b.vehicle_id].revenue+=b.total||0; });
-                const topVehicles=Object.values(vehicleBookings).sort((a,b)=>b.count-a.count).slice(0,5);
-                const maxVCount=Math.max(...topVehicles.map(v=>v.count),1);
-                const partnerRevenue:Record<string,{name:string;revenue:number;count:number}>={};
-                bookings.filter(b=>b.status==='completed').forEach(b=>{ const k=b.owner_id||b.shop_name||'unknown'; if(!partnerRevenue[k]) partnerRevenue[k]={name:b.shop_name||'Unknown',revenue:0,count:0}; partnerRevenue[k].revenue+=b.total||0; partnerRevenue[k].count++; });
-                const topPartners=Object.values(partnerRevenue).sort((a,b)=>b.revenue-a.revenue).slice(0,5);
-                const maxPRev=Math.max(...topPartners.map(p=>p.revenue),1);
-                const typeBreakdown={car:0,bike:0,van:0,tuk:0};
-                vehicles.forEach((v:any)=>{ if(v.type in typeBreakdown)(typeBreakdown as any)[v.type]++; });
-                const typeTotal=Object.values(typeBreakdown).reduce((s,v)=>s+v,0)||1;
-                const typeColors:Record<string,string>={car:'bg-blue-500',bike:'bg-emerald-500',van:'bg-purple-500',tuk:'bg-amber-500'};
-                const typeLabels:Record<string,string>={car:'🚙 Cars',bike:'🏍️ Bikes',van:'🚐 Vans',tuk:'🛺 Tuk-tuks'};
-                return (<>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[{l:'Total Revenue (6m)',v:`Rs. ${totalRev6m.toLocaleString()}`,i:'💰',c:'border-teal-800/50 bg-teal-900/20',t:'text-teal-400'},{l:'Drivo Earnings (6m)',v:`Rs. ${totalFee6m.toLocaleString()}`,i:'📈',c:'border-emerald-800/50 bg-emerald-900/20',t:'text-emerald-400'},{l:'Total Bookings (6m)',v:totalBookings6m,i:'📋',c:'border-blue-800/50 bg-blue-900/20',t:'text-blue-400'}].map(s=>(
-                      <div key={s.l} className={`border ${s.c} rounded-2xl p-4`}><div className="text-xl mb-1">{s.i}</div><div className={`text-lg font-black ${s.t}`}>{s.v}</div><div className="text-[10px] text-slate-400 mt-0.5">{s.l}</div></div>
-                    ))}
-                  </div>
-                  <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
-                    <div className="flex items-center justify-between mb-5"><h2 className="font-black text-white text-sm">📊 Monthly Revenue</h2><span className="text-[10px] text-slate-500">Last 6 months</span></div>
-                    <div className="flex items-end gap-2 h-32">
-                      {monthlyData.map((m,i)=>(
-                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                          <span className="text-[9px] text-slate-400">{m.revenue>0?`${(m.revenue/1000).toFixed(0)}k`:''}</span>
-                          <div className="w-full flex flex-col gap-0.5 justify-end" style={{height:'80px'}}>
-                            <div className="w-full bg-teal-500 rounded-t-lg transition-all duration-500 relative group" style={{height:`${Math.max((m.revenue/maxRev)*80,m.revenue>0?4:0)}px`}}>
-                              {m.revenue>0&&<div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-700 text-white text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none z-10">Rs. {m.revenue.toLocaleString()}</div>}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-slate-500">{m.month}</span>
-                          <span className="text-[9px] text-slate-600">{m.count}b</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
-                      <h2 className="font-black text-white text-sm mb-4">🏆 Top Vehicles</h2>
-                      {topVehicles.length===0?<p className="text-slate-500 text-xs text-center py-6">No booking data yet</p>:(
-                        <div className="space-y-3">{topVehicles.map((v,i)=>(
-                          <div key={i} className="flex items-center gap-3">
-                            <span className={`text-sm font-black w-5 flex-shrink-0 ${i===0?'text-amber-400':i===1?'text-slate-300':i===2?'text-amber-700':'text-slate-600'}`}>#{i+1}</span>
-                            {v.img&&<img src={v.img} alt="" className="w-10 h-7 rounded-lg object-cover flex-shrink-0 bg-slate-700"/>}
-                            <div className="flex-1 min-w-0"><p className="text-xs font-black text-white truncate">{v.name}</p><div className="flex-1 bg-slate-800 rounded-full h-1 mt-1"><div className="h-full bg-amber-500 rounded-full" style={{width:`${(v.count/maxVCount)*100}%`}}/></div></div>
-                            <div className="text-right flex-shrink-0"><p className="text-xs font-black text-white">{v.count} <span className="text-slate-500 font-normal">bk</span></p><p className="text-[10px] text-emerald-400">Rs. {v.revenue.toLocaleString()}</p></div>
-                          </div>
-                        ))}</div>
-                      )}
-                    </div>
-                    <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
-                      <h2 className="font-black text-white text-sm mb-4">🏪 Top Partners</h2>
-                      {topPartners.length===0?<p className="text-slate-500 text-xs text-center py-6">No completed bookings yet</p>:(
-                        <div className="space-y-3">{topPartners.map((p,i)=>(
-                          <div key={i} className="flex items-center gap-3">
-                            <span className={`text-sm font-black w-5 flex-shrink-0 ${i===0?'text-amber-400':i===1?'text-slate-300':i===2?'text-amber-700':'text-slate-600'}`}>#{i+1}</span>
-                            <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0">{(p.name||'P').charAt(0).toUpperCase()}</div>
-                            <div className="flex-1 min-w-0"><p className="text-xs font-black text-white truncate">{p.name}</p><div className="flex-1 bg-slate-800 rounded-full h-1 mt-1"><div className="h-full bg-teal-500 rounded-full" style={{width:`${(p.revenue/maxPRev)*100}%`}}/></div></div>
-                            <div className="text-right flex-shrink-0"><p className="text-xs font-black text-emerald-400">Rs. {p.revenue.toLocaleString()}</p><p className="text-[10px] text-slate-500">{p.count} done</p></div>
-                          </div>
-                        ))}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
-                      <h2 className="font-black text-white text-sm mb-4">🚗 Fleet Breakdown</h2>
-                      <div className="space-y-3">{Object.entries(typeBreakdown).map(([type,count])=>(
-                        <div key={type} className="flex items-center gap-3"><span className="text-xs text-slate-400 w-20 flex-shrink-0">{typeLabels[type]}</span><div className="flex-1 bg-slate-800 rounded-full h-2"><div className={`h-full rounded-full ${typeColors[type]}`} style={{width:`${(count/typeTotal)*100}%`}}/></div><span className="text-xs font-black text-white w-6 text-right">{count}</span><span className="text-[10px] text-slate-500 w-8 text-right">{Math.round((count/typeTotal)*100)}%</span></div>
-                      ))}</div>
-                      <div className="mt-4 pt-3 border-t border-slate-800/50 flex items-center justify-between"><span className="text-xs text-slate-400">Total vehicles</span><span className="text-sm font-black text-white">{vehicles.length}</span></div>
-                    </div>
-                    <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
-                      <h2 className="font-black text-white text-sm mb-4">📋 Booking Status</h2>
-                      {(()=>{ const statusData=[{label:'Confirmed',count:bookings.filter(b=>b.status==='confirmed').length,color:'bg-emerald-500',tc:'text-emerald-400'},{label:'Approved',count:bookings.filter(b=>b.status==='admin_approved').length,color:'bg-blue-500',tc:'text-blue-400'},{label:'Pending',count:bookings.filter(b=>b.status==='pending').length,color:'bg-amber-500',tc:'text-amber-400'},{label:'Completed',count:bookings.filter(b=>b.status==='completed').length,color:'bg-indigo-500',tc:'text-indigo-400'},{label:'Declined',count:bookings.filter(b=>b.status==='declined').length,color:'bg-red-500',tc:'text-red-400'}]; const maxS=Math.max(...statusData.map(s=>s.count),1); const convRate=bookings.length>0?Math.round((bookings.filter(b=>b.status==='completed').length/bookings.length)*100):0; return (<><div className="space-y-3">{statusData.map(s=>(<div key={s.label} className="flex items-center gap-3"><span className="text-xs text-slate-400 w-20 flex-shrink-0">{s.label}</span><div className="flex-1 bg-slate-800 rounded-full h-2"><div className={`h-full rounded-full ${s.color}`} style={{width:`${(s.count/maxS)*100}%`}}/></div><span className={`text-xs font-black w-6 text-right ${s.tc}`}>{s.count}</span></div>))}</div><div className="mt-4 pt-3 border-t border-slate-800/50 flex items-center justify-between"><span className="text-xs text-slate-400">Completion rate</span><span className={`text-sm font-black ${convRate>=50?'text-emerald-400':'text-amber-400'}`}>{convRate}%</span></div></>); })()}
-                    </div>
-                  </div>
-                </>);
-              })()}
             </div>
           )}
 
-          {/* ══ PARTNERS ══ */}
           {tab==='partners'&&(
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -794,7 +684,6 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ══ CUSTOMERS ══ */}
           {tab==='customers'&&(
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -830,7 +719,6 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ══ VEHICLES ══ */}
           {tab==='vehicles'&&(
             <div className="space-y-4">
               <div><h1 className="text-2xl font-black text-white">Vehicles</h1><p className="text-slate-500 text-sm">{vehicles.length} total · {liveVehicles.length} live · {vehicles.length-liveVehicles.length} hidden</p></div>
@@ -861,12 +749,10 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ══ BOOKINGS ══ */}
           {tab==='bookings'&&(
             <div className="space-y-4">
               <div><h1 className="text-2xl font-black text-white">All Bookings</h1><p className="text-slate-500 text-sm">{bookings.length} total · {pendingBookings.length} pending action · platform earnings: Rs. {platformEarnings.toLocaleString()}</p></div>
 
-              {/* Pending action banner */}
               {pendingBookings.length>0&&(
                 <div className="bg-amber-900/20 border border-amber-700/50 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -906,18 +792,18 @@ export default function AdminPage() {
                           <td className="px-4 py-3 font-black text-white">Rs.{(b.total||b.total_price||0).toLocaleString()}</td>
                           <td className="px-4 py-3 text-emerald-400 font-bold">Rs.{(b.platform_fee||Math.round((b.total||b.total_price||0)*0.10)).toLocaleString()}</td>
                           <td className="px-4 py-3">
-                            <div className="flex gap-1">
-                              <span title="Admin" className={`w-2 h-2 rounded-full ${b.wa_admin_sent_at?'bg-emerald-400':'bg-slate-600'}`}/>
-                              <span title="Partner" className={`w-2 h-2 rounded-full ${b.wa_partner_sent_at?'bg-emerald-400':'bg-slate-600'}`}/>
-                              <span title="Customer" className={`w-2 h-2 rounded-full ${b.wa_customer_sent_at?'bg-emerald-400':'bg-slate-600'}`}/>
+                            <div className="flex gap-1" title="Admin / Partner / Customer">
+                              <span className={`w-2 h-2 rounded-full ${b.wa_admin_sent_at?'bg-emerald-400':'bg-slate-600'}`}/>
+                              <span className={`w-2 h-2 rounded-full ${b.wa_partner_sent_at?'bg-emerald-400':'bg-slate-600'}`}/>
+                              <span className={`w-2 h-2 rounded-full ${b.wa_customer_sent_at?'bg-emerald-400':'bg-slate-600'}`}/>
                             </div>
                           </td>
                           <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase border ${statusColor(b.status)}`}>{statusLabel(b.status)}</span></td>
                           <td className="px-4 py-3 text-right space-x-1" onClick={e=>e.stopPropagation()}>
                             {b.status==='pending'&&(
-                              <button onClick={async()=>{ setSelectedBooking(b); }} className="text-[11px] font-black px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition text-white">Approve</button>
+                              <button onClick={()=>setSelectedBooking(b)} className="text-[11px] font-black px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition text-white">Approve</button>
                             )}
-                            <button onClick={()=>{ if(!confirm('Delete this booking from history?')) return; supabase.from('bookings').delete().eq('id',b.id); setBookings(p=>p.filter(x=>x.id!==b.id)); showToast('Booking deleted','err'); }} className="text-[11px] font-black px-2 py-1 bg-red-900/50 hover:bg-red-600 rounded-lg transition text-red-400">🗑</button>
+                            <button onClick={()=>deleteBooking(b.id)} className="text-[11px] font-black px-2 py-1 bg-red-900/50 hover:bg-red-600 rounded-lg transition text-red-400">🗑</button>
                           </td>
                         </tr>
                       ))}
