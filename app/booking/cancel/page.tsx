@@ -1,9 +1,9 @@
 'use client';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function BookingCancelPage() {
+function CancelContent() {
   const params = useSearchParams();
-  const bookingId = params.get('booking_id');
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
@@ -21,5 +21,13 @@ export default function BookingCancelPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BookingCancelPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900"/></div>}>
+      <CancelContent />
+    </Suspense>
   );
 }
