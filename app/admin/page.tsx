@@ -12,6 +12,7 @@ const ADMIN_PASSWORD = 'Drivo@Admin2026!';
 const ADMIN_SESSION  = 'drivo_admin_v2';
 
 type AdminTab = 'dashboard'|'partners'|'customers'|'vehicles'|'bookings';
+type TrafficFilter = 'daily'|'weekly'|'monthly'|'yearly';
 
 function DrivoLogo({ className='w-8 h-8' }:{className?:string}) {
   return (
@@ -38,6 +39,130 @@ const statusLabel = (s:string) =>
   s==='declined'       ? '❌ Declined' :
   s==='completed'      ? '🏁 Completed' :
   s==='cancelled'      ? '🚫 Cancelled' : s;
+
+// ── Traffic Graph Component
+function TrafficGraph({ traffic, bookings }: { traffic: any[]; bookings: any[] }) {
+  const [filter, setFilter] = useState<TrafficFilter>('daily');
+
+  const getFilteredData = () => {
+    const now = new Date();
+    if (filter === 'daily') {
+      return traffic.slice(-14).map((e: any) => ({
+        label: e.date?.slice(5) || '',
+        visits: e.visits || 0,
+        bookings: e.bookings || e.booking_count || 0,
+      }));
+    }
+    if (filter === 'weekly') {
+      const weeks: Record<string, { label: string; visits: number; bookings: number }> = {};
+      traffic.forEach((e: any) => {
+        const d = new Date(e.date);
+        const wk = `W${Math.ceil(d.getDate() / 7)}-${d.getMonth() + 1}`;
+        if (!weeks[wk]) weeks[wk] = { label: wk, visits: 0, bookings: 0 };
+        weeks[wk].visits += e.visits || 0;
+        weeks[wk].bookings += e.bookings || e.booking_count || 0;
+      });
+      return Object.values(weeks).slice(-8);
+    }
+    if (filter === 'monthly') {
+      const months: Record<string, { label: string; visits: number; bookings: number }> = {};
+      traffic.forEach((e: any) => {
+        const d = new Date(e.date);
+        const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+        if (!months[mk]) months[mk] = { label, visits: 0, bookings: 0 };
+        months[mk].visits += e.visits || 0;
+        months[mk].bookings += e.bookings || e.booking_count || 0;
+      });
+      return Object.values(months).slice(-12);
+    }
+    if (filter === 'yearly') {
+      const years: Record<string, { label: string; visits: number; bookings: number }> = {};
+      traffic.forEach((e: any) => {
+        const yr = new Date(e.date).getFullYear().toString();
+        if (!years[yr]) years[yr] = { label: yr, visits: 0, bookings: 0 };
+        years[yr].visits += e.visits || 0;
+        years[yr].bookings += e.bookings || e.booking_count || 0;
+      });
+      return Object.values(years);
+    }
+    return [];
+  };
+
+  const data = getFilteredData();
+  const totalVisits = data.reduce((s, e) => s + e.visits, 0);
+  const totalBookings = data.reduce((s, e) => s + e.bookings, 0);
+  const maxV = Math.max(...data.map(e => e.visits), 1);
+  const maxB = Math.max(...data.map(e => e.bookings), 1);
+
+  return (
+    <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <div>
+          <h2 className="font-black text-white text-sm">📊 Traffic & Bookings</h2>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            {totalVisits.toLocaleString()} visits · {totalBookings} bookings
+          </p>
+        </div>
+        <div className="flex gap-1 bg-slate-800/60 rounded-xl p-1">
+          {(['daily', 'weekly', 'monthly', 'yearly'] as TrafficFilter[]).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition ${filter === f ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}>
+              {f === 'daily' ? 'Daily' : f === 'weekly' ? 'Weekly' : f === 'monthly' ? 'Monthly' : 'Yearly'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {data.length === 0 ? (
+        <p className="text-slate-500 text-sm text-center py-8">No traffic data yet</p>
+      ) : (
+        <>
+          {/* Legend */}
+          <div className="flex gap-4 mb-4">
+            <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 bg-indigo-500 rounded-full"/><span className="text-[10px] text-slate-400">Visits</span></div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 bg-emerald-500 rounded-full"/><span className="text-[10px] text-slate-400">Bookings</span></div>
+          </div>
+
+          {/* Bar chart */}
+          <div className="flex items-end gap-1.5 h-32 mb-3">
+            {data.map((e, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
+                {/* Tooltip */}
+                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-700 text-white text-[9px] px-2 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition pointer-events-none z-10 text-center">
+                  {e.label}<br/>{e.visits}v · {e.bookings}b
+                </div>
+                <div className="w-full flex flex-col gap-0.5 justify-end" style={{ height: '112px' }}>
+                  {/* Visits bar */}
+                  <div className="w-full bg-indigo-500/20 rounded-sm relative overflow-hidden" style={{ height: `${Math.max((e.visits / maxV) * 80, e.visits > 0 ? 3 : 0)}px` }}>
+                    <div className="absolute inset-0 bg-indigo-500 rounded-sm"/>
+                  </div>
+                  {/* Bookings bar */}
+                  <div className="w-full bg-emerald-500/20 rounded-sm relative overflow-hidden" style={{ height: `${Math.max((e.bookings / maxB) * 28, e.bookings > 0 ? 3 : 0)}px` }}>
+                    <div className="absolute inset-0 bg-emerald-500 rounded-sm"/>
+                  </div>
+                </div>
+                <span className="text-[8px] text-slate-600 truncate w-full text-center">{e.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Summary row */}
+          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-800/50">
+            <div className="bg-indigo-900/20 border border-indigo-800/30 rounded-xl p-3">
+              <p className="text-lg font-black text-indigo-400">{totalVisits.toLocaleString()}</p>
+              <p className="text-[10px] text-slate-400">Total Visits</p>
+            </div>
+            <div className="bg-emerald-900/20 border border-emerald-800/30 rounded-xl p-3">
+              <p className="text-lg font-black text-emerald-400">{totalBookings}</p>
+              <p className="text-[10px] text-slate-400">Total Bookings</p>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function AdminResetPasswordModal({ user, userType, onClose, showToast }: {
   user: any; userType: 'owner'|'customer'; onClose: ()=>void; showToast:(msg:string,type?:'ok'|'err')=>void;
@@ -115,21 +240,14 @@ function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate,
     if (!confirm('Approve this booking and notify the partner via WhatsApp?')) return;
     setActing(true);
     try {
-      // Update status
       await supabase.from('bookings').update({ status: 'admin_approved' }).eq('id', booking.id);
-
-      // Notify partner via WhatsApp
-      const waRes = await fetch('/api/bookings/notify-partner', {
+      await fetch('/api/bookings/notify-partner', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ bookingId: booking.id }),
       });
-
       const now = new Date().toISOString();
       const updates = { status: 'admin_approved', wa_partner_sent_at: now };
-
-      // Update wa_partner_sent_at in DB
       await supabase.from('bookings').update({ wa_partner_sent_at: now }).eq('id', booking.id);
-
       setLocalBooking((p:any) => ({...p, ...updates}));
       onStatusChange(booking.id, 'admin_approved');
       onBookingUpdate(booking.id, updates);
@@ -143,17 +261,13 @@ function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate,
     setActing(true);
     try {
       await supabase.from('bookings').update({ status: 'declined', decline_reason: reason }).eq('id', booking.id);
-
-      // Notify customer
       await fetch('/api/bookings/notify-customer', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ bookingId: booking.id, type: 'declined' }),
       });
-
       const now = new Date().toISOString();
       const updates = { status: 'declined', wa_customer_sent_at: now };
       await supabase.from('bookings').update({ wa_customer_sent_at: now }).eq('id', booking.id);
-
       setLocalBooking((p:any) => ({...p, ...updates}));
       onStatusChange(booking.id, 'declined');
       onBookingUpdate(booking.id, updates);
@@ -188,7 +302,6 @@ function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate,
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl w-8 h-8 flex items-center justify-center">×</button>
         </div>
-
         <div className="p-6 space-y-5">
           <div className="flex gap-4">
             <img src={b.vehicle_img||''} className="w-28 h-20 rounded-xl object-cover flex-shrink-0 bg-slate-800" alt=""/>
@@ -197,7 +310,6 @@ function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate,
               <p className="text-xs text-slate-400 mt-1">{b.shop_name} · {b.location}</p>
             </div>
           </div>
-
           <div className="bg-slate-800/50 rounded-xl divide-y divide-slate-700/50 border border-slate-700">
             {[
               ['Booking ID',     b.id?.slice(0,8)+'...'],
@@ -217,8 +329,6 @@ function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate,
               </div>
             ))}
           </div>
-
-          {/* WhatsApp tracking */}
           <div className="bg-slate-900 rounded-xl border border-slate-700 p-4">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-3">WhatsApp Status</p>
             <div className="space-y-2">
@@ -231,13 +341,11 @@ function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate,
                   <span className="text-slate-400">{item.label}</span>
                   {item.sent
                     ? <span className="text-emerald-400 font-bold">✅ {new Date(item.sent).toLocaleTimeString()}</span>
-                    : <span className="text-slate-600">—</span>
-                  }
+                    : <span className="text-slate-600">—</span>}
                 </div>
               ))}
             </div>
           </div>
-
           {b.status === 'pending' && (
             <div className="space-y-2">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Admin Action</p>
@@ -253,14 +361,12 @@ function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate,
               </div>
             </div>
           )}
-
           {b.status === 'admin_approved' && (
             <div className="bg-blue-900/20 border border-blue-800/50 rounded-xl p-4 text-center">
               <p className="text-xs text-blue-300 font-bold">⏳ Waiting for partner to confirm or decline</p>
               <p className="text-[10px] text-blue-400/70 mt-1">Partner was notified via WhatsApp</p>
             </div>
           )}
-
           {b.status === 'confirmed' && (
             <div className="space-y-2">
               <div className="bg-emerald-900/20 border border-emerald-800/50 rounded-xl p-4 text-center">
@@ -272,13 +378,11 @@ function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate,
               </button>
             </div>
           )}
-
           {(b.status === 'completed' || b.status === 'declined' || b.status === 'cancelled') && (
             <div className={`rounded-xl p-4 text-center text-xs font-bold ${b.status==='completed' ? 'bg-indigo-900/20 border border-indigo-800/50 text-indigo-300' : 'bg-red-900/20 border border-red-800/50 text-red-300'}`}>
               {b.status==='completed' ? '🏁 Booking completed' : b.status==='declined' ? '❌ Booking declined' : '🚫 Booking cancelled'}
             </div>
           )}
-
           {b.customer_id && <CustomerInfoCard customerId={b.customer_id}/>}
         </div>
       </div>
@@ -324,7 +428,7 @@ export default function AdminPage() {
       supabase.from('customers').select('*').is('deleted_at',null).order('created_at',{ascending:false}).limit(1000),
       supabase.from('vehicles').select('*,vehicle_photos(storage_url,sort_order)').order('created_at',{ascending:false}).limit(500),
       supabase.from('bookings').select('*').order('booked_at',{ascending:false}).limit(1000),
-      supabase.from('traffic').select('*').order('date',{ascending:false}).limit(60),
+      supabase.from('traffic').select('*').order('date',{ascending:false}).limit(365),
     ]);
     if(ow.data) setOwners(ow.data);
     if(cu.data) setCustomers(cu.data);
@@ -373,12 +477,9 @@ export default function AdminPage() {
   };
   const logout = ()=>{ sessionStorage.removeItem(ADMIN_SESSION); setAuthed(false); };
 
-  // Update booking status locally — no refresh needed
   const onStatusChange = (id:string, status:string) => {
     setBookings(p=>p.map(b=>b.id===id?{...b,status}:b));
   };
-
-  // Update any booking fields locally
   const onBookingUpdate = (id:string, data:any) => {
     setBookings(p=>p.map(b=>b.id===id?{...b,...data}:b));
   };
@@ -421,7 +522,6 @@ export default function AdminPage() {
   const activeBookings    = bookings.filter(b=>!['cancelled','declined'].includes(b.status));
   const platformEarnings  = completedBookings.reduce((s,b)=>s+(b.platform_fee||Math.round((b.total||b.total_price||0)*0.10)),0);
   const liveVehicles      = vehicles.filter(v=>v.is_available);
-  const totalVisits       = traffic.reduce((s,e:any)=>s+(e.visits||0),0);
 
   const getPartnerStats = (ownerId:string) => {
     const pb=bookings.filter(b=>b.owner_id===ownerId);
@@ -610,15 +710,17 @@ export default function AdminPage() {
                 <div><h1 className="text-2xl font-black text-white">Analytics Dashboard</h1><p className="text-slate-500 text-sm mt-0.5">Real-time platform overview</p></div>
                 <div className="flex items-center gap-2 text-xs text-emerald-400 font-bold bg-emerald-900/20 border border-emerald-800/50 px-3 py-1.5 rounded-full"><div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"/>Live</div>
               </div>
+
+              {/* Stats grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  {l:'Site Visits',     v:totalVisits,                  i:'👁️',c:'border-indigo-800/50 bg-indigo-900/20'},
                   {l:'Partners',        v:owners.length,                i:'🏪',c:'border-blue-800/50 bg-blue-900/20'},
                   {l:'Customers',       v:customers.length,             i:'🧳',c:'border-purple-800/50 bg-purple-900/20'},
                   {l:'Vehicles',        v:vehicles.length,              i:'🚗',c:'border-slate-700 bg-slate-800/40'},
                   {l:'Live Now',        v:liveVehicles.length,          i:'🟢',c:'border-emerald-800/50 bg-emerald-900/20'},
                   {l:'Active Bookings', v:activeBookings.length,        i:'📋',c:'border-amber-800/50 bg-amber-900/20'},
                   {l:'Pending',         v:pendingBookings.length,       i:'⏳',c:'border-orange-800/50 bg-orange-900/20'},
+                  {l:'Completed',       v:completedBookings.length,     i:'🏁',c:'border-indigo-800/50 bg-indigo-900/20'},
                   {l:'Drivo Earnings',  v:`Rs. ${platformEarnings.toLocaleString()}`,i:'💰',c:'border-teal-800/50 bg-teal-900/20'},
                 ].map(s=>(
                   <div key={s.l} className={`border ${s.c} rounded-2xl p-4`}>
@@ -628,6 +730,11 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Traffic Graph with filter */}
+              <TrafficGraph traffic={traffic} bookings={bookings} />
+
+              {/* Recent Bookings */}
               <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-black text-white text-sm">Recent Bookings</h2>
@@ -645,6 +752,24 @@ export default function AdminPage() {
                   ))}
                   {bookings.length===0&&<p className="text-slate-500 text-sm text-center py-6">No bookings yet</p>}
                 </div>
+              </div>
+
+              {/* Booking status breakdown */}
+              <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+                <h2 className="font-black text-white text-sm mb-4">📋 Booking Status Breakdown</h2>
+                {(()=>{
+                  const statusData=[
+                    {label:'Confirmed',count:bookings.filter(b=>b.status==='confirmed').length,color:'bg-emerald-500',tc:'text-emerald-400'},
+                    {label:'Approved',count:bookings.filter(b=>b.status==='admin_approved').length,color:'bg-blue-500',tc:'text-blue-400'},
+                    {label:'Pending',count:bookings.filter(b=>b.status==='pending').length,color:'bg-amber-500',tc:'text-amber-400'},
+                    {label:'Completed',count:bookings.filter(b=>b.status==='completed').length,color:'bg-indigo-500',tc:'text-indigo-400'},
+                    {label:'Declined',count:bookings.filter(b=>b.status==='declined').length,color:'bg-red-500',tc:'text-red-400'},
+                    {label:'Cancelled',count:bookings.filter(b=>b.status==='cancelled').length,color:'bg-slate-500',tc:'text-slate-400'},
+                  ];
+                  const maxS=Math.max(...statusData.map(s=>s.count),1);
+                  const convRate=bookings.length>0?Math.round((bookings.filter(b=>b.status==='completed').length/bookings.length)*100):0;
+                  return (<><div className="space-y-3">{statusData.map(s=>(<div key={s.label} className="flex items-center gap-3"><span className="text-xs text-slate-400 w-20 flex-shrink-0">{s.label}</span><div className="flex-1 bg-slate-800 rounded-full h-2"><div className={`h-full rounded-full ${s.color}`} style={{width:`${(s.count/maxS)*100}%`}}/></div><span className={`text-xs font-black w-6 text-right ${s.tc}`}>{s.count}</span></div>))}</div><div className="mt-4 pt-3 border-t border-slate-800/50 flex items-center justify-between"><span className="text-xs text-slate-400">Completion rate</span><span className={`text-sm font-black ${convRate>=50?'text-emerald-400':'text-amber-400'}`}>{convRate}%</span></div></>);
+                })()}
               </div>
             </div>
           )}
@@ -741,106 +866,4 @@ export default function AdminPage() {
                           </td>
                         </tr>
                       ); })}
-                      {vehicles.length===0&&<tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">No vehicles yet</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {tab==='bookings'&&(
-            <div className="space-y-4">
-              <div><h1 className="text-2xl font-black text-white">All Bookings</h1><p className="text-slate-500 text-sm">{bookings.length} total · {pendingBookings.length} pending action · platform earnings: Rs. {platformEarnings.toLocaleString()}</p></div>
-
-              {pendingBookings.length>0&&(
-                <div className="bg-amber-900/20 border border-amber-700/50 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse flex-shrink-0"/>
-                    <div>
-                      <p className="text-amber-300 font-black text-sm">{pendingBookings.length} booking{pendingBookings.length>1?'s':''} waiting for approval</p>
-                      <p className="text-amber-400/70 text-xs mt-0.5">Click a booking below to approve and notify partner</p>
-                    </div>
-                  </div>
-                  <button onClick={()=>setBookingFilter('pending')} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-xs uppercase transition flex-shrink-0">View Pending</button>
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-2 items-center">
-                <div className="flex gap-1 bg-slate-800/60 rounded-xl p-1 flex-wrap">
-                  {['all','pending','admin_approved','confirmed','completed','cancelled','declined'].map(f=>(
-                    <button key={f} onClick={()=>setBookingFilter(f)}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition ${bookingFilter===f?'bg-white text-slate-900':'text-slate-400 hover:text-white'}`}>
-                      {f==='admin_approved'?'Approved':f} {f!=='all'&&<span className="ml-1 opacity-60">({bookings.filter(b=>b.status===f).length})</span>}
-                    </button>
-                  ))}
-                </div>
-                <input placeholder="Search vehicle or shop..." value={bookingSearch} onChange={e=>setBookingSearch(e.target.value)} className="bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-4 py-2 outline-none focus:border-slate-500 placeholder:text-slate-600 w-52"/>
-                <span className="text-xs text-slate-500">{filteredBookings.length} results</span>
-              </div>
-
-              <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead><tr className="bg-slate-800/60 text-slate-400 font-black uppercase tracking-wider text-[10px]"><th className="px-4 py-3">Vehicle</th><th className="px-4 py-3">Shop</th><th className="px-4 py-3">Dates</th><th className="px-4 py-3">Total</th><th className="px-4 py-3">Fee</th><th className="px-4 py-3">WhatsApp</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th></tr></thead>
-                    <tbody className="divide-y divide-slate-800/40">
-                      {filteredBookings.map(b=>(
-                        <tr key={b.id} className={`hover:bg-slate-800/30 transition cursor-pointer ${b.status==='pending'?'bg-amber-950/10':''}`} onClick={()=>setSelectedBooking(b)}>
-                          <td className="px-4 py-3"><div className="flex items-center gap-2"><img src={b.vehicle_img||''} className="w-10 h-7 rounded-lg object-cover flex-shrink-0 bg-slate-800" alt=""/><span className="font-bold text-white">{b.vehicle_name}</span></div></td>
-                          <td className="px-4 py-3 text-slate-300">{b.shop_name}</td>
-                          <td className="px-4 py-3 text-slate-300">{b.pickup_date||b.start_date}<br/><span className="text-slate-500">→ {b.return_date||b.end_date}</span></td>
-                          <td className="px-4 py-3 font-black text-white">Rs.{(b.total||b.total_price||0).toLocaleString()}</td>
-                          <td className="px-4 py-3 text-emerald-400 font-bold">Rs.{(b.platform_fee||Math.round((b.total||b.total_price||0)*0.10)).toLocaleString()}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex gap-1" title="Admin / Partner / Customer">
-                              <span className={`w-2 h-2 rounded-full ${b.wa_admin_sent_at?'bg-emerald-400':'bg-slate-600'}`}/>
-                              <span className={`w-2 h-2 rounded-full ${b.wa_partner_sent_at?'bg-emerald-400':'bg-slate-600'}`}/>
-                              <span className={`w-2 h-2 rounded-full ${b.wa_customer_sent_at?'bg-emerald-400':'bg-slate-600'}`}/>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase border ${statusColor(b.status)}`}>{statusLabel(b.status)}</span></td>
-                          <td className="px-4 py-3 text-right space-x-1" onClick={e=>e.stopPropagation()}>
-                            {b.status==='pending'&&(
-                              <button onClick={()=>setSelectedBooking(b)} className="text-[11px] font-black px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg transition text-white">Approve</button>
-                            )}
-                            <button onClick={()=>deleteBooking(b.id)} className="text-[11px] font-black px-2 py-1 bg-red-900/50 hover:bg-red-600 rounded-lg transition text-red-400">🗑</button>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredBookings.length===0&&<tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">No bookings found</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function CustomerInfoCard({customerId}:{customerId:string}) {
-  const [cust,setCust]=useState<any>(null);
-  useEffect(()=>{
-    const sb=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    sb.from('customers').select('first_name,last_name,phone,email,nic,driving_license,city,avatar_url').eq('id',customerId).single().then(({data})=>setCust(data));
-  },[customerId]);
-  if(!cust) return <div className="text-xs text-slate-500 text-center py-2">Loading...</div>;
-  return (
-    <div className="bg-blue-900/20 border border-blue-800/50 rounded-xl p-4 space-y-3">
-      <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider">Renter Info</p>
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center text-blue-300 font-black overflow-hidden flex-shrink-0">
-          {cust.avatar_url?<img src={cust.avatar_url} className="w-full h-full object-cover" alt=""/>:(cust.first_name||'U').charAt(0)}
-        </div>
-        <div><p className="font-black text-white text-sm">{cust.first_name} {cust.last_name}</p><p className="text-[10px] text-slate-400">{cust.email}</p></div>
-      </div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        {[['Phone',cust.phone||'—'],['City',cust.city||'—'],['NIC/Passport',cust.nic||'—'],['License',cust.driving_license||'—']].map(([k,v])=>(
-          <div key={k}><p className="text-[9px] text-slate-400 font-bold uppercase">{k}</p><p className="font-black text-white">{v}</p></div>
-        ))}
-      </div>
-    </div>
-  );
-}
+                      {vehicles.length===0&&<tr><t
