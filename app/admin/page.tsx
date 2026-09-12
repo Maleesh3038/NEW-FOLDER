@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -84,7 +84,7 @@ function TrafficGraph({ traffic }: { traffic: any[] }) {
     return Object.values(years);
   };
 
-  const data = getData();
+  const data = useMemo(()=>getData(), [filter, traffic]);
   const totalV = data.reduce((s,e)=>s+e.visits,0);
   const totalB = data.reduce((s,e)=>s+e.bk,0);
   const maxV = Math.max(...data.map(e=>e.visits),1);
