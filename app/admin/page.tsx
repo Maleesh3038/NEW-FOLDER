@@ -354,52 +354,56 @@ function InlineAnalytics() {
 
 // ════════════════════════════════════════════════════════════════════════════
 // TRAFFIC GRAPH (dashboard tab)
+// Uses traffic_events for visits + real bookings table for booking counts
+// Only bookings with status confirmed/completed (i.e. payment done) are counted
 // ════════════════════════════════════════════════════════════════════════════
-function TrafficGraph({ traffic }: { traffic: any[] }) {
+function TrafficGraph({ traffic, bookings: allBookings }: { traffic: any[]; bookings: any[] }) {
   const [filter, setFilter] = useState<TrafficFilter>('daily');
 
+  // Only count bookings that went through payment (confirmed or completed)
+  const paidBookings = useMemo(()=>
+    allBookings.filter(b => b.status === 'confirmed' || b.status === 'completed'),
+  [allBookings]);
+
   const getData = () => {
+    const now = new Date();
     if (filter === 'daily') {
-      return traffic.slice(-14).map((e:any) => ({
-        label: e.date?.slice(5) || '',
-        visits: e.visits || 0,
-        bk: e.bookings || e.booking_count || 0,
-      }));
+      return Array.from({length:14},(_,i)=>{
+        const d = new Date(now); d.setDate(d.getDate()-(13-i));
+        const ds = d.toISOString().split('T')[0];
+        const tRow = traffic.find((e:any)=>e.date===ds);
+        const bk = paidBookings.filter(b=>{
+          const bd = (b.booked_at||b.created_at||'').split('T')[0];
+          return bd===ds;
+        }).length;
+        return { label: d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'}), visits: tRow?.visits||tRow?.visitor_count||0, bk };
+      });
     }
     if (filter === 'weekly') {
-      const weeks: Record<string,{label:string;visits:number;bk:number}> = {};
-      traffic.forEach((e:any) => {
-        const d = new Date(e.date);
-        const k = `W${Math.ceil(d.getDate()/7)}-${d.getMonth()+1}`;
-        if (!weeks[k]) weeks[k] = { label: k, visits: 0, bk: 0 };
-        weeks[k].visits += e.visits || 0;
-        weeks[k].bk += e.bookings || e.booking_count || 0;
+      return Array.from({length:8},(_,i)=>{
+        const ws = new Date(now); ws.setDate(ws.getDate()-(7-i)*7);
+        const we = new Date(ws); we.setDate(we.getDate()+6);
+        const visits = traffic.filter((e:any)=>{ const d=new Date(e.date); return d>=ws&&d<=we; }).reduce((s:number,e:any)=>s+(e.visits||e.visitor_count||0),0);
+        const bk = paidBookings.filter(b=>{ const d=new Date(b.booked_at||b.created_at); return d>=ws&&d<=we; }).length;
+        return { label: ws.toLocaleDateString('en-US',{month:'short',day:'numeric'}), visits, bk };
       });
-      return Object.values(weeks).slice(-8);
     }
     if (filter === 'monthly') {
-      const months: Record<string,{label:string;visits:number;bk:number}> = {};
-      traffic.forEach((e:any) => {
-        const d = new Date(e.date);
-        const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-        const label = d.toLocaleString('default',{month:'short',year:'2-digit'});
-        if (!months[k]) months[k] = { label, visits: 0, bk: 0 };
-        months[k].visits += e.visits || 0;
-        months[k].bk += e.bookings || e.booking_count || 0;
+      return Array.from({length:12},(_,i)=>{
+        const m = new Date(now.getFullYear(),now.getMonth()-(11-i),1);
+        const visits = traffic.filter((e:any)=>{ const d=new Date(e.date); return d.getMonth()===m.getMonth()&&d.getFullYear()===m.getFullYear(); }).reduce((s:number,e:any)=>s+(e.visits||e.visitor_count||0),0);
+        const bk = paidBookings.filter(b=>{ const d=new Date(b.booked_at||b.created_at); return d.getMonth()===m.getMonth()&&d.getFullYear()===m.getFullYear(); }).length;
+        return { label: m.toLocaleDateString('en-US',{month:'short',year:'2-digit'}), visits, bk };
       });
-      return Object.values(months).slice(-12);
     }
-    const years: Record<string,{label:string;visits:number;bk:number}> = {};
-    traffic.forEach((e:any) => {
-      const yr = new Date(e.date).getFullYear().toString();
-      if (!years[yr]) years[yr] = { label: yr, visits: 0, bk: 0 };
-      years[yr].visits += e.visits || 0;
-      years[yr].bk += e.bookings || e.booking_count || 0;
-    });
-    return Object.values(years);
+    // yearly
+    const yrs: Record<string,{label:string;visits:number;bk:number}> = {};
+    traffic.forEach((e:any)=>{ const yr=new Date(e.date).getFullYear().toString(); if(!yrs[yr])yrs[yr]={label:yr,visits:0,bk:0}; yrs[yr].visits+=(e.visits||e.visitor_count||0); });
+    paidBookings.forEach(b=>{ const yr=new Date(b.booked_at||b.created_at).getFullYear().toString(); if(!yrs[yr])yrs[yr]={label:yr,visits:0,bk:0}; yrs[yr].bk++; });
+    return Object.values(yrs).sort((a,b)=>a.label.localeCompare(b.label));
   };
 
-  const data = useMemo(()=>getData(), [filter, traffic]);
+  const data = useMemo(()=>getData(), [filter, traffic, paidBookings]);
   const totalV = data.reduce((s,e)=>s+e.visits,0);
   const totalB = data.reduce((s,e)=>s+e.bk,0);
   const maxV = Math.max(...data.map(e=>e.visits),1);
@@ -890,7 +894,7 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-              <TrafficGraph traffic={traffic}/>
+              <TrafficGraph traffic={traffic} bookings={bookings}/>
               <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4"><h2 className="font-black text-white text-sm">Recent Bookings</h2><button onClick={()=>setTab('bookings')} className="text-xs text-slate-400 hover:text-white">View all →</button></div>
                 <div className="space-y-1">
