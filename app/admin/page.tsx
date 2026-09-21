@@ -14,6 +14,14 @@ const ADMIN_SESSION  = 'drivo_admin_v2';
 type AdminTab = 'dashboard'|'partners'|'customers'|'vehicles'|'bookings';
 type TrafficFilter = 'daily'|'weekly'|'monthly'|'yearly';
 
+// ── Palette ──────────────────────────────────────────────────────────────────
+const C = {
+  blue:    '#3987e5', orange:  '#d95926', aqua:    '#199e70',
+  yellow:  '#c98500', magenta: '#d55181', violet:  '#9085e9',
+  surface: '#0d0d14', surface2:'#111118', border:  '#1e293b',
+  textPri: '#f1f5f9', textSec: '#94a3b8', textMut: '#475569',
+};
+
 function DrivoLogo({ className='w-8 h-8' }:{className?:string}) {
   return (
     <svg className={className} viewBox="0 0 100 100" fill="none">
@@ -40,6 +48,313 @@ const statusLabel = (s:string) =>
   s==='completed'      ? '🏁 Completed' :
   s==='cancelled'      ? '🚫 Cancelled' : s;
 
+// ════════════════════════════════════════════════════════════════════════════
+// ANALYTICS COMPONENTS
+// ════════════════════════════════════════════════════════════════════════════
+
+interface TrafficEvent {
+  id: string; session_id: string; page: string; referrer: string;
+  device: string; browser: string; country: string; created_at: string;
+}
+
+function BarChartSVG({ data, color=C.blue }: { data:{label:string;value:number}[]; color?:string }) {
+  const [hov,setHov] = useState<number|null>(null);
+  const max = Math.max(...data.map(d=>d.value),1);
+  const W=600; const H=160; const PL=32; const PR=8; const PT=16; const PB=36;
+  const cW=W-PL-PR; const cH=H-PT-PB;
+  const barW=Math.max(4,(cW/data.length)*0.6);
+  const gap=cW/data.length;
+  const ticks=[0,0.5,1];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{overflow:'visible'}}>
+      {ticks.map(f=>{
+        const y=PT+cH-f*cH;
+        return <g key={f}>
+          <line x1={PL} x2={W-PR} y1={y} y2={y} stroke="#1e293b" strokeWidth={1}/>
+          <text x={PL-5} y={y+4} textAnchor="end" fontSize={8} fill={C.textMut}>{Math.round(max*f)}</text>
+        </g>;
+      })}
+      {data.map((d,i)=>{
+        const x=PL+i*gap+gap/2;
+        const bH=Math.max(d.value>0?3:0,(d.value/max)*cH);
+        const y=PT+cH-bH;
+        const isH=hov===i;
+        return (
+          <g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'default'}}>
+            <rect x={x-gap/2} y={PT} width={gap} height={cH} fill="transparent"/>
+            <rect x={x-barW/2} y={y} width={barW} height={bH} rx={3} fill={color} opacity={isH?1:0.8}/>
+            {isH&&<g>
+              <rect x={x-44} y={y-40} width={88} height={32} rx={5} fill="#1e293b" stroke="#334155" strokeWidth={1}/>
+              <text x={x} y={y-24} textAnchor="middle" fontSize={9} fill={C.textSec}>{d.label}</text>
+              <text x={x} y={y-12} textAnchor="middle" fontSize={12} fontWeight="700" fill={color}>{d.value}</text>
+            </g>}
+            <text x={x} y={H-4} textAnchor="middle" fontSize={8} fill={C.textMut}
+              transform={data.length>16?`rotate(-40,${x},${H-4})`:undefined}>{d.label}</text>
+          </g>
+        );
+      })}
+      <line x1={PL} x2={W-PR} y1={PT+cH} y2={PT+cH} stroke="#334155" strokeWidth={1}/>
+    </svg>
+  );
+}
+
+function DonutSVG({ slices, title }: { slices:{label:string;value:number;color:string}[]; title:string }) {
+  const [hov,setHov]=useState<number|null>(null);
+  const total=slices.reduce((s,d)=>s+d.value,0)||1;
+  const cx=70;const cy=70;const R=58;const r=32;
+  let angle=-90;
+  function toXY(a:number,rr:number){const rad=a*Math.PI/180;return{x:+(cx+rr*Math.cos(rad)).toFixed(2),y:+(cy+rr*Math.sin(rad)).toFixed(2)};}
+  function arc(pct:number,startA:number){
+    const endA=startA+pct*360;
+    const s=toXY(startA,R);const e=toXY(endA,R);const si=toXY(startA,r);const ei=toXY(endA,r);
+    const lg=pct>0.5?1:0;
+    return `M${s.x} ${s.y} A${R} ${R} 0 ${lg} 1 ${e.x} ${e.y} L${ei.x} ${ei.y} A${r} ${r} 0 ${lg} 0 ${si.x} ${si.y}Z`;
+  }
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <svg viewBox="0 0 140 140" width={130} height={130}>
+        {slices.map((s,i)=>{const pct=s.value/total;const sa=angle;angle+=pct*360;return(
+          <path key={i} d={arc(pct,sa)} fill={s.color} opacity={hov===null||hov===i?1:0.35}
+            stroke="#0d0d14" strokeWidth={2}
+            onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'default',transition:'opacity 0.15s'}}/>
+        );})}
+        <text x={cx} y={cy-5} textAnchor="middle" fontSize={18} fontWeight="800" fill={C.textPri}>
+          {hov!==null?slices[hov].value:total}
+        </text>
+        <text x={cx} y={cy+10} textAnchor="middle" fontSize={9} fill={C.textSec}>
+          {hov!==null?slices[hov].label:title}
+        </text>
+      </svg>
+      <div className="w-full space-y-1">
+        {slices.map((s,i)=>(
+          <div key={i} className="flex items-center justify-between text-[11px]"
+            onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)}
+            style={{opacity:hov===null||hov===i?1:0.4,transition:'opacity 0.15s',cursor:'default'}}>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-sm flex-shrink-0" style={{background:s.color}}/>
+              <span style={{color:C.textSec}}>{s.label}</span>
+            </div>
+            <span style={{color:C.textPri,fontWeight:700}}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TimeHeatmap({ events }: { events:TrafficEvent[] }) {
+  const [hov,setHov]=useState<number|null>(null);
+  const hours=Array.from({length:24},(_,h)=>({h,count:events.filter(e=>new Date(e.created_at).getHours()===h).length}));
+  const max=Math.max(...hours.map(h=>h.count),1);
+  return (
+    <div>
+      <div className="flex gap-0.5 items-end" style={{height:64}}>
+        {hours.map(({h,count})=>{
+          const pct=count/max;
+          const isH=hov===h;
+          return (
+            <div key={h} className="flex flex-col items-center flex-1 h-full justify-end gap-0.5"
+              onMouseEnter={()=>setHov(h)} onMouseLeave={()=>setHov(null)}>
+              {isH&&<span style={{fontSize:8,color:C.textPri,fontWeight:700,whiteSpace:'nowrap'}}>{count}</span>}
+              <div style={{
+                height:`${Math.max(pct*100,count>0?5:1.5)}%`,
+                background:isH?C.blue:`rgba(57,135,229,${0.12+pct*0.88})`,
+                borderRadius:2,width:'100%',transition:'background 0.15s'}}/>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between mt-1" style={{fontSize:8,color:C.textMut}}>
+        {[0,6,12,18,23].map(h=><span key={h}>{h}:00</span>)}
+      </div>
+    </div>
+  );
+}
+
+function InlineAnalytics() {
+  const [filter,setFilter]=useState<TrafficFilter>('daily');
+  const [events,setEvents]=useState<TrafficEvent[]>([]);
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    (async()=>{
+      setLoading(true);
+      const now=new Date();
+      const from=new Date(now);
+      if(filter==='daily')   from.setDate(from.getDate()-14);
+      if(filter==='weekly')  from.setDate(from.getDate()-28);
+      if(filter==='monthly') from.setMonth(from.getMonth()-6);
+      if(filter==='yearly')  from.setFullYear(from.getFullYear()-2);
+      const {data}=await supabase.from('traffic_events').select('*')
+        .gte('created_at',from.toISOString()).order('created_at',{ascending:true});
+      setEvents(data||[]);
+      setLoading(false);
+    })();
+  },[filter]);
+
+  const barData=useMemo(()=>{
+    const now=new Date();
+    if(filter==='daily'){
+      return Array.from({length:14},(_,i)=>{
+        const d=new Date(now);d.setDate(d.getDate()-(13-i));
+        const ds=d.toISOString().split('T')[0];
+        return{label:d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'}),value:events.filter(e=>e.created_at.startsWith(ds)).length};
+      });
+    }
+    if(filter==='weekly'){
+      return Array.from({length:4},(_,i)=>{
+        const ws=new Date(now);ws.setDate(ws.getDate()-(3-i)*7);
+        const we=new Date(ws);we.setDate(we.getDate()+6);
+        return{label:ws.toLocaleDateString('en-US',{month:'short',day:'numeric'}),value:events.filter(e=>{const d=new Date(e.created_at);return d>=ws&&d<=we;}).length};
+      });
+    }
+    if(filter==='monthly'){
+      return Array.from({length:6},(_,i)=>{
+        const m=new Date(now.getFullYear(),now.getMonth()-(5-i),1);
+        return{label:m.toLocaleDateString('en-US',{month:'short',year:'2-digit'}),value:events.filter(e=>{const d=new Date(e.created_at);return d.getMonth()===m.getMonth()&&d.getFullYear()===m.getFullYear();}).length};
+      });
+    }
+    return Array.from({length:24},(_,i)=>{
+      const m=new Date(now.getFullYear(),now.getMonth()-(23-i),1);
+      return{label:m.toLocaleDateString('en-US',{month:'short',year:'2-digit'}),value:events.filter(e=>{const d=new Date(e.created_at);return d.getMonth()===m.getMonth()&&d.getFullYear()===m.getFullYear();}).length};
+    });
+  },[filter,events]);
+
+  const deviceSlices=useMemo(()=>{
+    const c:{[k:string]:number}={mobile:0,desktop:0,tablet:0};
+    events.forEach(e=>{if(e.device in c)c[e.device]++;});
+    return[{label:'Mobile',value:c.mobile,color:C.blue},{label:'Desktop',value:c.desktop,color:C.aqua},{label:'Tablet',value:c.tablet,color:C.yellow}].filter(s=>s.value>0);
+  },[events]);
+
+  const browserSlices=useMemo(()=>{
+    const c:{[k:string]:number}={};
+    events.forEach(e=>{c[e.browser]=(c[e.browser]||0)+1;});
+    const cols=[C.blue,C.orange,C.aqua,C.yellow,C.magenta,C.violet];
+    return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([label,value],i)=>({label,value,color:cols[i%cols.length]}));
+  },[events]);
+
+  const pageSlices=useMemo(()=>{
+    const c:{[k:string]:number}={};
+    events.forEach(e=>{c[e.page||'/']=(c[e.page||'/']||0)+1;});
+    const cols=[C.blue,C.orange,C.aqua,C.yellow,C.magenta,C.violet];
+    return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([label,value],i)=>({label,value,color:cols[i]}));
+  },[events]);
+
+  const topPages=useMemo(()=>{
+    const c:{[k:string]:number}={};
+    events.forEach(e=>{c[e.page||'/']=(c[e.page||'/']||0)+1;});
+    return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  },[events]);
+
+  const total=events.length;
+  const sessions=new Set(events.filter(e=>e.session_id).map(e=>e.session_id)).size;
+  const mobileN=events.filter(e=>e.device==='mobile').length;
+  const peakH=(()=>{const h=Array(24).fill(0);events.forEach(e=>h[new Date(e.created_at).getHours()]++);const mx=Math.max(...h);return mx>0?h.indexOf(mx):null;})();
+
+  const filters:TrafficFilter[]=['daily','weekly','monthly','yearly'];
+
+  return (
+    <div className="mt-8 space-y-4">
+      {/* Section header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-black text-white">📈 Traffic Analytics</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Visitor tracking from <code className="bg-slate-800 px-1 rounded text-slate-400">traffic_events</code> table</p>
+        </div>
+        <div className="flex gap-1 bg-slate-800/60 rounded-xl p-1">
+          {filters.map(f=>(
+            <button key={f} onClick={()=>setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition ${filter===f?'bg-white text-slate-900':'text-slate-400 hover:text-white'}`}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-8 text-center text-slate-500 text-sm animate-pulse">Loading analytics…</div>
+      ) : total===0 ? (
+        <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-10 text-center">
+          <div className="text-3xl mb-3">📭</div>
+          <p className="text-slate-400 font-bold text-sm mb-1">No traffic data yet</p>
+          <p className="text-slate-600 text-xs">Add <code className="bg-slate-800 px-1 rounded">TrafficTracker</code> to your <code className="bg-slate-800 px-1 rounded">layout.tsx</code> to start tracking</p>
+        </div>
+      ) : (
+        <>
+          {/* KPI tiles */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              {label:'Total Visits',value:total.toLocaleString(),color:C.blue,bg:'bg-blue-900/20 border-blue-800/40'},
+              {label:'Unique Sessions',value:sessions.toLocaleString(),color:C.aqua,bg:'bg-emerald-900/20 border-emerald-800/40'},
+              {label:'Mobile Visits',value:`${mobileN} (${total?Math.round(mobileN/total*100):0}%)`,color:C.orange,bg:'bg-orange-900/20 border-orange-800/40'},
+              {label:'Peak Hour',value:peakH!==null?`${peakH}:00`:'—',color:C.yellow,bg:'bg-amber-900/20 border-amber-800/40'},
+            ].map(k=>(
+              <div key={k.label} className={`border ${k.bg} rounded-2xl p-4`}>
+                <p className="text-lg font-black" style={{color:k.color}}>{k.value}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{k.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Bar chart */}
+          <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+            <p className="text-xs font-black text-slate-300 mb-3">
+              Visits Over Time
+              <span className="ml-2 text-[10px] text-slate-600 font-normal">
+                {filter==='daily'?'Last 14 days':filter==='weekly'?'Last 4 weeks':filter==='monthly'?'Last 6 months':'Last 2 years'}
+              </span>
+            </p>
+            <BarChartSVG data={barData} color={C.blue}/>
+          </div>
+
+          {/* Donut charts row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              {title:'Devices',slices:deviceSlices.length?deviceSlices:[{label:'Unknown',value:total,color:C.blue}]},
+              {title:'Browsers',slices:browserSlices.length?browserSlices:[{label:'Unknown',value:total,color:C.blue}]},
+              {title:'Pages',slices:pageSlices.length?pageSlices:[{label:'/',value:total,color:C.blue}]},
+            ].map(({title,slices})=>(
+              <div key={title} className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+                <p className="text-xs font-black text-slate-300 mb-4">{title}</p>
+                <DonutSVG slices={slices} title={title.toLowerCase()}/>
+              </div>
+            ))}
+          </div>
+
+          {/* Time heatmap + top pages side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+              <p className="text-xs font-black text-slate-300 mb-4">Time-of-Day Activity <span className="text-[10px] text-slate-600 font-normal">(hover for count)</span></p>
+              <TimeHeatmap events={events}/>
+            </div>
+            <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+              <p className="text-xs font-black text-slate-300 mb-3">Top Pages</p>
+              <div className="space-y-2">
+                {topPages.map(([page,count],i)=>(
+                  <div key={page} className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-600 w-4 text-right flex-shrink-0">{i+1}</span>
+                    <span className="font-mono text-[11px] text-blue-400 flex-1 truncate">{page||'/'}</span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{width:`${Math.round(count/total*100)}%`,background:C.blue}}/>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-bold w-6 text-right">{count}</span>
+                    </div>
+                  </div>
+                ))}
+                {topPages.length===0&&<p className="text-xs text-slate-600 text-center py-4">No page data</p>}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TRAFFIC GRAPH (dashboard tab)
+// ════════════════════════════════════════════════════════════════════════════
 function TrafficGraph({ traffic }: { traffic: any[] }) {
   const [filter, setFilter] = useState<TrafficFilter>('daily');
 
@@ -140,6 +455,9 @@ function TrafficGraph({ traffic }: { traffic: any[] }) {
   );
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// MODALS
+// ════════════════════════════════════════════════════════════════════════════
 function AdminResetPasswordModal({ user, userType, onClose, showToast }: {
   user: any; userType: 'owner'|'customer'; onClose: ()=>void; showToast:(msg:string,type?:'ok'|'err')=>void;
 }) {
@@ -293,6 +611,9 @@ function BookingActionModal({ booking, onClose, onStatusChange, onBookingUpdate,
   );
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// MAIN ADMIN PAGE
+// ════════════════════════════════════════════════════════════════════════════
 export default function AdminPage() {
   const [authed,setAuthed]       = useState(false);
   const [email,setEmail]         = useState('');
@@ -733,6 +1054,9 @@ export default function AdminPage() {
                   </table>
                 </div>
               </div>
+
+              {/* ── INLINE ANALYTICS SECTION ── */}
+              <InlineAnalytics />
             </div>
           )}
         </main>
