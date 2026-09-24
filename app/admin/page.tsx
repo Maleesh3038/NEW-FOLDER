@@ -11,7 +11,7 @@ const ADMIN_EMAIL    = 'admin@drivo.lk';
 const ADMIN_PASSWORD = 'Drivo@Admin2026!';
 const ADMIN_SESSION  = 'drivo_admin_v2';
 
-type AdminTab = 'dashboard'|'partners'|'customers'|'vehicles'|'bookings';
+type AdminTab = 'dashboard'|'partners'|'customers'|'vehicles'|'bookings'|'traffic';
 type TrafficFilter = 'daily'|'weekly'|'monthly'|'yearly';
 
 // ── Palette ──────────────────────────────────────────────────────────────────
@@ -310,11 +310,11 @@ function InlineAnalytics() {
   const fmtDate=(d:string)=>new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 
   return (
-    <div className="mt-8 space-y-4">
+    <div className="space-y-4">
       {/* Section header + date controls */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-black text-white">📈 Traffic Analytics</h2>
+          <h1 className="text-2xl font-black text-white">Traffic Analytics</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             {rangeFrom&&rangeTo?`${fmtDate(rangeFrom)} → ${fmtDate(rangeTo)} · ${rangeDays} day${rangeDays!==1?'s':''}`:' '}
           </p>
@@ -957,9 +957,9 @@ export default function AdminPage() {
         <aside className="w-56 bg-[#0d0d14] border-r border-slate-800/60 flex flex-col fixed h-full z-40">
           <div className="px-5 py-5 border-b border-slate-800/60"><div className="flex items-center gap-2.5"><DrivoLogo className="w-8 h-8"/><div><p className="font-black text-white text-base leading-tight">drivo</p><span className="text-[9px] text-red-400 font-black uppercase tracking-wider">Admin · Live</span></div></div></div>
           <nav className="flex-1 px-3 py-4 space-y-1">
-            {(['dashboard','partners','customers','vehicles','bookings'] as AdminTab[]).map(key=>{
-              const icons:Record<AdminTab,string> = {dashboard:'📊',partners:'🏪',customers:'🧳',vehicles:'🚗',bookings:'📋'};
-              const labels:Record<AdminTab,string> = {dashboard:'Dashboard',partners:'Partners',customers:'Customers',vehicles:'Vehicles',bookings:'Bookings'};
+            {(['dashboard','partners','customers','vehicles','bookings','traffic'] as AdminTab[]).map(key=>{
+              const icons:Record<AdminTab,string> = {dashboard:'📊',partners:'🏪',customers:'🧳',vehicles:'🚗',bookings:'📋',traffic:'📈'};
+              const labels:Record<AdminTab,string> = {dashboard:'Dashboard',partners:'Partners',customers:'Customers',vehicles:'Vehicles',bookings:'Bookings',traffic:'Traffic'};
               return (
                 <button key={key} onClick={()=>setTab(key)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition text-left ${tab===key?'bg-white text-slate-900':'text-slate-400 hover:bg-slate-800/60 hover:text-white'}`}>
                   <span>{icons[key]}</span>{labels[key]}
@@ -1168,7 +1168,12 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* ── INLINE ANALYTICS SECTION ── */}
+            </div>
+          )}
+
+          {/* ── TRAFFIC TAB ── */}
+          {tab==='traffic'&&(
+            <div className="space-y-2">
               <InlineAnalytics />
             </div>
           )}
