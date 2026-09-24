@@ -175,50 +175,106 @@ function InlineAnalytics() {
   const [filter,setFilter]=useState<TrafficFilter>('daily');
   const [events,setEvents]=useState<TrafficEvent[]>([]);
   const [loading,setLoading]=useState(true);
+  const [showCustom,setShowCustom]=useState(false);
+  const todayStr=()=>new Date().toISOString().split('T')[0];
+  const daysAgoStr=(n:number)=>{const d=new Date();d.setDate(d.getDate()-n+1);return d.toISOString().split('T')[0];};
+  const [customFrom,setCustomFrom]=useState(daysAgoStr(7));
+  const [customTo,setCustomTo]=useState(todayStr());
+  const [activePreset,setActivePreset]=useState<number|null>(7);
+  const [rangeFrom,setRangeFrom]=useState(daysAgoStr(7));
+  const [rangeTo,setRangeTo]=useState(todayStr());
+
+  const loadRange=useCallback(async(from:string,to:string)=>{
+    setLoading(true);
+    const {data}=await supabase.from('traffic_events').select('*')
+      .gte('created_at',`${from}T00:00:00`)
+      .lte('created_at',`${to}T23:59:59`)
+      .order('created_at',{ascending:true});
+    setEvents(data||[]);
+    setLoading(false);
+  },[]);
 
   useEffect(()=>{
-    (async()=>{
-      setLoading(true);
-      const now=new Date();
-      const from=new Date(now);
-      if(filter==='daily')   from.setDate(from.getDate()-14);
-      if(filter==='weekly')  from.setDate(from.getDate()-28);
-      if(filter==='monthly') from.setMonth(from.getMonth()-6);
-      if(filter==='yearly')  from.setFullYear(from.getFullYear()-2);
-      const {data}=await supabase.from('traffic_events').select('*')
-        .gte('created_at',from.toISOString()).order('created_at',{ascending:true});
-      setEvents(data||[]);
-      setLoading(false);
-    })();
+    // legacy filter tab still drives the quick preset on mount
+    const now=new Date();
+    const from=new Date(now);
+    if(filter==='daily')   from.setDate(from.getDate()-14);
+    if(filter==='weekly')  from.setDate(from.getDate()-28);
+    if(filter==='monthly') from.setMonth(from.getMonth()-6);
+    if(filter==='yearly')  from.setFullYear(from.getFullYear()-2);
+    const f=from.toISOString().split('T')[0];
+    const t=now.toISOString().split('T')[0];
+    setRangeFrom(f);setRangeTo(t);
+    loadRange(f,t);
   },[filter]);
 
-  const barData=useMemo(()=>{
-    const now=new Date();
-    if(filter==='daily'){
-      return Array.from({length:14},(_,i)=>{
-        const d=new Date(now);d.setDate(d.getDate()-(13-i));
-        const ds=d.toISOString().split('T')[0];
-        return{label:d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'}),value:events.filter(e=>e.created_at.startsWith(ds)).length};
-      });
-    }
-    if(filter==='weekly'){
-      return Array.from({length:4},(_,i)=>{
-        const ws=new Date(now);ws.setDate(ws.getDate()-(3-i)*7);
-        const we=new Date(ws);we.setDate(we.getDate()+6);
-        return{label:ws.toLocaleDateString('en-US',{month:'short',day:'numeric'}),value:events.filter(e=>{const d=new Date(e.created_at);return d>=ws&&d<=we;}).length};
-      });
-    }
-    if(filter==='monthly'){
-      return Array.from({length:6},(_,i)=>{
-        const m=new Date(now.getFullYear(),now.getMonth()-(5-i),1);
-        return{label:m.toLocaleDateString('en-US',{month:'short',year:'2-digit'}),value:events.filter(e=>{const d=new Date(e.created_at);return d.getMonth()===m.getMonth()&&d.getFullYear()===m.getFullYear();}).length};
-      });
-    }
-    return Array.from({length:24},(_,i)=>{
-      const m=new Date(now.getFullYear(),now.getMonth()-(23-i),1);
-      return{label:m.toLocaleDateString('en-US',{month:'short',year:'2-digit'}),value:events.filter(e=>{const d=new Date(e.created_at);return d.getMonth()===m.getMonth()&&d.getFullYear()===m.getFullYear();}).length};
+  const applyCustom=()=>{
+    if(!customFrom||!customTo||customFrom>customTo)return;
+    setActivePreset(null);
+    setRangeFrom(customFrom);setRangeTo(customTo);
+    loadRange(customFrom,customTo);
+    setShowCustom(false);
+  };
+
+  const setPreset=(days:number)=>{
+    setActivePreset(days);
+    setShowCustom(false);
+    const to=todayStr();
+    const from=daysAgoStr(days);
+    setCustomFrom(from);setCustomTo(to);
+    setRangeFrom(from);setRangeTo(to);
+    loadRange(from,to);
+  };
+
+  // Per-day rows for the selected range
+  const dayRows=useMemo(()=>{
+    if(!rangeFrom||!rangeTo)return[];
+    const days:string[]=[];
+    const cur=new Date(rangeFrom+'T12:00:00');
+    const end=new Date(rangeTo+'T12:00:00');
+    while(cur<=end){days.push(cur.toISOString().split('T')[0]);cur.setDate(cur.getDate()+1);}
+    return days.map(d=>{
+      const dayEvents=events.filter(e=>e.created_at.startsWith(d));
+      const uniqueSessions=new Set(dayEvents.filter(e=>e.session_id).map(e=>e.session_id)).size||dayEvents.length;
+      return{date:d,visitors:uniqueSessions};
     });
-  },[filter,events]);
+  },[events,rangeFrom,rangeTo]);
+
+  const barData=useMemo(()=>{
+    // For long ranges, group by week or month to avoid cramped bars
+    const n=dayRows.length;
+    if(n<=31){
+      return dayRows.map(r=>({
+        label:new Date(r.date+'T12:00:00').toLocaleDateString('en-US',{month:'numeric',day:'numeric'}),
+        value:r.visitors,
+      }));
+    }
+    if(n<=90){
+      // group by week
+      const weeks:{[k:string]:number}={};
+      dayRows.forEach(r=>{
+        const d=new Date(r.date+'T12:00:00');
+        const wStart=new Date(d);wStart.setDate(d.getDate()-d.getDay());
+        const key=wStart.toISOString().split('T')[0];
+        weeks[key]=(weeks[key]||0)+r.visitors;
+      });
+      return Object.entries(weeks).map(([k,v])=>({
+        label:new Date(k+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),
+        value:v,
+      }));
+    }
+    // group by month
+    const months:{[k:string]:number}={};
+    dayRows.forEach(r=>{
+      const d=new Date(r.date+'T12:00:00');
+      const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      months[key]=(months[key]||0)+r.visitors;
+    });
+    return Object.entries(months).map(([k,v])=>({
+      label:new Date(k+'-15T12:00:00').toLocaleDateString('en-US',{month:'short',year:'2-digit'}),
+      value:v,
+    }));
+  },[dayRows]);
 
   const deviceSlices=useMemo(()=>{
     const c:{[k:string]:number}={mobile:0,desktop:0,tablet:0};
@@ -247,27 +303,50 @@ function InlineAnalytics() {
   },[events]);
 
   const total=events.length;
-  const sessions=new Set(events.filter(e=>e.session_id).map(e=>e.session_id)).size;
+  const sessions=new Set(events.filter(e=>e.session_id).map(e=>e.session_id)).size||total;
   const mobileN=events.filter(e=>e.device==='mobile').length;
   const peakH=(()=>{const h=Array(24).fill(0);events.forEach(e=>h[new Date(e.created_at).getHours()]++);const mx=Math.max(...h);return mx>0?h.indexOf(mx):null;})();
-
-  const filters:TrafficFilter[]=['daily','weekly','monthly','yearly'];
+  const rangeDays=dayRows.length||1;
+  const fmtDate=(d:string)=>new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 
   return (
     <div className="mt-8 space-y-4">
-      {/* Section header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* Section header + date controls */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-black text-white">📈 Traffic Analytics</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Visitor tracking from <code className="bg-slate-800 px-1 rounded text-slate-400">traffic_events</code> table</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {rangeFrom&&rangeTo?`${fmtDate(rangeFrom)} → ${fmtDate(rangeTo)} · ${rangeDays} day${rangeDays!==1?'s':''}`:' '}
+          </p>
         </div>
-        <div className="flex gap-1 bg-slate-800/60 rounded-xl p-1">
-          {filters.map(f=>(
-            <button key={f} onClick={()=>setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition ${filter===f?'bg-white text-slate-900':'text-slate-400 hover:text-white'}`}>
-              {f}
+        <div className="flex flex-col items-end gap-2">
+          {/* Quick presets */}
+          <div className="flex gap-1 flex-wrap justify-end">
+            {([1,7,14,30,90] as const).map(n=>(
+              <button key={n} onClick={()=>setPreset(n)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition border ${activePreset===n?'bg-white text-slate-900 border-white':'text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'}`}>
+                {n===1?'Today':`${n}d`}
+              </button>
+            ))}
+            <button onClick={()=>setShowCustom(v=>!v)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition border ${showCustom?'bg-blue-600 text-white border-blue-500':'text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'}`}>
+              📅 Custom
             </button>
-          ))}
+          </div>
+          {/* Custom date picker */}
+          {showCustom&&(
+            <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2">
+              <input type="date" value={customFrom} onChange={e=>setCustomFrom(e.target.value)}
+                className="bg-transparent text-white text-xs border-none outline-none cursor-pointer"/>
+              <span className="text-slate-500 text-xs">→</span>
+              <input type="date" value={customTo} onChange={e=>setCustomTo(e.target.value)}
+                className="bg-transparent text-white text-xs border-none outline-none cursor-pointer"/>
+              <button onClick={applyCustom}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black px-3 py-1 rounded-lg transition">
+                Apply
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -284,9 +363,9 @@ function InlineAnalytics() {
           {/* KPI tiles */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
-              {label:'Total Visits',value:total.toLocaleString(),color:C.blue,bg:'bg-blue-900/20 border-blue-800/40'},
-              {label:'Unique Sessions',value:sessions.toLocaleString(),color:C.aqua,bg:'bg-emerald-900/20 border-emerald-800/40'},
-              {label:'Mobile Visits',value:`${mobileN} (${total?Math.round(mobileN/total*100):0}%)`,color:C.orange,bg:'bg-orange-900/20 border-orange-800/40'},
+              {label:'Unique Visitors',value:sessions.toLocaleString(),color:C.blue,bg:'bg-blue-900/20 border-blue-800/40'},
+              {label:'Total Events',value:total.toLocaleString(),color:C.aqua,bg:'bg-emerald-900/20 border-emerald-800/40'},
+              {label:'Mobile',value:`${mobileN} (${total?Math.round(mobileN/total*100):0}%)`,color:C.orange,bg:'bg-orange-900/20 border-orange-800/40'},
               {label:'Peak Hour',value:peakH!==null?`${peakH}:00`:'—',color:C.yellow,bg:'bg-amber-900/20 border-amber-800/40'},
             ].map(k=>(
               <div key={k.label} className={`border ${k.bg} rounded-2xl p-4`}>
@@ -299,13 +378,43 @@ function InlineAnalytics() {
           {/* Bar chart */}
           <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
             <p className="text-xs font-black text-slate-300 mb-3">
-              Visits Over Time
+              Visitors Per Day
               <span className="ml-2 text-[10px] text-slate-600 font-normal">
-                {filter==='daily'?'Last 14 days':filter==='weekly'?'Last 4 weeks':filter==='monthly'?'Last 6 months':'Last 2 years'}
+                {rangeFrom&&rangeTo?`${fmtDate(rangeFrom)} → ${fmtDate(rangeTo)}`:''}
               </span>
             </p>
             <BarChartSVG data={barData} color={C.blue}/>
           </div>
+
+          {/* Per-day breakdown table */}
+          {dayRows.length>0&&(
+            <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+              <p className="text-xs font-black text-slate-300 mb-3">Daily Breakdown</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-800">
+                      <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Date</th>
+                      <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Day</th>
+                      <th className="text-right text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2">Visitors</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...dayRows].reverse().map(r=>{
+                      const dow=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(r.date+'T12:00:00').getDay()];
+                      return(
+                        <tr key={r.date} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition">
+                          <td className="py-2 pr-4 text-slate-400 font-mono">{r.date}</td>
+                          <td className="py-2 pr-4 text-slate-500">{dow}</td>
+                          <td className="py-2 text-right font-black tabular-nums" style={{color:r.visitors>0?C.blue:'#475569'}}>{r.visitors.toLocaleString()}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Donut charts row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
