@@ -11,7 +11,7 @@ const ADMIN_EMAIL    = 'admin@drivo.lk';
 const ADMIN_PASSWORD = 'Drivo@Admin2026!';
 const ADMIN_SESSION  = 'drivo_admin_v2';
 
-type AdminTab = 'dashboard'|'partners'|'customers'|'vehicles'|'bookings'|'traffic';
+type AdminTab = 'dashboard'|'partners'|'customers'|'vehicles'|'bookings'|'traffic'|'budget';
 type TrafficFilter = 'daily'|'weekly'|'monthly'|'yearly';
 
 // ── Palette ──────────────────────────────────────────────────────────────────
@@ -167,6 +167,305 @@ function TimeHeatmap({ events }: { events:TrafficEvent[] }) {
       <div className="flex justify-between mt-1" style={{fontSize:8,color:C.textMut}}>
         {[0,6,12,18,23].map(h=><span key={h}>{h}:00</span>)}
       </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// INLINE BUDGET TRACKER
+// ════════════════════════════════════════════════════════════════════════════
+const BUDGET_KEY = 'drivo_budget_v1';
+const MONTHS_B = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_FULL_B = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function fmtRs(n: number) {
+  return 'Rs. ' + Math.abs(n).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+interface BudgetEntry { id: string; desc: string; category: string; amount: number; type: 'income'|'expense'; date: string; }
+
+function InlineBudget() {
+  const [entries, setEntries] = useState<BudgetEntry[]>([]);
+  const [budgetView, setBudgetView] = useState<'overview'|'monthly'|'yearly'>('overview');
+  const [desc, setDesc] = useState('');
+  const [cat, setCat] = useState('');
+  const [amount, setAmount] = useState('');
+  const [type, setType] = useState<'income'|'expense'>('income');
+  const [incFilter, setIncFilter] = useState<'all'|'month'|'year'>('all');
+  const [expFilter, setExpFilter] = useState<'all'|'month'|'year'>('all');
+  const [chartYear, setChartYear] = useState(new Date().getFullYear());
+  const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    try { const s = localStorage.getItem(BUDGET_KEY); if (s) setEntries(JSON.parse(s)); } catch {}
+  }, []);
+
+  function save(next: BudgetEntry[]) {
+    setEntries(next);
+    try { localStorage.setItem(BUDGET_KEY, JSON.stringify(next)); } catch {}
+  }
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2200);
+  }
+
+  function addEntry(e: React.FormEvent) {
+    e.preventDefault();
+    const amt = parseFloat(amount);
+    if (!desc.trim() || !amt || amt <= 0) { showToast('Description and valid amount required'); return; }
+    const entry: BudgetEntry = { id: Date.now().toString(36), desc: desc.trim(), category: cat.trim()||'General', amount: amt, type, date: new Date().toISOString() };
+    save([...entries, entry]);
+    setDesc(''); setCat(''); setAmount('');
+    showToast(type === 'income' ? '✓ Income added' : '✓ Expense added');
+  }
+
+  function deleteEntry(id: string) { save(entries.filter(e => e.id !== id)); showToast('Deleted'); }
+
+  function fmtDate(iso: string) { const d = new Date(iso); return d.getDate() + ' ' + MONTHS_B[d.getMonth()] + ' ' + d.getFullYear(); }
+
+  const years = useMemo(() => {
+    const s = new Set([new Date().getFullYear()]);
+    entries.forEach(e => s.add(new Date(e.date).getFullYear()));
+    return [...s].sort((a,b) => b-a);
+  }, [entries]);
+
+  function filterPeriod(list: BudgetEntry[], period: 'all'|'month'|'year') {
+    const now = new Date();
+    if (period === 'month') return list.filter(e => { const d = new Date(e.date); return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth(); });
+    if (period === 'year') return list.filter(e => new Date(e.date).getFullYear()===now.getFullYear());
+    return list;
+  }
+
+  const totalInc = entries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const totalExp = entries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  const balance = totalInc - totalExp;
+
+  const incList = useMemo(()=>filterPeriod(entries.filter(e=>e.type==='income'),incFilter).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()),[entries,incFilter]);
+  const expList = useMemo(()=>filterPeriod(entries.filter(e=>e.type==='expense'),expFilter).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()),[entries,expFilter]);
+
+  const monthData = useMemo(()=>MONTHS_B.map((m,i)=>{
+    const mo = entries.filter(e=>{const d=new Date(e.date);return d.getFullYear()===chartYear&&d.getMonth()===i;});
+    return { label:m, income:mo.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0), expense:mo.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0) };
+  }),[entries,chartYear]);
+
+  const yearlyData = useMemo(()=>years.map(y=>{
+    const yo=entries.filter(e=>new Date(e.date).getFullYear()===y);
+    const inc=yo.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+    const exp=yo.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    return {y,inc,exp,bal:inc-exp};
+  }),[entries,years]);
+
+  const maxChart = Math.max(...monthData.map(d=>Math.max(d.income,d.expense)),1);
+
+  function EntryTable({ list, showType=false }: { list: BudgetEntry[]; showType?: boolean }) {
+    if (!list.length) return <p className="text-slate-500 text-xs text-center py-8">No transactions yet</p>;
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead><tr className="border-b border-slate-800">
+            <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Date</th>
+            <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Description</th>
+            <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Category</th>
+            {showType&&<th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Type</th>}
+            <th className="text-right text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2">Amount</th>
+            <th className="w-8"></th>
+          </tr></thead>
+          <tbody>
+            {list.map(e=>(
+              <tr key={e.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition">
+                <td className="py-2 pr-4 text-slate-400 font-mono whitespace-nowrap">{fmtDate(e.date)}</td>
+                <td className="py-2 pr-4 text-slate-200">{e.desc}</td>
+                <td className="py-2 pr-4 text-slate-500">{e.category}</td>
+                {showType&&<td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${e.type==='income'?'bg-emerald-900/50 text-emerald-400':'bg-red-900/40 text-red-400'}`}>{e.type==='income'?'Income':'Expense'}</span></td>}
+                <td className={`py-2 text-right font-black tabular-nums ${e.type==='income'?'text-emerald-400':'text-red-400'}`}>{e.type==='income'?'+':'−'} {fmtRs(e.amount)}</td>
+                <td className="py-2 text-center"><button onClick={()=>deleteEntry(e.id)} className="text-slate-600 hover:text-red-400 transition text-base leading-none">×</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-black text-white">Budget</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Income & expense tracker</p>
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {(['overview','monthly','yearly'] as const).map(v=>(
+            <button key={v} onClick={()=>setBudgetView(v)}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition border ${budgetView===v?'bg-white text-slate-900 border-white':'text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'}`}>
+              {v.charAt(0).toUpperCase()+v.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPI tiles */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          {label:'Total Income',val:fmtRs(totalInc),cls:'text-emerald-400'},
+          {label:'Total Expenses',val:fmtRs(totalExp),cls:'text-red-400'},
+          {label:'Balance',val:(balance<0?'− ':'')+fmtRs(balance),cls:balance>=0?'text-blue-400':'text-red-400'},
+        ].map(({label,val,cls})=>(
+          <div key={label} className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-4">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+            <p className={`text-lg font-black tabular-nums ${cls}`}>{val}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Add form */}
+      <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+        <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-4">Add Transaction</p>
+        <form onSubmit={addEntry} className="flex flex-wrap gap-2">
+          <input value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Description" className="flex-1 min-w-[140px] bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
+          <input value={cat} onChange={e=>setCat(e.target.value)} placeholder="Category" className="w-32 bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
+          <input value={amount} onChange={e=>setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="Amount (LKR)" className="w-36 bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
+          <select value={type} onChange={e=>setType(e.target.value as 'income'|'expense')} className="bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500">
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+          </select>
+          <button type="submit" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition">Add</button>
+        </form>
+      </div>
+
+      {/* Toast */}
+      {toast&&<div className="bg-slate-700 text-white text-xs font-semibold px-4 py-2 rounded-xl w-fit">{toast}</div>}
+
+      {/* Overview view */}
+      {budgetView==='overview'&&(
+        <>
+          {/* Chart */}
+          <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <p className="text-xs font-black text-slate-300">Monthly Overview</p>
+              <div className="flex gap-1">
+                {years.map(y=>(
+                  <button key={y} onClick={()=>setChartYear(y)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition border ${chartYear===y?'bg-white text-slate-900 border-white':'text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'}`}>
+                    {y}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-4 mb-3">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-emerald-500"/><span className="text-[10px] text-slate-400">Income</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-1.5 rounded-full bg-red-500"/><span className="text-[10px] text-slate-400">Expense</span></div>
+            </div>
+            {entries.length===0 ? <p className="text-slate-600 text-xs text-center py-8">Add transactions to see the chart</p> : (
+              <svg viewBox="0 0 760 160" width="100%" style={{overflow:'visible'}}>
+                {[0,0.5,1].map(f=>{
+                  const y=16+(160-16-36)*(1-f);
+                  const label=maxChart*f>=1e6?(maxChart*f/1e6).toFixed(1)+'M':maxChart*f>=1e3?(maxChart*f/1e3).toFixed(0)+'K':Math.round(maxChart*f).toString();
+                  return <g key={f}><line x1={32} x2={752} y1={y} y2={y} stroke="#1e293b" strokeWidth={1}/><text x={28} y={y+4} textAnchor="end" fontSize={8} fill={C.textMut}>{label}</text></g>;
+                })}
+                {monthData.map((d,i)=>{
+                  const bW=48; const cH=160-16-36; const bH_i=(d.income/maxChart)*cH; const bH_e=(d.expense/maxChart)*cH;
+                  const xBase=32+(i*(760-32)/12)+(760-32)/12/2;
+                  return <g key={i}>
+                    <rect x={xBase-bW/2} y={16+cH-bH_i} width={bW/2-1} height={Math.max(bH_i,0)} rx={2} fill="#10b981" opacity={0.85}/>
+                    <rect x={xBase+1} y={16+cH-bH_e} width={bW/2-1} height={Math.max(bH_e,0)} rx={2} fill="#ef4444" opacity={0.85}/>
+                    <text x={xBase} y={160-4} textAnchor="middle" fontSize={8} fill={C.textMut}>{d.label}</text>
+                  </g>;
+                })}
+                <line x1={32} x2={752} y1={16+160-16-36} y2={16+160-16-36} stroke="#334155" strokeWidth={1}/>
+              </svg>
+            )}
+          </div>
+
+          {/* Recent transactions */}
+          <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+            <p className="text-xs font-black text-slate-300 mb-4">Recent Transactions</p>
+            <EntryTable list={[...entries].sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()).slice(0,15)} showType/>
+          </div>
+        </>
+      )}
+
+      {/* Monthly view */}
+      {budgetView==='monthly'&&(
+        <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <p className="text-xs font-black text-slate-300">Monthly Breakdown</p>
+            <div className="flex gap-1">
+              {years.map(y=>(
+                <button key={y} onClick={()=>setChartYear(y)}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition border ${chartYear===y?'bg-white text-slate-900 border-white':'text-slate-400 border-slate-700 hover:border-slate-500 hover:text-white'}`}>
+                  {y}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead><tr className="border-b border-slate-800">
+                <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Month</th>
+                <th className="text-right text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Income</th>
+                <th className="text-right text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Expenses</th>
+                <th className="text-right text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2">Balance</th>
+              </tr></thead>
+              <tbody>
+                {MONTHS_FULL_B.map((m,i)=>{
+                  const d=monthData[i]; const bal=d.income-d.expense; const hasData=d.income>0||d.expense>0;
+                  return <tr key={m} className="border-b border-slate-800/50" style={{opacity:hasData?1:0.35}}>
+                    <td className="py-2 pr-4 font-semibold text-slate-300">{m}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums text-emerald-400 font-black">{d.income>0?fmtRs(d.income):'—'}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums text-red-400 font-black">{d.expense>0?fmtRs(d.expense):'—'}</td>
+                    <td className={`py-2 text-right tabular-nums font-black ${bal>=0?'text-blue-400':'text-red-400'}`}>{hasData?(bal<0?'−':'')+fmtRs(bal):'—'}</td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Yearly view */}
+      {budgetView==='yearly'&&(
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            {(()=>{const curY=new Date().getFullYear();const cur=yearlyData.find(r=>r.y===curY)||{inc:0,exp:0,bal:0};return[
+              {label:`${curY} Income`,val:fmtRs(cur.inc),cls:'text-emerald-400'},
+              {label:`${curY} Expenses`,val:fmtRs(cur.exp),cls:'text-red-400'},
+              {label:`${curY} Balance`,val:(cur.bal<0?'−':'')+fmtRs(cur.bal),cls:cur.bal>=0?'text-blue-400':'text-red-400'},
+            ];})().map(({label,val,cls})=>(
+              <div key={label} className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-4">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+                <p className={`text-lg font-black tabular-nums ${cls}`}>{val}</p>
+              </div>
+            ))}
+          </div>
+          <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
+            <p className="text-xs font-black text-slate-300 mb-4">Yearly Summary</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-slate-800">
+                  <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Year</th>
+                  <th className="text-right text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Income</th>
+                  <th className="text-right text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Expenses</th>
+                  <th className="text-right text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2">Balance</th>
+                </tr></thead>
+                <tbody>
+                  {yearlyData.map(r=>(
+                    <tr key={r.y} className="border-b border-slate-800/50">
+                      <td className="py-2 pr-4 font-black text-white">{r.y}{r.y===new Date().getFullYear()&&<span className="ml-2 text-[9px] text-blue-400 font-black">Current</span>}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums text-emerald-400 font-black">{fmtRs(r.inc)}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums text-red-400 font-black">{fmtRs(r.exp)}</td>
+                      <td className={`py-2 text-right tabular-nums font-black ${r.bal>=0?'text-blue-400':'text-red-400'}`}>{(r.bal<0?'−':'')+fmtRs(r.bal)}</td>
+                    </tr>
+                  ))}
+                  {yearlyData.length===0&&<tr><td colSpan={4} className="py-8 text-center text-slate-600">No data yet</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -957,9 +1256,9 @@ export default function AdminPage() {
         <aside className="w-56 bg-[#0d0d14] border-r border-slate-800/60 flex flex-col fixed h-full z-40">
           <div className="px-5 py-5 border-b border-slate-800/60"><div className="flex items-center gap-2.5"><DrivoLogo className="w-8 h-8"/><div><p className="font-black text-white text-base leading-tight">drivo</p><span className="text-[9px] text-red-400 font-black uppercase tracking-wider">Admin · Live</span></div></div></div>
           <nav className="flex-1 px-3 py-4 space-y-1">
-            {(['dashboard','partners','customers','vehicles','bookings','traffic'] as AdminTab[]).map(key=>{
-              const icons:Record<AdminTab,string> = {dashboard:'📊',partners:'🏪',customers:'🧳',vehicles:'🚗',bookings:'📋',traffic:'📈'};
-              const labels:Record<AdminTab,string> = {dashboard:'Dashboard',partners:'Partners',customers:'Customers',vehicles:'Vehicles',bookings:'Bookings',traffic:'Traffic'};
+            {(['dashboard','partners','customers','vehicles','bookings','traffic','budget'] as AdminTab[]).map(key=>{
+              const icons:Record<AdminTab,string> = {dashboard:'📊',partners:'🏪',customers:'🧳',vehicles:'🚗',bookings:'📋',traffic:'📈',budget:'💰'};
+              const labels:Record<AdminTab,string> = {dashboard:'Dashboard',partners:'Partners',customers:'Customers',vehicles:'Vehicles',bookings:'Bookings',traffic:'Traffic',budget:'Budget'};
               return (
                 <button key={key} onClick={()=>setTab(key)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition text-left ${tab===key?'bg-white text-slate-900':'text-slate-400 hover:bg-slate-800/60 hover:text-white'}`}>
                   <span>{icons[key]}</span>{labels[key]}
@@ -1175,6 +1474,13 @@ export default function AdminPage() {
           {tab==='traffic'&&(
             <div className="space-y-2">
               <InlineAnalytics />
+            </div>
+          )}
+
+          {/* ── BUDGET TAB ── */}
+          {tab==='budget'&&(
+            <div className="space-y-2">
+              <InlineBudget />
             </div>
           )}
         </main>
