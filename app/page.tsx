@@ -1549,7 +1549,7 @@ export default function Home() {
   const periodsCount = rentalPeriod === 'daily' ? days : rentalPeriod === 'weekly' ? Math.ceil(days / 7) : Math.ceil(days / 28);
   const base = periodInfo.price * periodsCount;
   const delFee = deliveryType === 'delivery' ? (selectedVehicle?.delivery_charge || 1500) : 0;
-  const driverFee = withDriver && selectedVehicle?.driver_charge ? selectedVehicle.driver_charge * days : 0;
+  const driverFee = driverWithOption === 'with_driver' && selectedVehicle?.driver_charge ? selectedVehicle.driver_charge * days : 0;
   const depositAmt = selectedVehicle ? ((selectedVehicle as any).deposit_amount || 0) : 0;
   const total = base + delFee + driverFee;
   const platformFeeAmt = Math.round(total * 0.10);
