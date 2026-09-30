@@ -182,7 +182,7 @@ function fmtRs(n: number) {
   return 'Rs. ' + Math.abs(n).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-interface BudgetEntry { id: string; desc: string; category: string; amount: number; type: 'income'|'expense'; date: string; }
+interface BudgetEntry { id: string; desc: string; category: string; amount: number; type: 'income'|'expense'; date: string; note?: string; }
 
 function InlineBudget() {
   const [entries, setEntries] = useState<BudgetEntry[]>([]);
@@ -191,6 +191,8 @@ function InlineBudget() {
   const [cat, setCat] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'income'|'expense'>('income');
+  const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
+  const [note, setNote] = useState('');
   const [incFilter, setIncFilter] = useState<'all'|'month'|'year'>('all');
   const [expFilter, setExpFilter] = useState<'all'|'month'|'year'>('all');
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
@@ -214,9 +216,10 @@ function InlineBudget() {
     e.preventDefault();
     const amt = parseFloat(amount);
     if (!desc.trim() || !amt || amt <= 0) { showToast('Description and valid amount required'); return; }
-    const entry: BudgetEntry = { id: Date.now().toString(36), desc: desc.trim(), category: cat.trim()||'General', amount: amt, type, date: new Date().toISOString() };
+    const dateVal = entryDate || new Date().toISOString().split('T')[0];
+    const entry: BudgetEntry = { id: Date.now().toString(36), desc: desc.trim(), category: cat.trim()||'General', amount: amt, type, date: new Date(dateVal + 'T12:00:00').toISOString(), note: note.trim()||undefined };
     save([...entries, entry]);
-    setDesc(''); setCat(''); setAmount('');
+    setDesc(''); setCat(''); setAmount(''); setNote(''); setEntryDate(new Date().toISOString().split('T')[0]);
     showToast(type === 'income' ? '✓ Income added' : '✓ Expense added');
   }
 
@@ -268,6 +271,7 @@ function InlineBudget() {
             <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Description</th>
             <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Category</th>
             {showType&&<th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Type</th>}
+            <th className="text-left text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2 pr-4">Note</th>
             <th className="text-right text-[10px] font-black text-slate-500 uppercase tracking-wide pb-2">Amount</th>
             <th className="w-8"></th>
           </tr></thead>
@@ -278,6 +282,7 @@ function InlineBudget() {
                 <td className="py-2 pr-4 text-slate-200">{e.desc}</td>
                 <td className="py-2 pr-4 text-slate-500">{e.category}</td>
                 {showType&&<td className="py-2 pr-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${e.type==='income'?'bg-emerald-900/50 text-emerald-400':'bg-red-900/40 text-red-400'}`}>{e.type==='income'?'Income':'Expense'}</span></td>}
+                <td className="py-2 pr-4 text-slate-500 italic max-w-[160px] truncate" title={e.note||''}>{e.note||<span className="text-slate-700">—</span>}</td>
                 <td className={`py-2 text-right font-black tabular-nums ${e.type==='income'?'text-emerald-400':'text-red-400'}`}>{e.type==='income'?'+':'−'} {fmtRs(e.amount)}</td>
                 <td className="py-2 text-center"><button onClick={()=>deleteEntry(e.id)} className="text-slate-600 hover:text-red-400 transition text-base leading-none">×</button></td>
               </tr>
@@ -323,15 +328,21 @@ function InlineBudget() {
       {/* Add form */}
       <div className="bg-[#0d0d14] border border-slate-800/60 rounded-2xl p-5">
         <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-4">Add Transaction</p>
-        <form onSubmit={addEntry} className="flex flex-wrap gap-2">
-          <input value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Description" className="flex-1 min-w-[140px] bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
-          <input value={cat} onChange={e=>setCat(e.target.value)} placeholder="Category" className="w-32 bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
-          <input value={amount} onChange={e=>setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="Amount (LKR)" className="w-36 bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
-          <select value={type} onChange={e=>setType(e.target.value as 'income'|'expense')} className="bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500">
-            <option value="income">Income</option>
-            <option value="expense">Expense</option>
-          </select>
-          <button type="submit" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition">Add</button>
+        <form onSubmit={addEntry} className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            <input value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Description *" className="flex-1 min-w-[140px] bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
+            <input value={cat} onChange={e=>setCat(e.target.value)} placeholder="Category" className="w-32 bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
+            <input value={amount} onChange={e=>setAmount(e.target.value)} type="number" min="0" step="0.01" placeholder="Amount (LKR) *" className="w-36 bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
+            <select value={type} onChange={e=>setType(e.target.value as 'income'|'expense')} className="bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500">
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+            <input value={entryDate} onChange={e=>setEntryDate(e.target.value)} type="date" className="bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 [color-scheme:dark]"/>
+          </div>
+          <div className="flex gap-2">
+            <input value={note} onChange={e=>setNote(e.target.value)} placeholder="Note (optional) — e.g. Invoice #123, bank ref, memo..." className="flex-1 bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 outline-none focus:border-slate-500 placeholder:text-slate-600"/>
+            <button type="submit" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl transition whitespace-nowrap">Add Entry</button>
+          </div>
         </form>
       </div>
 
